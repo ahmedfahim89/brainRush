@@ -176,6 +176,7 @@ Product Owner, 2026-10-04. Basis: `docs/sprint-plan.md` (Sprint 1), `docs/sprint
 Notes:
 - All 4 Minor bugs fixed and verified; no open Critical/Major bugs. DoD met.
 - New decision **D-17** recorded in the backlog: code must stay compatible with MySQL 8 **and** MariaDB 10.4 (XAMPP reference, phpMyAdmin) and PHP 8.0. Sprint 1 was verified on the reference environment (PHP 8.0.30, MariaDB 10.4.32). MySQL 8 was reviewed statically only (`utf8mb4_unicode_520_ci` and `VALUES()` exist there; `VALUES()` only raises a deprecation warning) — a MySQL 8 schema-load smoke test is a non-blocking follow-up.
+  - **Update 2026-10-04:** D-17 changed. The target database is MariaDB 10.4 only, so the MySQL 8 follow-up is closed as no longer needed.
 - Observations O-1..O-6 accepted as is; no backlog change needed.
 
 **Sprint 1: ACCEPTED.**

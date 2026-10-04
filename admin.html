@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BrainRush - Admin</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="admin">
+  <header class="page-header">
+    <h1>BrainRush <span class="subtitle">Admin</span></h1>
+    <nav><a class="nav-link" href="index.html">&larr; Back to the game</a></nav>
+  </header>
+
+  <p id="global-msg" class="msg" role="alert" hidden></p>
+
+  <main class="admin-grid">
+    <!-- Settings (US-18) -->
+    <section class="panel" id="settings-panel" aria-labelledby="settings-title">
+      <h2 id="settings-title">Game settings</h2>
+      <form id="settings-form" class="stack" novalidate>
+        <label for="setting-categories">Categories per game</label>
+        <input id="setting-categories" name="categories_per_game" type="number" min="1" max="10" step="1" required>
+        <label for="setting-timer">Default timer (seconds)</label>
+        <input id="setting-timer" name="timer_seconds" type="number" min="5" max="600" step="1" required>
+        <div class="actions">
+          <button type="submit" class="btn btn-primary">Save settings</button>
+        </div>
+      </form>
+      <p id="settings-msg" class="msg" role="status" aria-live="polite" hidden></p>
+    </section>
+
+    <!-- Point values (US-19) -->
+    <section class="panel" id="points-panel" aria-labelledby="points-title">
+      <h2 id="points-title">Point values <span class="hint">(board rows)</span></h2>
+      <form id="points-form" class="inline-form" novalidate>
+        <label for="point-new" class="visually-hidden">New point value</label>
+        <input id="point-new" type="number" min="1" max="1000000" step="1" placeholder="e.g. 1000" required>
+        <button type="submit" class="btn btn-primary">Add</button>
+      </form>
+      <p id="points-msg" class="msg" role="status" aria-live="polite" hidden></p>
+      <ul id="points-list" class="item-list"></ul>
+    </section>
+
+    <!-- Categories (US-20) -->
+    <section class="panel panel-wide" id="categories-panel" aria-labelledby="categories-title">
+      <h2 id="categories-title">Categories</h2>
+      <form id="category-form" class="inline-form" novalidate>
+        <label for="category-new" class="visually-hidden">New category name</label>
+        <input id="category-new" type="text" maxlength="100" placeholder="New category name" required>
+        <button type="submit" class="btn btn-primary">Add</button>
+      </form>
+      <p id="categories-msg" class="msg" role="status" aria-live="polite" hidden></p>
+      <p id="categories-summary" class="hint"></p>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th scope="col">Name</th><th scope="col">Questions</th><th scope="col">Status</th><th scope="col">Actions</th></tr>
+          </thead>
+          <tbody id="categories-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Questions (US-21) -->
+    <section class="panel panel-wide" id="questions-panel" aria-labelledby="questions-title">
+      <h2 id="questions-title">Questions</h2>
+
+      <form id="question-form" class="question-form" novalidate>
+        <h3 id="question-form-title">Add question</h3>
+        <div class="form-row">
+          <div class="field">
+            <label for="question-category">Category</label>
+            <select id="question-category" required></select>
+          </div>
+          <div class="field">
+            <label for="question-points">Points</label>
+            <select id="question-points" required></select>
+          </div>
+        </div>
+        <label for="question-text">Question</label>
+        <textarea id="question-text" rows="3" maxlength="5000" required></textarea>
+        <label for="question-answer">Answer</label>
+        <input id="question-answer" type="text" maxlength="5000" required>
+        <div class="actions">
+          <button type="submit" id="question-save" class="btn btn-primary">Add question</button>
+          <button type="button" id="question-cancel" class="btn" hidden>Cancel edit</button>
+        </div>
+      </form>
+      <p id="questions-msg" class="msg" role="status" aria-live="polite" hidden></p>
+
+      <div class="filter-row">
+        <label for="question-filter">Show questions of</label>
+        <select id="question-filter"></select>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th scope="col">Category</th><th scope="col">Points</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Actions</th></tr>
+          </thead>
+          <tbody id="questions-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Coverage grid (US-22) -->
+    <section class="panel panel-wide" id="coverage-panel" aria-labelledby="coverage-title">
+      <h2 id="coverage-title">Coverage</h2>
+      <p class="hint">Categories &times; point values. Click an empty slot to add its question, or a filled slot to edit it.</p>
+      <p class="legend">
+        <span class="slot slot-filled legend-swatch" aria-hidden="true">&#10003;</span> filled
+        <span class="slot slot-empty legend-swatch" aria-hidden="true">&ndash;</span> empty
+      </p>
+      <div class="table-wrap">
+        <table class="coverage-table" id="coverage-table"></table>
+      </div>
+    </section>
+  </main>
+
+  <script src="js/admin.js"></script>
+</body>
+</html>
