@@ -14,9 +14,9 @@ You are the **Senior Tester** of BrainRush. You verify; you never modify applica
 
 ## How to test
 1. **Static checks** (always): `php -l` on all PHP files (if PHP is installed); grep for `innerHTML` used with data, string-concatenated SQL, hard-coded board sizes (e.g. literal 5 categories or 100–500 lists in JS/PHP outside seed data), and credentials outside `api/config.php`; confirm `api/config.php` is in `.gitignore`.
-2. **API checks** (if PHP + MySQL available): start `php -S localhost:8000` from the project root in the background, exercise every endpoint with `curl` — happy paths, validation errors (400), duplicates (409), not found (404). Stop the server afterwards.
+2. **API checks** (if PHP + MariaDB available): start `php -S localhost:8000` from the project root in the background, exercise every endpoint with `curl` — happy paths, validation errors (400), duplicates (409), not found (404). Stop the server afterwards.
 3. **UI checks** (if the server runs): use the browser tools on `http://localhost:8000/` and `/admin.html`; walk through the sprint's acceptance criteria; check the console for JS errors.
-4. If PHP/MySQL are not installed, do the static checks plus careful code review against each acceptance criterion, and mark runtime checks as **PENDING (environment)** — do not mark them passed.
+4. If PHP/MariaDB are not installed, do the static checks plus careful code review against each acceptance criterion, and mark runtime checks as **PENDING (environment)** — do not mark them passed.
 
 ## Output
 Write `docs/sprints/sprint-N-test-report.md`:

@@ -179,7 +179,7 @@ As an admin, I want clear errors and navigation, so that I can work without gues
 
 ### US-24 Schema and seed (Must)
 As a developer/host, I want a schema with seed data, so that the game is playable immediately after install.
-- **Given** an empty MySQL, **when** `sql/schema.sql` is run, **then** database `brainrush` (utf8mb4) exists with tables settings, point_values, categories, questions; settings are categories_per_game=5, timer_seconds=30; point values 100–500; 6 categories (Geography, Science, History, Sports, Movies, Technology) each with 5 questions.
+- **Given** an empty MariaDB 10.4 server, **when** `sql/schema.sql` is run, **then** database `brainrush` (utf8mb4) exists with tables settings, point_values, categories, questions; settings are categories_per_game=5, timer_seconds=30; point values 100–500; 6 categories (Geography, Science, History, Sports, Movies, Technology) each with 5 questions.
 - **Given** the schema, **then** `questions` has unique key (category_id, points), FK to categories with ON DELETE CASCADE and FK to point_values(points) with ON DELETE RESTRICT.
 
 ### US-25 API endpoints and validation (Must)
@@ -233,4 +233,6 @@ Where the spec is silent or ambiguous, the PO chose the simplest party-game beha
 | D-14 | Category name | Non-empty after trimming, max 100 characters, unique case-insensitive (duplicate → 409). |
 | D-15 | New Game | Clears all saved state including names; settings are reloaded from the API. |
 | D-16 | Contestants mid-game | Adding/removing contestants after Start is not supported. |
-| D-17 | Target database / runtime | The target database is MySQL-compatible. The reference environment is XAMPP (MariaDB 10.4 + PHP 8.0, managed via phpMyAdmin). All SQL and PHP must stay compatible with **both MySQL 8 and MariaDB 10.4** and with **PHP 8.0** (no PHP 8.1+ features; no SQL syntax or collations missing on either server). Schema must be importable via phpMyAdmin as well as the `mysql` CLI. |
+| D-17 | Target database / runtime | The target database is **MariaDB 10.4** (MySQL 8 is no longer a target; changed 2026-10-04). The reference environment is XAMPP (MariaDB 10.4 + PHP 8.0, managed via phpMyAdmin). All SQL and PHP must stay compatible with **MariaDB 10.4** and **PHP 8.0** (no PHP 8.1+ features; no SQL syntax or collations missing on MariaDB 10.4). Schema must be importable via phpMyAdmin as well as the `mysql` CLI. |
+| D-18 | Admin deletes | Every admin delete (point value, category, question) asks for a plain-text confirm first; Cancel sends nothing. A confirmed delete of a used point value still reaches the API and shows the 409 inline (US-19). Admin conveniences that only prefill forms (e.g. clickable coverage cells) are allowed. Added 2026-10-04 (Sprint 2). |
+| D-19 | Admin layout | The admin page targets desktop/laptop widths (≥ 1024 px). Narrower widths may scroll tables horizontally inside their panel; mobile layout is out of scope. Messages and long unbroken names must not make the whole page scroll horizontally at ≥ 1024 px (follow-up for Sprint 2 O-5, fix with the Sprint 4 CSS work). Added 2026-10-04 (Sprint 2). |

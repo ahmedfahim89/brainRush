@@ -1,6 +1,6 @@
 # BrainRush — Sprint Plan
 
-Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..US-28, decisions D-01..D-16).
+Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..US-28, decisions D-01..D-19).
 Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops) -> product-owner accepts -> scrum-master updates status -> commit on branch `sprint-N` + PR to `main`.
 
 ---
@@ -65,7 +65,9 @@ Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops
 
 **Tester focus:** spec verification step 3 (add category, fill slots, duplicate -> 409, edit/delete, delete category); settings range errors; add 1000 -> new empty coverage column + category no longer playable; delete used point value blocked; all errors inline; no `innerHTML` with data; browser console free of JS errors.
 
-**Status:** In progress
+**Status:** Done
+
+**Outcome:** US-18, US-19, US-20, US-21, US-22, US-23 accepted by the Product Owner (see `docs/sprints/sprint-2-test-report.md`; 33/33 checks pass on PHP 8.0.30 / MariaDB 10.4, nothing PENDING). 1 fix loop (BUG-2-01, Minor cosmetic: category names wrapping mid-word at 1024 px; fixed and verified in re-test); no open Critical/Major/Minor bugs. No story carry-overs; two non-blocking follow-ups moved to Sprint 4: O-5 (long unbroken name in `.msg` causes horizontal page scroll) and O-4 (README note on `expose_php=Off`). New decisions: D-18 (every admin delete asks for a confirm; coverage cells may prefill forms), D-19 (admin targets desktop >= 1024 px; messages and long names must not make the page scroll horizontally).
 
 ---
 
@@ -110,9 +112,11 @@ Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops
 8. `css/style.css` — question screen large type, timer bar/red state, cell owner colors/grey, results/winner styles.
 9. Security sweep across `js/game.js` and `js/admin.js`: no `innerHTML` with data; XSS payload test strings render as text.
 10. `README.md` — final: full setup, how to play, admin usage, config/credentials and public-exposure warning kept.
-11. `docs/sprints/sprint-4-dev.md`.
+11. `css/style.css` — carry-over from Sprint 2 (O-5, D-19): add `overflow-wrap: anywhere` to `.msg` so a very long unbroken name in a success/error message no longer makes the admin page scroll horizontally at >= 1024 px.
+12. `README.md` — carry-over from Sprint 2 (O-4): add a hosting-hardening note recommending `expose_php=Off` (hides the `X-Powered-By: PHP/x.y.z` header). Part of the final README (task 10).
+13. `docs/sprints/sprint-4-dev.md`.
 
-**Tester focus:** spec verification step 4 end to end; timer at 20 s (from override), red third, beep, pause/resume/reset; wrong then correct scoring and button disabling; grey cell; End Game early and auto-offer on full board (incl. 6x6); results winner/tie/single contestant; refresh on board, mid-question and on results; corrupt localStorage; `<img src=x onerror=alert(1)>` in category/question/answer/name in game and admin; console free of errors; re-run any PENDING (environment) checks from Sprints 1–3 if PHP/MySQL now available.
+**Tester focus:** spec verification step 4 end to end; timer at 20 s (from override), red third, beep, pause/resume/reset; wrong then correct scoring and button disabling; grey cell; End Game early and auto-offer on full board (incl. 6x6); results winner/tie/single contestant; refresh on board, mid-question and on results; corrupt localStorage; `<img src=x onerror=alert(1)>` in category/question/answer/name in game and admin; console free of errors; re-check Sprint 2 O-5 in `admin.html` at 1024 px (add a 100-character unbroken category name: success message wraps, no horizontal page scroll; then delete it) and confirm the README mentions `expose_php=Off`; re-run any PENDING (environment) checks from Sprints 1–3 if PHP/MariaDB now available.
 
 **Status:** Planned
 

@@ -1,12 +1,12 @@
 # BrainRush
 
-Jeopardy-style trivia party game (HTML/CSS/JS + PHP + MySQL).
+Jeopardy-style trivia party game (HTML/CSS/JS + PHP + MariaDB).
 
 See `docs/spec.md`, `docs/product-backlog.md` and `docs/sprint-plan.md`. Game and admin pages arrive in later sprints; full usage instructions will be completed in Sprint 4.
 
 ## Setup
 
-1. **Install** PHP 8 (with the `pdo_mysql` extension enabled) and MySQL 8 or MariaDB.
+1. **Install** PHP 8 (with the `pdo_mysql` extension enabled) and MariaDB 10.4 (e.g. XAMPP).
 2. **Create the database** (creates `brainrush`, its tables and sample data — 6 categories x 5 questions):
    ```
    mysql -u root -p < sql/schema.sql

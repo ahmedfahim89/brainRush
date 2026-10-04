@@ -1,7 +1,7 @@
-# BrainRush — Trivia Board Game (PHP + MySQL)
+# BrainRush — Trivia Board Game (PHP + MariaDB)
 
 ## Context
-Greenfield project in `C:\Users\NB28970\Desktop\claude\BrainRush` (folder is empty). Build a Jeopardy-style party trivia game: a host runs the game on one screen, players/teams answer out loud, and the host awards or deducts points manually. Plus an admin page to manage categories and questions. Stack: HTML/CSS/vanilla JS front end, PHP (PDO) JSON API, MySQL. User will install PHP + MySQL locally before development (built-in `php -S` server is enough; XAMPP also works).
+Greenfield project in `C:\Users\NB28970\Desktop\claude\BrainRush` (folder is empty). Build a Jeopardy-style party trivia game: a host runs the game on one screen, players/teams answer out loud, and the host awards or deducts points manually. Plus an admin page to manage categories and questions. Stack: HTML/CSS/vanilla JS front end, PHP (PDO) JSON API, MariaDB 10.4. User will install PHP + MariaDB locally before development (built-in `php -S` server is enough; XAMPP also works).
 
 Decisions confirmed with user:
 - Admin manages categories; host picks N of them at game setup (N configurable, default 5).
@@ -17,7 +17,7 @@ The work is done by a simulated Scrum team, defined as project subagents in `Bra
 |---|---|---|---|---|
 | `product-owner.md` | **product-owner** | Owns BrainRush business rules (players/teams limits, dynamic board, one question per slot, scoring +/−, timer, cell coloring, winner/tie, admin rules). Turns this spec into a product backlog of user stories with acceptance criteria (Given/When/Then); answers rule questions from other agents; accepts/rejects sprint results against acceptance criteria. | Read, Write, Edit, Glob, Grep | `docs/product-backlog.md` |
 | `scrum-master.md` | **scrum-master** | Reads the backlog, splits it into ordered sprints with goals, story list, task breakdown, dependencies and Definition of Done; tracks status after each sprint. Does not write code. | Read, Write, Edit, Glob, Grep | `docs/sprint-plan.md` (status updated per sprint) |
-| `game-developer.md` | **game-developer** | Senior full-stack game developer (PHP 8 + PDO, MySQL, vanilla JS/HTML/CSS). Implements only the stories of the current sprint, following the architecture/security rules below (prepared statements, `textContent`, no hard-coded board size). Writes a short sprint dev note. | Read, Write, Edit, Glob, Grep, Bash | code + `docs/sprints/sprint-N-dev.md` |
+| `game-developer.md` | **game-developer** | Senior full-stack game developer (PHP 8 + PDO, MariaDB, vanilla JS/HTML/CSS). Implements only the stories of the current sprint, following the architecture/security rules below (prepared statements, `textContent`, no hard-coded board size). Writes a short sprint dev note. | Read, Write, Edit, Glob, Grep, Bash | code + `docs/sprints/sprint-N-dev.md` |
 | `game-tester.md` | **game-tester** | Senior QA. After each sprint, verifies every acceptance criterion: `php -l` on all PHP, API checks with `curl`, UI flows in the browser pane (setup limits, dynamic grid, timer, scoring, colors, refresh restore, results/tie, admin CRUD + 409s). Reports bugs with steps to reproduce; does not fix code. | Read, Glob, Grep, Bash, browser tools | `docs/sprints/sprint-N-test-report.md` |
 
 ### Workflow (I orchestrate)
@@ -35,7 +35,7 @@ The work is done by a simulated Scrum team, defined as project subagents in `Bra
 - Each sprint: branch `sprint-N` (from the previous sprint's branch), commit the sprint's code + dev note + test report with message `Sprint N: <sprint goal>` (+ Co-Authored-By trailer), push, and open a PR to `main` with `gh pr create` listing stories done and test results — so you review/merge (org policy: AI code is human-reviewed before merge).
 - I'll check `git ls-remote` first; if the remote repo already has commits I'll pull/rebase onto them rather than overwrite. Push uses your existing git credentials — if auth fails I'll stop and ask you to log in (`gh auth login`).
 
-Note: project agents are loaded at session start; if they aren't picked up right after creation, I'll either ask you to reload the session or run them as `general-purpose` agents with the agent file's prompt. Testing that needs PHP/MySQL waits until you've installed them — until then the tester runs static checks only and flags the rest as pending.
+Note: project agents are loaded at session start; if they aren't picked up right after creation, I'll either ask you to reload the session or run them as `general-purpose` agents with the agent file's prompt. Testing that needs PHP/MariaDB waits until you've installed them — until then the tester runs static checks only and flags the rest as pending.
 
 ## File structure
 ```
@@ -116,7 +116,7 @@ Screens toggled by JS (single page, state held in a JS object, also saved to `lo
 - `api/config.php` holds placeholder credentials only; README tells user to set their own. Admin is unprotected per user choice — note in README that it should not be exposed publicly.
 
 ## Verification
-1. Install PHP + MySQL, run `mysql -u root -p < sql/schema.sql`, set credentials in `api/config.php`.
+1. Install PHP + MariaDB 10.4 (e.g. XAMPP), run `mysql -u root -p < sql/schema.sql`, set credentials in `api/config.php`.
 2. Start server from project root: `php -S localhost:8000`.
 3. Admin (`http://localhost:8000/admin.html`): add a category, add questions for all slots, try a duplicate slot (expect 409 message), edit/delete a question, delete a category. Change settings to 6 categories / 20 s, add point value 1000 → coverage grid shows new empty column; fill it for 6 categories.
 4. Game (`http://localhost:8000/`): try 7 players / 5 teams (blocked), pick 6 categories → board is 6 × 6 with 100…1000; open a cell → timer counts down from 20 and beeps at 0; mark one wrong (−) and one correct (+) → cell takes the correct player's color; a cell with no correct answer turns grey; refresh mid-game (state restored); finish board → results show correct winner/tie.
