@@ -1,6 +1,7 @@
 <?php
 // BrainRush API helpers: PDO connection, JSON in/out, validation helpers,
-// and a generic error handler that never leaks DSN, credentials or traces.
+// admin protection for writes (require_admin), and a generic error handler
+// that never leaks DSN, credentials or traces. Include-only (blocked by .htaccess).
 
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
@@ -82,6 +83,18 @@ function read_json_body(): array
     return json_decode($raw, true);
 }
 
+/** Settings from api/config.php (loaded once), or null if missing/invalid. */
+function app_config(): ?array
+{
+    static $config = false;
+    if ($config === false) {
+        $configFile = __DIR__ . '/config.php';
+        $loaded = is_file($configFile) ? require $configFile : null;
+        $config = is_array($loaded) ? $loaded : null;
+    }
+    return $config;
+}
+
 /** Shared PDO connection (utf8mb4, exceptions, real prepared statements). */
 function db(): PDO
 {
@@ -90,9 +103,8 @@ function db(): PDO
         return $pdo;
     }
 
-    $configFile = __DIR__ . '/config.php';
-    $config = is_file($configFile) ? require $configFile : null;
-    if (!is_array($config)) {
+    $config = app_config();
+    if ($config === null) {
         error_log('BrainRush API: api/config.php is missing or invalid (copy api/config.example.php).');
         json_response(['error' => 'Server is not configured'], 500);
     }
@@ -168,4 +180,103 @@ function is_duplicate_key(PDOException $e): bool
 function is_foreign_key_error(PDOException $e): bool
 {
     return $e->getCode() === '23000' && in_array((int) ($e->errorInfo[1] ?? 0), [1451, 1452], true);
+}
+
+// ---------------------------------------------------------------------------
+// Admin protection for write requests (US-29 / D-20)
+// ---------------------------------------------------------------------------
+
+const ADMIN_REALM = 'BrainRush admin';
+
+/**
+ * Stop with 401/403 unless the caller may change content:
+ * - admin credentials configured -> HTTP Basic Auth must match them;
+ * - none configured -> only requests from this machine (loopback) are allowed.
+ * Call it before reading the body or touching the database.
+ */
+function require_admin(): void
+{
+    $denial = admin_denial();
+    if ($denial === null) {
+        return;
+    }
+    [$code, $message] = $denial;
+    if ($code === 401 && !headers_sent()) {
+        header('WWW-Authenticate: Basic realm="' . ADMIN_REALM . '", charset="UTF-8"');
+    }
+    json_response(['error' => $message], $code);
+}
+
+/** null if admin access is allowed, otherwise [http_status, human message]. */
+function admin_denial(): ?array
+{
+    $config = app_config() ?? [];
+    $user = (string) ($config['admin_user'] ?? '');
+    $hash = (string) ($config['admin_password_hash'] ?? '');
+
+    if ($user === '' && $hash === '') {
+        return is_local_request()
+            ? null
+            : [403, 'Admin changes are disabled: configure admin credentials in api/config.php (see docs/deploy-hostinger.md).'];
+    }
+    // Half-configured or a plain-text "hash": fail closed with a clear hint (no values logged).
+    if ($user === '' || empty(password_get_info($hash)['algo'])) {
+        error_log('BrainRush API: admin_user / admin_password_hash in api/config.php are incomplete or the hash is not password_hash() output.');
+        return [500, 'Admin login is not set up correctly on the server: check admin_user and admin_password_hash in api/config.php.'];
+    }
+
+    [$givenUser, $givenPassword] = request_basic_credentials();
+    if ($givenUser === null) {
+        return [401, 'Login required to change content.'];
+    }
+    // Both checks always run, so timing does not reveal whether the user name matched.
+    $userOk = hash_equals($user, $givenUser);
+    $passwordOk = password_verify($givenPassword, $hash);
+    return ($userOk && $passwordOk) ? null : [401, 'Login failed: wrong user name or password.'];
+}
+
+/**
+ * Basic Auth credentials of this request as [user, password], or [null, null].
+ * PHP fills PHP_AUTH_* under mod_php / php -S; CGI/FastCGI/LiteSpeed setups only
+ * see the raw header when .htaccess passes it on (HTTP_AUTHORIZATION, or
+ * REDIRECT_HTTP_AUTHORIZATION after an internal rewrite).
+ */
+function request_basic_credentials(): array
+{
+    if (isset($_SERVER['PHP_AUTH_USER']) && is_string($_SERVER['PHP_AUTH_USER'])) {
+        return [$_SERVER['PHP_AUTH_USER'], (string) ($_SERVER['PHP_AUTH_PW'] ?? '')];
+    }
+    foreach (['HTTP_AUTHORIZATION', 'REDIRECT_HTTP_AUTHORIZATION'] as $key) {
+        $header = (string) ($_SERVER[$key] ?? '');
+        if (!preg_match('/^\s*Basic\s+([A-Za-z0-9+\/]+=*)\s*$/i', $header, $m)) {
+            continue;
+        }
+        $decoded = base64_decode($m[1], true);
+        if ($decoded !== false && strpos($decoded, ':') !== false) {
+            return explode(':', $decoded, 2);
+        }
+    }
+    return [null, null];
+}
+
+/**
+ * True only for a request made on this machine: loopback REMOTE_ADDR, a local
+ * Host name and no proxy headers. The extra checks keep a site that sits behind a
+ * local reverse proxy (where every visitor appears as 127.0.0.1) closed.
+ * Forwarding headers are never trusted to grant access.
+ */
+function is_local_request(): bool
+{
+    $address = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+    if (!in_array($address, ['127.0.0.1', '::1', '::ffff:127.0.0.1'], true)) {
+        return false;
+    }
+    foreach (['HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'HTTP_FORWARDED'] as $proxyHeader) {
+        if (!empty($_SERVER[$proxyHeader])) {
+            return false;
+        }
+    }
+    $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+    $host = (string) preg_replace('/:\d+$/', '', $host);
+    return in_array($host, ['localhost', '127.0.0.1', '[::1]'], true);
 }

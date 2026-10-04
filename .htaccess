@@ -1,0 +1,49 @@
+# BrainRush - web server rules for the hosted deployment (US-29, D-20).
+# Works on Apache 2.4 (XAMPP) and LiteSpeed (Hostinger). Module-specific
+# directives sit inside <IfModule> so a missing module never causes a 500.
+# The PHP built-in server (php -S) ignores this file.
+
+# No directory listings.
+Options -Indexes
+
+# --- Pass the Authorization header to PHP (Basic Auth under CGI/FastCGI/LSAPI) ---
+<IfModule mod_version.c>
+  <IfVersion >= 2.4.13>
+    CGIPassAuth On
+  </IfVersion>
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Fallback for servers without CGIPassAuth (e.g. LiteSpeed): expose the header
+  # as HTTP_AUTHORIZATION (REDIRECT_HTTP_AUTHORIZATION after a rewrite).
+  RewriteCond %{HTTP:Authorization} .
+  RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+  # --- Force HTTPS, except on this computer (localhost / 127.0.0.1 / ::1) ---
+  # X-Forwarded-Proto only *skips* the redirect (TLS ended at a proxy/CDN); it never grants access.
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteCond %{HTTP_HOST} !^(localhost|127\.0\.0\.1|\[::1\])(:[0-9]+)?$ [NC]
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+  # --- Block private files and folders (403) ---
+  # Paths are relative to this folder, so this also works in a sub-folder install.
+  RewriteRule ^(sql|docs|\.claude)(/|$) - [F,L]
+  RewriteRule ^\.git - [F,L]
+  RewriteRule ^README\.md$ - [F,L]
+  RewriteRule ^api/(config[^/]*|db)\.php$ - [F,L]
+</IfModule>
+
+# Second line of defence (no mod_rewrite needed): never serve config/include-only
+# PHP files, Markdown, SQL dumps or git/htaccess files from any folder.
+<FilesMatch "^(config.*\.php|db\.php|.*\.md|.*\.sql|\.git.*|\.ht.*)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>

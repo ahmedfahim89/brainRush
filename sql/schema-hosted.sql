@@ -1,17 +1,15 @@
--- BrainRush schema + seed data
--- Run with: mysql -u root -p < sql/schema.sql
+-- BrainRush schema + seed data -- HOSTED variant (phpMyAdmin import, e.g. Hostinger)
+-- Import into an EXISTING, empty database: in phpMyAdmin select the database
+-- first, then Import this file. It has no CREATE DATABASE / USE statement
+-- because shared hosting creates the database (and its prefixed name) for you.
+--
+-- KEEP IN SYNC: the tables and seed data below must stay identical to
+-- sql/schema.sql (everything after its "USE brainrush;" line). Any schema change
+-- must update both files in the same sprint (US-29).
+--
 -- Safe to re-run: tables are only created if missing and seed rows use INSERT IGNORE,
 -- so existing data (including admin changes to settings) is never overwritten.
---
--- KEEP IN SYNC: sql/schema-hosted.sql (phpMyAdmin import on hosting) holds the same
--- tables and seed data without CREATE DATABASE / USE. Any schema change must update
--- both files in the same sprint (US-29).
-
-CREATE DATABASE IF NOT EXISTS brainrush
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_520_ci;
-
-USE brainrush;
+-- Standard SQL for MariaDB 10.4 and newer (10.6 / 10.11 / 11.x).
 
 -- Key/value game settings (categories_per_game, timer_seconds)
 CREATE TABLE IF NOT EXISTS settings (

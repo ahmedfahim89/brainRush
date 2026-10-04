@@ -4,6 +4,7 @@
 // POST   /api/categories.php             body { name } -> 201 created category
 // PUT    /api/categories.php?id=<id>     body { name } -> 200 renamed category
 // DELETE /api/categories.php?id=<id>     -> 200 (its questions are deleted by FK cascade)
+// Writes need admin access (require_admin: 401/403 otherwise).
 require_once __DIR__ . '/db.php';
 
 const CATEGORY_NAME_MAX = 100;
@@ -99,17 +100,20 @@ switch ($_SERVER['REQUEST_METHOD']) {
         break;
 
     case 'POST':
+        require_admin();
         $body = read_json_body();
         create_category(db(), $body);
         break;
 
     case 'PUT':
+        require_admin();
         $id = require_query_id();
         $body = read_json_body();
         rename_category(db(), $id, $body);
         break;
 
     case 'DELETE':
+        require_admin();
         $id = require_query_id();
         delete_category(db(), $id);
         break;
