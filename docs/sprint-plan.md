@@ -16,7 +16,7 @@ Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops
 7. Developer note written (`docs/sprints/sprint-N-dev.md`).
 8. Product Owner accepted the sprint's stories.
 
-**Environment note:** PHP and MySQL are **not yet installed** on this machine. Until they are, the tester performs static checks only (code review against criteria, grep for `innerHTML`/string-concatenated SQL, file structure, `.gitignore`). Runtime checks (`php -l`, `mysql < sql/schema.sql`, `curl` API calls, browser flows against `php -S localhost:8000`) are reported as **PENDING (environment)** and do not count as failures. A story whose criteria are only statically verified may be accepted provisionally by the PO; all PENDING checks must be re-run once PHP + MySQL are installed, before the final PR merge.
+**Environment note (updated after Sprint 1):** The environment is now available: XAMPP with PHP 8.0.30 (`C:/xampp/php/php.exe`) and MariaDB 10.4 (managed via phpMyAdmin). Runtime checks (`php -l`, loading `sql/schema.sql`, `curl` API calls, browser flows against `php -S localhost:8000`) are therefore **no longer PENDING** for future sprints; the tester must run them. Any check from earlier sprints still marked PENDING (environment) must be re-run and closed before the final PR merge. **Compatibility constraint (backlog D-17):** all code must stay PHP 8.0 and MariaDB 10.4 compatible (no PHP 8.1+ features such as enums, readonly properties or `never`; no SQL syntax unsupported by MariaDB 10.4).
 
 ---
 
@@ -39,7 +39,9 @@ Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops
 
 **Tester focus:** `php -l` on all `api/*.php`; schema keys/FKs/seed counts; every endpoint's status codes (200/201/400/404/405/409/500); `playable=1` after adding a point value; board payload shape and order; SQL-injection string stored literally; no credentials/trace in error responses; `config.php` not tracked.
 
-**Status:** Planned
+**Status:** Done
+
+**Outcome:** US-24, US-25, US-26, US-28 accepted by the Product Owner (see `docs/sprints/sprint-1-test-report.md`). No carry-overs. Environment now available (XAMPP, PHP 8.0.30, MariaDB 10.4), so runtime checks are no longer PENDING from Sprint 2 onward; code must stay PHP 8.0 / MariaDB 10.4 compatible (D-17).
 
 ---
 
@@ -63,7 +65,7 @@ Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops
 
 **Tester focus:** spec verification step 3 (add category, fill slots, duplicate -> 409, edit/delete, delete category); settings range errors; add 1000 -> new empty coverage column + category no longer playable; delete used point value blocked; all errors inline; no `innerHTML` with data; browser console free of JS errors.
 
-**Status:** Planned
+**Status:** In progress
 
 ---
 
