@@ -115,6 +115,11 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 .msg-error { color: #ffd0d0; background: var(--danger-bg); border-left-color: var(--danger); }
 .msg-success { color: #c9f5dc; background: var(--success-bg); border-left-color: var(--success); }
 #global-msg { margin: 1rem 1.5rem 0; }
+.msg-warning { color: #fff1c2; background: rgba(245, 197, 24, 0.12); border-left-color: var(--gold); }
+/* Admin login notice (US-29): text + "Log in" button on one line */
+.auth-banner { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin: 1rem 1.5rem 0; }
+.auth-banner[hidden] { display: none; }
+.auth-banner .auth-text { flex: 1 1 20rem; min-width: 0; overflow-wrap: anywhere; }
 
 /* ---------- Admin layout ---------- */
 .admin-grid {

@@ -2,6 +2,7 @@
 // GET    /api/points.php          -> [{ id, points, question_count }] ascending
 // POST   /api/points.php          body { points } -> 201 created value
 // DELETE /api/points.php?id=<id>  -> 200; 409 if questions still use it
+// Writes need admin access (require_admin: 401/403 otherwise).
 require_once __DIR__ . '/db.php';
 
 const MIN_POINTS = 1;
@@ -77,10 +78,12 @@ switch ($_SERVER['REQUEST_METHOD']) {
         break;
 
     case 'POST':
+        require_admin();
         create_point_value(db(), read_json_body());
         break;
 
     case 'DELETE':
+        require_admin();
         $id = require_query_id();
         delete_point_value(db(), $id);
         break;

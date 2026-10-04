@@ -20,6 +20,9 @@
   const byId = (id) => document.getElementById(id);
   const dom = {
     globalMsg: byId('global-msg'),
+    authBanner: byId('auth-banner'),
+    authText: byId('auth-text'),
+    authRetry: byId('auth-retry'),
     settingsForm: byId('settings-form'),
     settingCategories: byId('setting-categories'),
     settingTimer: byId('setting-timer'),
@@ -83,6 +86,13 @@
     }
   }
 
+  /** Readable text for an error response without a JSON `error` (e.g. a web-server error page). */
+  function fallbackErrorText(status) {
+    if (status === 401) return 'Login required to change content.';
+    if (status === 403) return 'Access denied: changes are not allowed here.';
+    return 'Request failed (HTTP ' + status + ').';
+  }
+
   /** Call the JSON API. Resolves with the parsed body; rejects with ApiError carrying the API's `error` text. */
   async function api(path, method, body) {
     const init = { method: method || 'GET', headers: { Accept: 'application/json' } };
@@ -105,7 +115,7 @@
     if (!response.ok) {
       const message = data && typeof data.error === 'string' && data.error
         ? data.error
-        : 'Request failed (HTTP ' + response.status + ').';
+        : fallbackErrorText(response.status);
       throw new ApiError(message, response.status);
     }
     if (data === null) {
@@ -140,16 +150,20 @@
   /**
    * Run an API action for a panel: clears the panel message, disables the given
    * buttons while busy and shows any error inline. On 404/409 the data is reloaded,
-   * because the page was probably showing stale data.
+   * because the page was probably showing stale data. 401/403 also update the
+   * login notice; a successful change proves the login works, so it is hidden.
    */
   async function runAction(msgNode, buttons, action) {
     clearMessage(msgNode);
     buttons.forEach((b) => { b.disabled = true; });
     try {
       await action();
+      hideAuthProblem();
     } catch (err) {
       showError(msgNode, errorText(err));
-      if (err instanceof ApiError && (err.status === 404 || err.status === 409)) {
+      if (isAuthError(err)) {
+        showAuthProblem(err);
+      } else if (err instanceof ApiError && (err.status === 404 || err.status === 409)) {
         refreshData().catch(() => {});
       }
     } finally {
@@ -172,6 +186,50 @@
   function ensureArray(data, what) {
     if (!Array.isArray(data)) throw new ApiError('The server sent an unexpected ' + what + ' list.', 200);
     return data;
+  }
+
+  // ---------- Admin login (US-29) ----------
+  // Reading is always allowed; changes need the admin login (or this computer when
+  // no login is configured). The browser shows its own login prompt on a 401 and
+  // then re-sends the login with every later API request.
+
+  function isAuthError(err) {
+    return err instanceof ApiError && (err.status === 401 || err.status === 403);
+  }
+
+  /** Show the login notice for a failed check or change; the page stays usable read-only. */
+  function showAuthProblem(err) {
+    let text;
+    if (isAuthError(err) && err.status === 401) {
+      text = errorText(err) + ' You can still browse the content. Click "Log in" (or save a change) to enter the admin user name and password.';
+      dom.authRetry.textContent = 'Log in';
+    } else if (isAuthError(err)) {
+      text = errorText(err) + ' You can still browse the content.';
+      dom.authRetry.textContent = 'Check again';
+    } else {
+      text = 'Could not check the admin login: ' + errorText(err);
+      dom.authRetry.textContent = 'Try again';
+    }
+    dom.authText.textContent = text;
+    dom.authBanner.hidden = false;
+  }
+
+  function hideAuthProblem() {
+    dom.authBanner.hidden = true;
+    dom.authText.textContent = '';
+  }
+
+  /** Ask the API whether changes are allowed; a 401 makes the browser show its login prompt. */
+  async function checkAuth() {
+    dom.authRetry.disabled = true;
+    try {
+      await api('auth.php');
+      hideAuthProblem();
+    } catch (err) {
+      showAuthProblem(err);
+    } finally {
+      dom.authRetry.disabled = false;
+    }
   }
 
   // ---------- Data loading ----------
@@ -724,12 +782,14 @@
     dom.qCancel.addEventListener('click', cancelEdit);
     dom.qCategory.addEventListener('change', () => renderPointOptions());
     dom.qFilter.addEventListener('change', onFilterChange);
+    dom.authRetry.addEventListener('click', checkAuth);
   }
 
   async function init() {
     bindEvents();
     setFormMode();
     renderAll();
+    checkAuth(); // up front, so a protected site asks for the login before any edit
     loadSettings();
     try {
       await refreshData();

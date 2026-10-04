@@ -5,6 +5,7 @@
 // POST   /api/questions.php                          body { category_id, points, question, answer } -> 201
 // PUT    /api/questions.php?id=<id>                  body: any of the POST fields -> 200
 // DELETE /api/questions.php?id=<id>                  -> 200
+// Writes need admin access (require_admin: 401/403 otherwise).
 require_once __DIR__ . '/db.php';
 
 const QUESTION_TEXT_MAX = 5000;
@@ -227,17 +228,20 @@ switch ($_SERVER['REQUEST_METHOD']) {
         break;
 
     case 'POST':
+        require_admin();
         $body = read_json_body();
         create_question(db(), $body);
         break;
 
     case 'PUT':
+        require_admin();
         $id = require_query_id();
         $body = read_json_body();
         update_question(db(), $id, $body);
         break;
 
     case 'DELETE':
+        require_admin();
         $id = require_query_id();
         delete_question(db(), $id);
         break;

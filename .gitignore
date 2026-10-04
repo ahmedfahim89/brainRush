@@ -3,3 +3,4 @@ api/config.php
 Thumbs.db
 *.log
 .claude/settings.local.json
+/password.txt

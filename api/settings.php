@@ -1,6 +1,7 @@
 <?php
 // GET  /api/settings.php  -> { categories_per_game, timer_seconds }
 // PUT  /api/settings.php  body { categories_per_game?, timer_seconds? } -> updated settings
+// Writes need admin access (require_admin: 401/403 otherwise).
 require_once __DIR__ . '/db.php';
 
 // Editable settings and their allowed integer range (values themselves live in the DB).
@@ -46,6 +47,7 @@ switch ($_SERVER['REQUEST_METHOD']) {
         break;
 
     case 'PUT':
+        require_admin();
         $updates = validate_settings(read_json_body());
         $pdo = db();
         $stmt = $pdo->prepare(

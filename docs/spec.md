@@ -8,7 +8,7 @@ Decisions confirmed with user:
 - **Nothing hard-coded about board size**: number of categories, the list of point values (e.g. 100…500 today, 100…10000 tomorrow) and the timer length are all configuration stored in the DB and editable in admin.
 - Exactly **one question per category + point value slot** (enforced by DB unique key).
 - Each player/team gets a color; an answered cell is filled with the color of whoever answered it correctly.
-- Admin page is **not** password-protected.
+- ~~Admin page is **not** password-protected.~~ Changed 2026-10-04 (D-20): admin **write** operations are protected by HTTP Basic Auth when admin credentials are configured; otherwise writes are allowed only from localhost. See Security notes.
 
 ## Delivery team: 4 project agents
 The work is done by a simulated Scrum team, defined as project subagents in `BrainRush/.claude/agents/` (Markdown with frontmatter: `name`, `description`, `tools`, `model`, and a system prompt body). The product spec in the rest of this plan is the input to the Product Owner.
@@ -54,6 +54,9 @@ BrainRush/
   api/categories.php    # GET list (?playable=1 → only categories with every point value filled), POST, PUT, DELETE
   api/questions.php     # GET list (?category_id=), GET for board (?board=1&categories=1,2,...), POST, PUT, DELETE
   sql/schema.sql        # tables + sample seed data (5–6 categories × 5 questions)
+  sql/schema-hosted.sql # same tables + seed, no CREATE DATABASE/USE (phpMyAdmin import on hosting)
+  .htaccess             # HTTPS redirect, Authorization pass-through, access blocks (hosted deploy)
+  docs/deploy-hostinger.md # deployment guide (Hostinger shared hosting)
   README.md             # setup steps
 ```
 
@@ -113,7 +116,11 @@ Screens toggled by JS (single page, state held in a JS object, also saved to `lo
 
 ## Security notes
 - All SQL via prepared statements; all user text rendered with `textContent` (no `innerHTML` of data) to avoid XSS.
-- `api/config.php` holds placeholder credentials only; README tells user to set their own. Admin is unprotected per user choice — note in README that it should not be exposed publicly.
+- `api/config.php` is git-ignored and holds the real credentials; the committed `api/config.example.php` holds placeholders only (admin keys empty). README tells the user to copy it and set their own.
+- **Admin auth (D-20, changed 2026-10-04)**: write requests (POST/PUT/DELETE on `api/*.php`) require HTTP Basic Auth when admin credentials (username + `password_hash`) are configured in the git-ignored `api/config.php`. Missing/wrong credentials → 401 with a `WWW-Authenticate: Basic` challenge. When no admin credentials are configured, writes are allowed only from loopback (127.0.0.1 / ::1) with a local `Host` (`localhost` / `127.0.0.1` / `[::1]`) and no proxy/forwarding headers, otherwise 403 with a human-readable message — local play/dev works unchanged and a public deploy fails closed.
+- GET endpoints stay open because the game needs them. Known, accepted limitation: questions and answers are readable via the API by anyone who knows the URL (acceptable for a party game).
+- Hosted deployments (public staging on Hostinger shared hosting, redeployed after each sprint) must use HTTPS. `.htaccess` forces HTTPS on non-localhost hosts, passes the `Authorization` header to PHP, disables directory listing and blocks web access to `sql/`, `docs/`, `.claude/`, `README.md` and `api/config*.php`. Deployment steps in `docs/deploy-hostinger.md`; database imported via phpMyAdmin from `sql/schema-hosted.sql` (no `CREATE DATABASE`/`USE`, kept in sync with `sql/schema.sql`).
+- README describes local setup, admin credential setup and links the deployment guide.
 
 ## Verification
 1. Install PHP + MariaDB 10.4 (e.g. XAMPP), run `mysql -u root -p < sql/schema.sql`, set credentials in `api/config.php`.

@@ -13,6 +13,11 @@
   </header>
 
   <p id="global-msg" class="msg" role="alert" hidden></p>
+  <!-- Admin login notice (US-29): shown when changes need a login or are disabled -->
+  <div id="auth-banner" class="msg msg-warning auth-banner" role="alert" hidden>
+    <span id="auth-text" class="auth-text"></span>
+    <button type="button" id="auth-retry" class="btn btn-small btn-primary">Log in</button>
+  </div>
 
   <main class="admin-grid">
     <!-- Settings (US-18) -->
