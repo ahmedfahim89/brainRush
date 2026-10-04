@@ -233,3 +233,4 @@ Where the spec is silent or ambiguous, the PO chose the simplest party-game beha
 | D-14 | Category name | Non-empty after trimming, max 100 characters, unique case-insensitive (duplicate → 409). |
 | D-15 | New Game | Clears all saved state including names; settings are reloaded from the API. |
 | D-16 | Contestants mid-game | Adding/removing contestants after Start is not supported. |
+| D-17 | Target database / runtime | The target database is MySQL-compatible. The reference environment is XAMPP (MariaDB 10.4 + PHP 8.0, managed via phpMyAdmin). All SQL and PHP must stay compatible with **both MySQL 8 and MariaDB 10.4** and with **PHP 8.0** (no PHP 8.1+ features; no SQL syntax or collations missing on either server). Schema must be importable via phpMyAdmin as well as the `mysql` CLI. |
