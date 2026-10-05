@@ -91,7 +91,7 @@ Application bugs: 0 Critical, 0 Major, 0 Minor. No application code was modified
 | 47 | Security | `.htaccess` blocks `password.txt` (RewriteRule + FilesMatch) | PASS | `.htaccess:36` `RewriteRule ^password\.txt$ - [F,L]` and `.htaccess:43` FilesMatch list includes `password\.txt`. I read only `.htaccess`, never `password.txt`. |
 | 48 | Security | `docs/deploy-hostinger.md` lists `password.txt` as never uploaded and `.htaccess` as required | PASS | Table row "**`password.txt`** ... (never, under any name)", "Build the zip from the left column only", "**`.htaccess` must be uploaded**", Git deployment note that it is git-ignored, the `/password.txt` 403/404 smoke item, and the redeploy notes. |
 | 49 | Security | Apache (already on port 80): `/password.txt` and other private paths return 403, status only | PASS | `http://localhost/BrainRush/` is a separate checkout under `C:\xampp\htdocs\BrainRush` (branch `us-29-sprint2-record`, not this working tree) whose `.htaccess` is byte-identical to this one. Status-only `curl -s -o /dev/null -w "%{http_code}"`: `password.txt`, `PASSWORD.TXT`, `password.txt%20`, `api/../password.txt` (with `--path-as-is`), `README.md`, `sql/schema.sql`, `docs/spec.md`, `api/config.php`, `api/db.php`, `.git/config`, `css/` all 403; `index.html` 200. No response body was printed. |
-| 50 | Security | Hosted site `/password.txt` returns 403 or 404 | PENDING (hosted) | No hosted URL available. The owner runs it with the deploy guide's smoke test after the redeploy. |
+| 50 | Security | Hosted site `/password.txt` returns 403 or 404 | PENDING (hosted) → PASS (owner, 2026-10-05) | No hosted URL available. The owner runs it with the deploy guide's smoke test after the redeploy. Owner confirmed it on 2026-10-05; see "Owner follow-up". |
 | 51 | DoD | `php -l` passes on all PHP | PASS | 8 / 8 files. |
 | 52 | DoD | `api/config.php` and `password.txt` git-ignored and untracked | PASS | See Static checks. |
 | 53 | DoD | No hard-coded board size, points or timer; no credentials outside `api/config.php` | PASS | See Static checks. |
@@ -191,3 +191,10 @@ DoD met (rows 51-55; 0 open bugs; dev note present).
 - OBS-6 Apache serves an older checkout: FU-07 (Could). Environment: ENV-4-01 cleanup is FU-06.
 
 **Sprint 4 verdict: ACCEPTED (10 / 10 stories).** Open: FU-01 (hosted check) and FU-02 / FU-06 (owner actions).
+
+## Owner follow-up (2026-10-05)
+
+- **Row 50 / FU-01:** the owner ran the hosted `/password.txt` check after the redeploy and confirmed it is blocked. **PASS** (owner-confirmed). No Sprint 4 checks remain PENDING.
+- **FU-02:** won't do, by owner decision. `password.txt` stays in the project folder; it is git-ignored and blocked by `.htaccess` on Apache and the host, but the local `php -S` server still serves it.
+- **FU-07:** done. The owner updated the local XAMPP Apache checkout.
+- **FU-06:** MariaDB restarted and the leftover point value 1000 deleted; all 6 categories are playable again. The antivirus exclusion check is still open.
