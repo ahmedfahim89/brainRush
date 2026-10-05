@@ -224,6 +224,19 @@ As the owner, I want to deploy BrainRush to Hostinger shared hosting as a public
 
 ---
 
+## Story status
+
+| Sprint | Stories | Status |
+|---|---|---|
+| 1 | US-24, US-25, US-26, US-28 | Accepted |
+| 2 | US-18, US-19, US-20, US-21, US-22, US-23, US-29 | Accepted (US-29 hosted `/password.txt` check open, see FU-01) |
+| 3 | US-01, US-02, US-03, US-04, US-05, US-06, US-07, US-09 | Accepted |
+| 4 | US-08, US-10, US-11, US-12, US-13, US-14, US-15, US-16, US-17, US-27 | Accepted 2026-10-05 |
+
+All 29 stories accepted. Open items are listed under "Follow-ups after Sprint 4".
+
+---
+
 ## Decisions
 
 Where the spec is silent or ambiguous, the PO chose the simplest party-game behaviour:
@@ -254,3 +267,23 @@ Where the spec is silent or ambiguous, the PO chose the simplest party-game beha
 | D-22 | Contestant name length | Max **30 characters** after trimming, the same for players and teams. Enforced by the setup input (`maxlength`). A restored saved game with a longer name counts as invalid (Setup is shown, see US-17 corrupt-data rule). Added 2026-10-05 (Sprint 3). |
 | D-23 | When Start is disabled | Start is disabled outright, with a visible reason, only for blocks the host has to fix structurally: too many entries for the mode (D-07), not enough playable categories (D-11), setup data failed to load (retry offered), and while the Start request is running. Field errors (names, category count, timer) are checked on click, all shown at once inline, and focus moves to the first problem. Added 2026-10-05 (Sprint 3). |
 | D-24 | Setup form on refresh | Not saved. Refreshing during setup shows the defaults again (Players, one empty entry, timer from settings, current playable categories). Only a started game is saved (US-17). Added 2026-10-05 (Sprint 3). |
+| D-25 | Revealed answer on refresh | Once "Show Answer" was clicked, the answer stays shown after a refresh mid-question (the room has already seen it). Extends D-04. Added 2026-10-05 (Sprint 4). |
+| D-26 | End Game on a full board | The D-09 confirm applies only while unused cells remain. When every cell is used, both End Game buttons (board bar and the "all played" offer) go straight to Results. New Game on Results needs no confirm. Added 2026-10-05 (Sprint 4). |
+| D-27 | Ranks on Results | Equal scores share a rank (standard competition ranking: 1, 1, 3). Equal scores are listed in setup order. Winner/tie text follows D-10. Added 2026-10-05 (Sprint 4). |
+| D-28 | Saved-game versions | The saved game carries a `version`. A Sprint 3 (v1) save on the board is upgraded and restored; any other older or unknown version is discarded (Setup shown, US-17 corrupt-data rule). Any future change to the saved shape must bump the version and either migrate or discard safely. Added 2026-10-05 (Sprint 4). |
+| D-29 | Beep after refresh | Browsers block audio until the user interacts with the page. After a refresh mid-question with no click or key press, the beep at 0 may be silent. The visible "Time's up!" is the guaranteed signal. Accepted as a known limitation and documented in the README; no "enable sound" prompt. Added 2026-10-05 (Sprint 4). |
+| D-30 | Game screen layout | Targets laptop 1366x768 and projector 1920x1080. Never a horizontal scroll. Vertical scroll is acceptable on Setup (a form), for unusually long question/answer text, and while the "all played" offer is shown. Board + scoreboard should fit one 1366x768 screen up to 6 rows and 6 contestants (currently 22 px over, see FU-03). Added 2026-10-05 (Sprint 4). |
+
+---
+
+## Follow-ups after Sprint 4
+
+| ID | Item | Priority | Owner |
+|---|---|---|---|
+| FU-01 | Hosted smoke check after the Sprint 4 redeploy: `/password.txt` (and the other private paths in US-29) return 403 or 404, status only, never the content. Record the result in `docs/sprints/sprint-4-test-report.md`. The Sprint 4 redeploy is not done until this passes. If it ever returns 200, take the file off the host at once, change every credential in it, and report it per the Celfocus incident process. | Must | Owner |
+| FU-02 | Move `password.txt` out of the project folder. It is the web root, and `php -S` serves every file there (`.htaccess` only protects Apache and the host). | Must | Owner |
+| FU-03 | Make the 6x6 board + 6-contestant scoreboard fit 1366x768 with no page scroll (now 22 px over), per D-30. | Should | Developer |
+| FU-04 | Long question text: scale the question font down with text length so questions up to about 250 characters fit the question column at 1366x768. | Could | Developer |
+| FU-05 | Grey (unanswered) cells: use the same points-label size as owned cells. | Could | Developer |
+| FU-06 | Housekeeping before the next session: restart MariaDB, then delete the leftover point value 1000 (no questions) so categories are playable again; check the antivirus exclusion for `C:\xampp\mysql\data` (ENV-4-01, second InnoDB hang). | Must (environment) | Owner / Developer |
+| FU-07 | Local XAMPP Apache serves an older checkout (`C:\xampp\htdocs\BrainRush`); update it or point it at this repo before relying on it for end-to-end checks. | Could (environment) | Owner |
