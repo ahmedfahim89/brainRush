@@ -6,16 +6,85 @@
   <title>BrainRush</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body class="game">
   <header class="page-header">
     <h1>BrainRush</h1>
     <nav><a class="nav-link" href="admin.html">Admin</a></nav>
   </header>
 
-  <main class="placeholder">
-    <h2>The game board is coming soon</h2>
-    <p>Game setup and the board are being built in the next sprint.</p>
-    <p>Meanwhile you can manage settings, point values, categories and questions on the <a href="admin.html">Admin page</a>.</p>
+  <main class="game-main">
+    <!-- Setup (US-01..US-06) -->
+    <section id="screen-setup" class="screen setup" aria-labelledby="setup-title">
+      <h2 id="setup-title">New game</h2>
+      <div id="setup-load-msg" class="msg" role="alert" hidden></div>
+
+      <form id="setup-form" novalidate>
+        <fieldset class="setup-block">
+          <legend>Who is playing?</legend>
+          <div class="mode-toggle" role="radiogroup" aria-label="Play mode">
+            <label class="mode-option">
+              <input type="radio" name="mode" value="players" checked>
+              <span>Players <small id="mode-limit-players" class="mode-limit"></small></span>
+            </label>
+            <label class="mode-option">
+              <input type="radio" name="mode" value="teams">
+              <span>Teams <small id="mode-limit-teams" class="mode-limit"></small></span>
+            </label>
+          </div>
+          <p class="hint">Click a color circle to switch to the next free color.</p>
+          <ol id="entry-list" class="entry-list"></ol>
+          <p id="entry-limit-msg" class="msg msg-error" role="alert" hidden></p>
+          <button type="button" id="entry-add" class="btn">Add player</button>
+        </fieldset>
+
+        <fieldset class="setup-block">
+          <legend id="cat-legend">Select categories</legend>
+          <p id="cat-count" class="hint"></p>
+          <div id="cat-warning" class="msg msg-warning" role="alert" hidden></div>
+          <ul id="cat-list" class="cat-list"></ul>
+          <p id="cat-error" class="msg msg-error" role="alert" hidden></p>
+        </fieldset>
+
+        <fieldset class="setup-block">
+          <legend>Timer</legend>
+          <label for="timer-input">Seconds per question (this game only)</label>
+          <input id="timer-input" class="timer-input" type="number" min="5" max="600" step="1" aria-describedby="timer-error">
+          <p id="timer-error" class="field-error" hidden></p>
+        </fieldset>
+
+        <div class="actions start-row">
+          <button type="submit" id="start-btn" class="btn btn-primary btn-large" disabled>Start Game</button>
+        </div>
+        <p id="start-msg" class="msg msg-error" role="alert" hidden></p>
+      </form>
+    </section>
+
+    <!-- Board + scoreboard (US-07, US-09) -->
+    <section id="screen-board" class="screen" aria-labelledby="board-title" hidden>
+      <div class="board-bar">
+        <h2 id="board-title" class="visually-hidden">Game board</h2>
+        <p id="board-info" class="hint board-info"></p>
+        <button type="button" id="quit-btn" class="btn btn-small btn-danger">Quit to setup</button>
+      </div>
+      <div id="board" class="board"></div>
+      <p id="board-msg" class="msg" role="status" aria-live="polite" hidden></p>
+      <section class="scoreboard" aria-labelledby="scoreboard-title">
+        <h2 id="scoreboard-title" class="visually-hidden">Scoreboard</h2>
+        <ul id="scoreboard" class="scoreboard-list"></ul>
+      </section>
+    </section>
+
+    <!-- Question screen: built in Sprint 4 (US-11..US-14) -->
+    <section id="screen-question" class="screen shell" aria-labelledby="question-title" hidden>
+      <h2 id="question-title">Question</h2>
+    </section>
+
+    <!-- Results screen: built in Sprint 4 (US-15, US-16) -->
+    <section id="screen-results" class="screen shell" aria-labelledby="results-title" hidden>
+      <h2 id="results-title">Results</h2>
+    </section>
   </main>
+
+  <script src="js/game.js"></script>
 </body>
 </html>

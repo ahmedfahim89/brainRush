@@ -1,6 +1,6 @@
 # BrainRush — Sprint Plan
 
-Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..US-28, decisions D-01..D-19).
+Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..US-29, decisions D-01..D-24).
 Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops) -> product-owner accepts -> scrum-master updates status -> commit on branch `sprint-N` + PR to `main`.
 
 ---
@@ -91,7 +91,9 @@ Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops
 
 **Tester focus:** 7 players / 5 teams blocked; mode switch with 5–6 names; empty/duplicate names; color distinctness and cycling; exactly-N rule; not-enough-playable path; timer validation; 5x5 and 6x6 (with 1000) boards; 10000 label fits; manual +/- step; XSS name rendered as text; API failure on Start.
 
-**Status:** Planned
+**Status:** Done
+
+**Outcome:** US-01, US-02, US-03, US-04, US-05, US-06, US-07, US-09 accepted by the Product Owner (see `docs/sprints/sprint-3-test-report.md`; 44/44 checks pass on PHP 8.0.30 / MariaDB 10.4, nothing PENDING). 0 fix loops, 0 bugs. No story carry-overs; four non-blocking follow-ups (O-1..O-4) and one security item (`password.txt`) moved to Sprint 4. New decisions: D-21 (interim "Quit to setup" button, removed in Sprint 4), D-22 (contestant names max 30 characters), D-23 (when Start is disabled vs. errors on click), D-24 (setup form not saved on refresh). Environment incident: the local MariaDB crashed once and hung once during developer testing (restarted; crash dump at `C:\xampp\mysql\data\mysqld.dmp`); the tester did not reproduce it. If it recurs, check the dump and XAMPP MySQL error log before further sprint testing.
 
 ---
 
@@ -114,9 +116,14 @@ Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops
 10. `README.md` — final: full setup, how to play, admin usage, config/credentials and public-exposure warning kept.
 11. `css/style.css` — carry-over from Sprint 2 (O-5, D-19): add `overflow-wrap: anywhere` to `.msg` so a very long unbroken name in a success/error message no longer makes the admin page scroll horizontally at >= 1024 px.
 12. `README.md` — carry-over from Sprint 2 (O-4): add a hosting-hardening note recommending `expose_php=Off` (hides the `X-Powered-By: PHP/x.y.z` header). Part of the final README (task 10).
-13. `docs/sprints/sprint-4-dev.md`.
+13. `css/style.css` — carry-over from Sprint 3 (O-1, Could): remove the unused `--cols: 5; --digits: 3;` fallbacks from `.board` (JS always sets them inline); no hard-coded board values remain.
+14. `index.html` + `js/game.js` — carry-over from Sprint 3 (O-2, Must, US-10, D-21): remove the "Quit to setup" button and its handler once End Game and New Game exist; verify no remaining path discards a game without a confirm (End Game -> confirm -> Results -> New Game is the only way out).
+15. `js/game.js` — carry-over from Sprint 3 (O-3, Should, US-17, D-22): `loadState()` rejects a saved game with any contestant name empty after trimming or longer than 30 characters and shows Setup without a JS error.
+16. `.htaccess` — carry-over from Sprint 3 (security): `password.txt` in the project root (git-ignored, untracked) is not covered by the current `FilesMatch` (config*.php, db.php, *.md, *.sql, .git*, .ht*). Add a rule denying `*.txt` (or `password.txt` explicitly). Developer must not open or print the file.
+17. `docs/deploy-hostinger.md` — carry-over from Sprint 3 (security, US-29): document that `password.txt` (and any local credentials file) must never be uploaded to the host, and that `.htaccess` must be uploaded so the `*.txt` block is active.
+18. `docs/sprints/sprint-4-dev.md`.
 
-**Tester focus:** spec verification step 4 end to end; timer at 20 s (from override), red third, beep, pause/resume/reset; wrong then correct scoring and button disabling; grey cell; End Game early and auto-offer on full board (incl. 6x6); results winner/tie/single contestant; refresh on board, mid-question and on results; corrupt localStorage; `<img src=x onerror=alert(1)>` in category/question/answer/name in game and admin; console free of errors; re-check Sprint 2 O-5 in `admin.html` at 1024 px (add a 100-character unbroken category name: success message wraps, no horizontal page scroll; then delete it) and confirm the README mentions `expose_php=Off`; re-run any PENDING (environment) checks from Sprints 1–3 if PHP/MariaDB now available.
+**Tester focus:** spec verification step 4 end to end; timer at 20 s (from override), red third, beep, pause/resume/reset; wrong then correct scoring and button disabling; grey cell; End Game early and auto-offer on full board (incl. 6x6); results winner/tie/single contestant; refresh on board, mid-question and on results; corrupt localStorage; `<img src=x onerror=alert(1)>` in category/question/answer/name in game and admin; console free of errors; re-check Sprint 2 O-5 in `admin.html` at 1024 px (add a 100-character unbroken category name: success message wraps, no horizontal page scroll; then delete it) and confirm the README mentions `expose_php=Off`; re-run any PENDING (environment) checks from Sprints 1–3 if PHP/MariaDB now available. Sprint 3 carry-overs: O-1 `.board` in `css/style.css` has no `--cols`/`--digits` fallbacks and 5x5, 6x6 and 1-column boards still render correctly; O-2 no "Quit to setup" button anywhere, and every route out of a game (End Game, New Game, refresh) either asks for confirm or goes through Results; O-3 hand-edit localStorage with an empty/whitespace name and a 31-character name -> Setup shown, no console error (30 characters still restores); O-4 visual check of Setup, Board, Question and Results at 1366x768 and 1920x1080 (no clipping, no unintended scroll, labels readable); security: locally and on the hosted site `/password.txt` returns 403 or 404 (never the content; tester must not open the file), and `docs/deploy-hostinger.md` lists it as never uploaded. If the local MariaDB crashes or hangs again, record it in the test report (Sprint 3 incident, not reproduced so far).
 
 **Status:** Planned
 
@@ -131,4 +138,4 @@ Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops
 | 3 | US-01, US-02, US-03, US-04, US-05, US-06, US-07, US-09 |
 | 4 | US-08, US-10, US-11, US-12, US-13, US-14, US-15, US-16, US-17, US-27 |
 
-All 28 stories appear exactly once. Notes: US-17 (persistence) is placed in Sprint 4 because its criteria cover the question and results screens; Sprint 3 builds the save/load layer as an enabler. US-27 (XSS) is accepted in Sprint 4 once all UI exists, but DoD item 4 enforces `textContent` from Sprint 2 onward. US-26 is accepted in Sprint 1 where all SQL lives; DoD item 3 keeps it enforced later.
+US-01..US-28 appear exactly once. US-29 (hosted deployment with protected admin) was delivered outside the sprint flow (commit a0ae85c) and is not assigned to a sprint; Sprint 4 carries its follow-ups (`.htaccess` `*.txt` block, `docs/deploy-hostinger.md`, hosted smoke check). Notes: US-17 (persistence) is placed in Sprint 4 because its criteria cover the question and results screens; Sprint 3 builds the save/load layer as an enabler. US-27 (XSS) is accepted in Sprint 4 once all UI exists, but DoD item 4 enforces `textContent` from Sprint 2 onward. US-26 is accepted in Sprint 1 where all SQL lives; DoD item 3 keeps it enforced later.
