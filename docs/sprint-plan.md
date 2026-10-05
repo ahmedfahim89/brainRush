@@ -184,7 +184,7 @@ All sprints (1-5) are done. Sprint 5 (polish) added no stories. Full wording and
 | FU-02 | Must | Move `password.txt` out of the project folder (it is the web root; `php -S` serves it). | Won't do (owner decision 2026-10-05) |
 | FU-06 | Must (environment) | Before the next session: restart MariaDB, delete the leftover point value 1000 (no questions) so categories are playable again, check the antivirus exclusion for `C:\xampp\mysql\data` (ENV-4-01). | Done 2026-10-05 |
 | FU-07 | Could (environment) | Update or repoint the local XAMPP Apache checkout (`C:\xampp\htdocs\BrainRush`) before using it for end-to-end checks. | Done 2026-10-05 |
-| FU-09 | Could | Owner: quick visual check of a 6x6 board with 6 players, and of the Results screen with 6 contestants, in a real windowed 1366x768 browser. A small scroll is accepted (D-30); raise a follow-up only if labels or owner names are hard to read. | **Open** |
+| FU-09 | Could | Owner: quick visual check of a 6x6 board with 6 players, and of the Results screen with 6 contestants, in a real windowed 1366x768 browser. A small scroll is accepted (D-30); raise a follow-up only if labels or owner names are hard to read. | Done 2026-10-05 (passed) |
 
 **Developer polish**
 
@@ -195,4 +195,4 @@ All sprints (1-5) are done. Sprint 5 (polish) added no stories. Full wording and
 | FU-05 | Could | Grey (unanswered) cells use the same points-label size as owned cells. | Done 2026-10-05 (Sprint 5) |
 | FU-08 | Could | Results with 6 contestants fits 1366x768 with no page scroll (was 3 px over, existed before Sprint 5). Long-name ties may still scroll (D-30). Added by the PO. | Done 2026-10-05 (Sprint 5) |
 
-**Open items:** FU-09 (laptop visual check, Owner) only. It does not block acceptance and needs no developer work.
+**Open items:** none. All follow-ups FU-01..FU-09 are closed (FU-02 won't do, by owner decision).
