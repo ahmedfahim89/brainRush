@@ -59,29 +59,69 @@
       </form>
     </section>
 
-    <!-- Board + scoreboard (US-07, US-09) -->
+    <!-- Board + scoreboard (US-07, US-08, US-09, US-10) -->
     <section id="screen-board" class="screen" aria-labelledby="board-title" hidden>
       <div class="board-bar">
         <h2 id="board-title" class="visually-hidden">Game board</h2>
         <p id="board-info" class="hint board-info"></p>
-        <button type="button" id="quit-btn" class="btn btn-small btn-danger">Quit to setup</button>
+        <button type="button" id="end-btn" class="btn btn-end">End Game</button>
+      </div>
+      <!-- US-10 / D-01: shown when every cell of the board has been played -->
+      <div id="board-done" class="board-done" role="status" hidden>
+        <p id="board-done-text" class="board-done-text"></p>
+        <button type="button" id="board-done-btn" class="btn btn-primary btn-large">End Game and show results</button>
       </div>
       <div id="board" class="board"></div>
-      <p id="board-msg" class="msg" role="status" aria-live="polite" hidden></p>
       <section class="scoreboard" aria-labelledby="scoreboard-title">
         <h2 id="scoreboard-title" class="visually-hidden">Scoreboard</h2>
         <ul id="scoreboard" class="scoreboard-list"></ul>
       </section>
     </section>
 
-    <!-- Question screen: built in Sprint 4 (US-11..US-14) -->
-    <section id="screen-question" class="screen shell" aria-labelledby="question-title" hidden>
-      <h2 id="question-title">Question</h2>
+    <!-- Question screen (US-11, US-12, US-13, US-14) -->
+    <section id="screen-question" class="screen question" aria-labelledby="question-title" hidden>
+      <div class="question-layout">
+        <div class="question-main">
+          <h2 id="question-title" class="question-heading" tabindex="-1"></h2>
+          <p id="question-text" class="question-text"></p>
+
+          <div id="timer" class="timer" role="timer" aria-labelledby="timer-label">
+            <span id="timer-label" class="visually-hidden">Seconds left</span>
+            <span id="timer-value" class="timer-value"></span>
+            <div class="timer-track" aria-hidden="true"><div id="timer-bar" class="timer-bar"></div></div>
+            <div class="timer-controls">
+              <button type="button" id="timer-pause" class="btn">Pause</button>
+              <button type="button" id="timer-reset" class="btn">Reset</button>
+            </div>
+            <p id="timer-status" class="timer-status" aria-live="polite"></p>
+          </div>
+
+          <div class="answer-block">
+            <button type="button" id="answer-btn" class="btn btn-primary">Show Answer</button>
+            <p id="answer-text" class="answer-text" tabindex="-1" hidden>
+              <span class="answer-label">Answer</span>
+              <span id="answer-value"></span>
+            </p>
+          </div>
+        </div>
+
+        <section class="scoring" aria-labelledby="scoring-title">
+          <h3 id="scoring-title">Scoring</h3>
+          <p class="hint">Each player or team can be scored once. Only one can be correct.</p>
+          <ul id="score-rows" class="score-rows"></ul>
+          <button type="button" id="back-btn" class="btn btn-primary btn-large btn-block">Back to Board</button>
+        </section>
+      </div>
     </section>
 
-    <!-- Results screen: built in Sprint 4 (US-15, US-16) -->
-    <section id="screen-results" class="screen shell" aria-labelledby="results-title" hidden>
+    <!-- Results screen (US-15, US-16) -->
+    <section id="screen-results" class="screen results" aria-labelledby="results-title" hidden>
       <h2 id="results-title">Results</h2>
+      <p id="results-winner" class="results-winner"></p>
+      <ol id="results-list" class="results-list"></ol>
+      <div class="actions start-row">
+        <button type="button" id="new-game-btn" class="btn btn-primary btn-large">New Game</button>
+      </div>
     </section>
   </main>
 

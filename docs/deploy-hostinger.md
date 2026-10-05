@@ -59,7 +59,7 @@ Pick **one** of the two ways below. Either way, the files go into the domain's *
    Hostinger only deploys into an **empty** folder. Delete the default `default.php` / `index.php` placeholder from `public_html` first (File Manager).
 4. Click **Create**, then **Deploy**.
 
-Git deployment copies the **whole repository**, including `docs/`, `sql/`, `.claude/` and `README.md`. That is expected: `.htaccess` blocks web access to all of them (you will check this in step 7). `api/config.php` is not in the repository, so a deploy never creates or overwrites it.
+Git deployment copies the **whole repository**, including `docs/`, `sql/`, `.claude/` and `README.md`. That is expected: `.htaccess` blocks web access to all of them (you will check this in step 7). `api/config.php` and `password.txt` are git-ignored, so they are not in the repository and a deploy never creates, uploads or overwrites them. Keep it that way: never force-add (`git add -f`) a credentials file.
 
 ### Option B: File Manager or FTP
 
@@ -70,10 +70,12 @@ Upload only what the website needs. Keep the folder structure:
 | `.htaccess` (a hidden file; make sure your FTP client or File Manager shows hidden files) | `sql/` (import it through phpMyAdmin instead) |
 | `index.html`, `admin.html` | `docs/`, `.claude/`, `.git/`, `.gitignore`, `README.md` |
 | `css/` (whole folder) | **`api/config.php` from your computer** (it holds your *local* database settings; create a new one on the server in step 5) |
-| `js/` (whole folder) | |
+| `js/` (whole folder) | **`password.txt`**, and any other local file with passwords or notes (never, under any name) |
 | `api/` (all `.php` files: `auth.php`, `categories.php`, `config.example.php`, `db.php`, `points.php`, `questions.php`, `settings.php`) | |
 
-In hPanel, **Files → File Manager** can upload a `.zip` and extract it. Zip the files from the left column, upload the zip into `public_html`, extract it, then delete the zip.
+In hPanel, **Files → File Manager** can upload a `.zip` and extract it. Zip the files from the left column, upload the zip into `public_html`, extract it, then delete the zip. Build the zip from the left column only. Do **not** zip the whole project folder: that would pull in `password.txt` and your local `api/config.php`.
+
+**`.htaccess` must be uploaded.** It forces HTTPS and blocks `sql/`, `docs/`, `README.md`, `api/config*.php` and `password.txt`. Without it these blocks are not active. The `password.txt` rule is only a safety net in case such a file ever lands on the server by mistake. The real rule is that it is never uploaded. If you find one on the server, delete it in File Manager and change every password it contained.
 
 ## 5. Create `api/config.php` on the server
 
@@ -130,6 +132,7 @@ Do these checks in a normal browser window, replacing `your-domain.example`.
 - [ ] `https://your-domain.example/api/config.php`, `/api/config.example.php`, `/api/db.php`
 - [ ] `https://your-domain.example/docs/spec.md` and `/README.md` (Git deployment only; with Option B they do not exist → 404)
 - [ ] `https://your-domain.example/.claude/agents/game-developer.md` (Git deployment only)
+- [ ] `https://your-domain.example/password.txt` (403 from `.htaccess` if a file were there by mistake, otherwise 404; it must never show content)
 - [ ] `https://your-domain.example/css/` (directory listing disabled → 403)
 
 **Optional command-line checks** (any terminal with `curl`):
@@ -150,10 +153,11 @@ The database content and `api/config.php` belong to the live site. A redeploy on
 2. Back up the live content first (strongly recommended). In phpMyAdmin, select the database → **Export** → **Quick** → **Go**. Keep the `.sql` file somewhere private.
 3. Update the code:
    - **Git deployment:** hPanel → **Advanced → Git** → **Deploy**. You can also set up the auto-deploy webhook shown there. `api/config.php` is untouched because it is not in the repository.
-   - **File Manager/FTP:** upload the changed files from the list in step 4 and overwrite the old ones. **Never** upload or overwrite `api/config.php`, and never delete the whole `api/` folder.
+   - **File Manager/FTP:** upload the changed files from the list in step 4 and overwrite the old ones, including `.htaccess` whenever it changed. **Never** upload or overwrite `api/config.php`, never upload `password.txt` or other local credential files, and never delete the whole `api/` folder.
 4. Database changes: only if that sprint's dev note (`docs/sprints/sprint-N-dev.md`) says the schema changed.
    - **Do not** re-import `schema-hosted.sql` "just in case". It never overwrites existing rows, but it **re-adds any sample category or question you deleted**. It also cannot change existing tables. A schema change comes with its own instructions or migration script in the dev note.
-5. Open the site and press **Ctrl+F5** (hard refresh) so the browser loads the new JavaScript and CSS. Then repeat the quick checks: the game loads, admin asks for the login, a save works, and `/sql/schema.sql` is blocked.
+5. Open the site and press **Ctrl+F5** (hard refresh) so the browser loads the new JavaScript and CSS. Then repeat the quick checks: the game loads, admin asks for the login, a save works, and `/sql/schema.sql` and `/password.txt` are blocked (403/404).
+   A game that was running in a browser before the redeploy is restored if its saved data is still valid. Otherwise that browser simply shows a fresh setup.
 
 ## Troubleshooting
 

@@ -1,5 +1,5 @@
-// BrainRush game page: setup, dynamic board and scoreboard.
-// The question, timer, scoring and results screens are added in Sprint 4.
+// BrainRush game page: setup, dynamic board, question + timer, scoring, results
+// and localStorage persistence (survives a page refresh).
 // The page only uses GET endpoints, so it works on the hosted site without the admin login.
 // All API/user text is rendered with textContent / DOM APIs (never innerHTML).
 'use strict';
@@ -7,11 +7,15 @@
 (function () {
   const API_BASE = 'api/';
   const STORAGE_KEY = 'brainrush.game';
-  const STORAGE_VERSION = 1;
+  const STORAGE_VERSION = 2; // v2 adds used cells + open question; v1 (Sprint 3) saves are migrated
   const NAME_MAX = 30;
-  const MINUS = String.fromCharCode(0x2212); // typographic minus sign
-  const TIMES = String.fromCharCode(0x00d7); // multiplication sign
-  const DOT = String.fromCharCode(0x00b7);   // middle dot
+  const TIMER_TICK_MS = 100;
+  const MINUS = String.fromCharCode(0x2212);   // typographic minus sign
+  const TIMES = String.fromCharCode(0x00d7);   // multiplication sign
+  const DOT = String.fromCharCode(0x00b7);     // middle dot
+  const EN_DASH = String.fromCharCode(0x2013); // "Category – 300"
+  const CHECK = String.fromCharCode(0x2713);   // check mark
+  const CROSS = String.fromCharCode(0x2717);   // ballot x
 
   const MODES = {
     players: { limit: 6, title: 'Players', label: 'Player', one: 'player', many: 'players' },
@@ -32,12 +36,20 @@
   const SCREENS = ['setup', 'board', 'question', 'results'];
 
   // Central state. `setup` is the form being filled in (memory only);
-  // `game` is the running game and is saved to localStorage on every change.
+  // `game` is the running game and is saved to localStorage on every change:
+  //   { mode, contestants: [{id, name, color, score}], timerSeconds, points, categories,
+  //     used: { "<categoryId>:<points>": { owner: contestantId | null } },
+  //     current: null | { catId, points, marks: { "<contestantId>": "correct" | "wrong" }, answerShown } }
   const state = {
     screen: 'setup',
     setup: null,
     game: null,
   };
+
+  // Countdown of the open question (memory only; restarts at full length after a refresh, D-04).
+  const timer = { totalMs: 0, remainingMs: 0, endAt: 0, running: false, handle: null };
+  let audioCtx = null;
+  let scoringRows = []; // DOM references of the question screen's scoring rows
 
   let nextEntryKey = 1;
 
@@ -66,9 +78,27 @@
     startMsg: byId('start-msg'),
     boardInfo: byId('board-info'),
     board: byId('board'),
-    boardMsg: byId('board-msg'),
+    boardDone: byId('board-done'),
+    boardDoneText: byId('board-done-text'),
+    boardDoneBtn: byId('board-done-btn'),
+    endBtn: byId('end-btn'),
     scoreboard: byId('scoreboard'),
-    quitBtn: byId('quit-btn'),
+    qHeading: byId('question-title'),
+    qText: byId('question-text'),
+    timerBox: byId('timer'),
+    timerValue: byId('timer-value'),
+    timerBar: byId('timer-bar'),
+    timerPause: byId('timer-pause'),
+    timerReset: byId('timer-reset'),
+    timerStatus: byId('timer-status'),
+    answerBtn: byId('answer-btn'),
+    answerText: byId('answer-text'),
+    answerValue: byId('answer-value'),
+    scoreRows: byId('score-rows'),
+    backBtn: byId('back-btn'),
+    resultsWinner: byId('results-winner'),
+    resultsList: byId('results-list'),
+    newGameBtn: byId('new-game-btn'),
   };
 
   // ---------- Generic helpers ----------
@@ -159,9 +189,41 @@
     return { min: Number(dom.timerInput.min), max: Number(dom.timerInput.max) };
   }
 
-  // ---------- Persistence (saveState / loadState) ----------
-  // Only the running game is stored. Sprint 4 (US-17) extends restore to the
-  // question and results screens; the stored shape is versioned for that.
+  // ---------- Game helpers ----------
+
+  function cellKey(categoryId, points) {
+    return categoryId + ':' + points;
+  }
+
+  function findCategory(g, id) {
+    return g.categories.find((c) => c.id === id) || null;
+  }
+
+  function findContestant(g, id) {
+    return g.contestants.find((c) => c.id === id) || null;
+  }
+
+  function totalCells(g) {
+    return g.categories.length * g.points.length;
+  }
+
+  function usedCount(g) {
+    return Object.keys(g.used).length;
+  }
+
+  /** D-01: the board is done when all N x P cells are used, whatever its size. */
+  function allCellsUsed(g) {
+    return usedCount(g) >= totalCells(g);
+  }
+
+  /** Id (number) of the contestant marked Correct on the open question, or null. */
+  function correctContestantId(current) {
+    const key = Object.keys(current.marks).find((k) => current.marks[k] === 'correct');
+    return key === undefined ? null : Number(key);
+  }
+
+  // ---------- Persistence (saveState / loadState, US-17) ----------
+  // Only a started game is stored (D-24), together with the screen it is on.
 
   function saveState() {
     try {
@@ -189,14 +251,31 @@
     }
     if (raw === null) return null;
     try {
-      const saved = JSON.parse(raw);
-      if (saved && saved.version === STORAGE_VERSION && SCREENS.indexOf(saved.screen) > 0 && isValidGame(saved.game)) {
+      const saved = migrateSaved(JSON.parse(raw));
+      if (saved && SCREENS.indexOf(saved.screen) > 0 && isValidGame(saved.game) &&
+          isValidScreenFor(saved.screen, saved.game)) {
         return { screen: saved.screen, game: saved.game };
       }
     } catch (err) {
-      // invalid JSON: fall through and discard it
+      // invalid JSON (or any unexpected shape): fall through and discard it
     }
     clearSavedState();
+    return null;
+  }
+
+  /** Bring an older saved shape up to the current version; null when unknown. */
+  function migrateSaved(saved) {
+    if (!isPlainObject(saved)) return null;
+    if (saved.version === STORAGE_VERSION) return saved;
+    // Sprint 3 (v1) only saved games on the board, without used cells.
+    if (saved.version === 1 && saved.screen === 'board' && isPlainObject(saved.game) &&
+        !hasOwn(saved.game, 'used') && !hasOwn(saved.game, 'current')) {
+      return {
+        version: STORAGE_VERSION,
+        screen: 'board',
+        game: Object.assign({}, saved.game, { used: {}, current: null }),
+      };
+    }
     return null;
   }
 
@@ -212,18 +291,23 @@
     return value !== null && typeof value === 'object' && !Array.isArray(value);
   }
 
+  /** Contestants: 1..limit, unique ids/colors/names, names 1-30 chars after trimming (D-22), integer scores. */
   function isValidContestants(list, mode) {
     if (!Array.isArray(list) || list.length < 1 || list.length > mode.limit) return false;
     const ids = {};
     const colors = {};
+    const names = {};
     return list.every((c) => {
-      const ok = isPlainObject(c) && Number.isInteger(c.id) && !ids[c.id] &&
-        typeof c.name === 'string' && c.name.trim() !== '' &&
+      const name = isPlainObject(c) && typeof c.name === 'string' ? c.name.trim() : '';
+      const nameKey = 'n:' + name.toLowerCase();
+      const ok = name !== '' && name.length <= NAME_MAX && !names[nameKey] &&
+        Number.isInteger(c.id) && !ids[c.id] &&
         PALETTE.some((p) => p.value === c.color) && !colors[c.color] &&
         Number.isInteger(c.score);
       if (ok) {
         ids[c.id] = true;
         colors[c.color] = true;
+        names[nameKey] = true;
       }
       return ok;
     });
@@ -233,12 +317,52 @@
     if (!Array.isArray(points) || !points.length) return false;
     const ascending = points.every((p, i) => Number.isInteger(p) && p > 0 && (i === 0 || p > points[i - 1]));
     if (!ascending || !Array.isArray(categories) || !categories.length) return false;
-    return categories.every((c) => isPlainObject(c) && Number.isInteger(c.id) &&
-      typeof c.name === 'string' && isPlainObject(c.questions) &&
-      points.every((p) => {
-        const q = hasOwn(c.questions, String(p)) ? c.questions[String(p)] : null;
-        return isPlainObject(q) && typeof q.question === 'string' && typeof q.answer === 'string';
-      }));
+    const ids = {};
+    return categories.every((c) => {
+      const ok = isPlainObject(c) && Number.isInteger(c.id) && !ids[c.id] &&
+        typeof c.name === 'string' && isPlainObject(c.questions) &&
+        points.every((p) => {
+          const q = hasOwn(c.questions, String(p)) ? c.questions[String(p)] : null;
+          return isPlainObject(q) && typeof q.question === 'string' && typeof q.answer === 'string';
+        });
+      if (ok) ids[c.id] = true;
+      return ok;
+    });
+  }
+
+  /** "<categoryId>:<points>" naming a real cell of this board, in canonical form. */
+  function isBoardCellKey(key, g) {
+    const match = /^(\d+):(\d+)$/.exec(key);
+    if (!match) return false;
+    const category = findCategory(g, Number(match[1]));
+    const points = Number(match[2]);
+    return category !== null && g.points.indexOf(points) !== -1 && cellKey(category.id, points) === key;
+  }
+
+  /** Used cells: each key is a board cell; owner is null (grey) or a contestant id. */
+  function isValidUsed(used, g) {
+    return isPlainObject(used) && Object.keys(used).every((key) => {
+      const cell = used[key];
+      return isBoardCellKey(key, g) && isPlainObject(cell) &&
+        (cell.owner === null || (Number.isInteger(cell.owner) && findContestant(g, cell.owner) !== null));
+    });
+  }
+
+  /** Open question: an unused cell, marks only for real contestants, at most one Correct (US-14). */
+  function isValidCurrent(current, g) {
+    if (current === null) return true;
+    if (!isPlainObject(current) || !Number.isInteger(current.catId) || !Number.isInteger(current.points) ||
+        typeof current.answerShown !== 'boolean' || !isPlainObject(current.marks)) return false;
+    const key = cellKey(current.catId, current.points);
+    if (!isBoardCellKey(key, g) || hasOwn(g.used, key)) return false;
+    let correct = 0;
+    const marksOk = Object.keys(current.marks).every((id) => {
+      const value = current.marks[id];
+      if (value === 'correct') correct += 1;
+      return /^\d+$/.test(id) && findContestant(g, Number(id)) !== null && String(Number(id)) === id &&
+        (value === 'correct' || value === 'wrong');
+    });
+    return marksOk && correct <= 1;
   }
 
   function isValidGame(g) {
@@ -246,13 +370,20 @@
     const range = timerRange();
     return isValidContestants(g.contestants, MODES[g.mode]) &&
       Number.isInteger(g.timerSeconds) && g.timerSeconds >= range.min && g.timerSeconds <= range.max &&
-      isValidBoard(g.points, g.categories);
+      isValidBoard(g.points, g.categories) &&
+      isValidUsed(g.used, g) && isValidCurrent(g.current, g);
+  }
+
+  /** The question screen needs an open question; board and results must not have one. */
+  function isValidScreenFor(screen, g) {
+    return screen === 'question' ? g.current !== null : g.current === null;
   }
 
   // ---------- Screens ----------
 
   function showScreen(name) {
     state.screen = name;
+    if (name !== 'question') stopTimer();
     SCREENS.forEach((key) => { dom.screens[key].hidden = key !== name; });
     window.scrollTo(0, 0);
     saveState();
@@ -672,12 +803,14 @@
       timerSeconds: timerSeconds, // this game only; the admin setting is not changed
       points: board.points,
       categories: board.categories,
+      used: {},
+      current: null,
     };
     renderGame();
     showScreen('board'); // also saves the state
   }
 
-  // ---------- Board and scoreboard (US-07, US-09) ----------
+  // ---------- Board and scoreboard (US-07, US-08, US-09, US-10) ----------
 
   /** D-05: manual corrections step by the smallest point value of this game's board. */
   function scoreStep() {
@@ -687,8 +820,8 @@
   function renderGame() {
     renderBoardInfo();
     renderBoard();
+    renderBoardDone();
     renderScoreboard();
-    clearMessage(dom.boardMsg);
   }
 
   function renderBoardInfo() {
@@ -697,6 +830,7 @@
     dom.boardInfo.textContent = [
       plural(g.contestants.length, mode.one, mode.many),
       g.categories.length + ' ' + TIMES + ' ' + g.points.length + ' board',
+      'Played ' + usedCount(g) + ' of ' + totalCells(g),
       'Timer ' + g.timerSeconds + ' s',
       'Corrections ' + String.fromCharCode(0x00b1) + scoreStep(),
     ].join('  ' + DOT + '  ');
@@ -708,6 +842,7 @@
     clear(dom.board);
     // Grid columns = number of categories; label size derives from column width and digit count.
     dom.board.style.setProperty('--cols', String(g.categories.length));
+    dom.board.style.setProperty('--rows', String(g.points.length));
     dom.board.style.setProperty('--digits', String(digits));
     g.categories.forEach((c) => {
       dom.board.appendChild(h('div', { className: 'board-cat', title: c.name }, [
@@ -715,20 +850,60 @@
       ]));
     });
     g.points.forEach((p) => {
-      g.categories.forEach((c) => {
-        dom.board.appendChild(h('button', {
-          type: 'button',
-          className: 'board-cell',
-          'aria-label': c.name + ', ' + p + ' points',
-          onclick: onCellClick,
-        }, [h('span', { className: 'cell-points', text: String(p) })]));
-      });
+      g.categories.forEach((c) => dom.board.appendChild(renderCell(c, p)));
     });
   }
 
-  function onCellClick() {
-    // Opening a question is US-11 (Sprint 4).
-    showMessage(dom.boardMsg, 'Opening questions is coming in the next sprint.', 'warning');
+  /** One board cell: open (clickable) or used (disabled; owner color + name, or grey, US-08). */
+  function renderCell(category, points) {
+    const g = state.game;
+    const key = cellKey(category.id, points);
+    const label = h('span', { className: 'cell-points', text: String(points) });
+    if (!hasOwn(g.used, key)) {
+      return h('button', {
+        type: 'button',
+        className: 'board-cell',
+        'aria-label': category.name + ', ' + points + ' points',
+        onclick: () => openQuestion(category.id, points),
+      }, [label]);
+    }
+    const owner = g.used[key].owner === null ? null : findContestant(g, g.used[key].owner);
+    const cell = h('button', {
+      type: 'button',
+      className: 'board-cell is-used ' + (owner ? 'is-owned' : 'is-unanswered'),
+      disabled: true, // disabled buttons ignore clicks
+      'aria-label': category.name + ', ' + points + ' points, ' +
+        (owner ? 'won by ' + owner.name : 'no correct answer'),
+    }, [label, owner ? h('span', { className: 'cell-owner', text: owner.name }) : null]);
+    if (owner) {
+      const color = paletteEntry(owner.color);
+      cell.style.backgroundColor = color.value;
+      cell.style.color = color.ink;
+    }
+    return cell;
+  }
+
+  /** US-10 / D-01: prominent End Game offer once every cell is used. */
+  function renderBoardDone() {
+    const g = state.game;
+    const done = allCellsUsed(g);
+    dom.boardDone.hidden = !done;
+    dom.boardDoneText.textContent = done ? 'All ' + totalCells(g) + ' questions have been played.' : '';
+  }
+
+  /** End Game: confirm first while cells are still open (D-09); unused cells are ignored. */
+  function endGame() {
+    const g = state.game;
+    if (!g || state.screen !== 'board') return;
+    if (!allCellsUsed(g)) {
+      const left = totalCells(g) - usedCount(g);
+      const text = 'End the game now? ' + plural(left, 'question has', 'questions have') +
+        ' not been played and will be ignored.';
+      if (!window.confirm(text)) return;
+    }
+    renderResults();
+    showScreen('results');
+    dom.newGameBtn.focus();
   }
 
   function renderScoreboard() {
@@ -768,8 +943,280 @@
     });
   }
 
-  function quitGame() {
-    if (!window.confirm('Quit this game and go back to setup? The board and scores will be lost.')) return;
+  // ---------- Question screen (US-11, US-13, US-14) ----------
+
+  /** US-11: open an unused cell. Used cells are disabled, and this guard ignores them anyway. */
+  function openQuestion(categoryId, points) {
+    const g = state.game;
+    if (!g || state.screen !== 'board' || g.current || hasOwn(g.used, cellKey(categoryId, points))) return;
+    g.current = { catId: categoryId, points: points, marks: {}, answerShown: false };
+    showQuestion();
+  }
+
+  /** Render the open question and (re)start its timer at full length (also used on restore, D-04). */
+  function showQuestion() {
+    const g = state.game;
+    const cur = g.current;
+    const category = findCategory(g, cur.catId);
+    const q = category.questions[String(cur.points)];
+    dom.qHeading.textContent = category.name + ' ' + EN_DASH + ' ' + cur.points;
+    dom.qText.textContent = q.question;
+    dom.answerValue.textContent = q.answer;
+    renderAnswerState();
+    renderScoringRows();
+    showScreen('question'); // also saves the state
+    startTimer(g.timerSeconds);
+    dom.qHeading.focus();
+  }
+
+  function renderAnswerState() {
+    const shown = state.game.current.answerShown;
+    dom.answerBtn.hidden = shown;
+    dom.answerText.hidden = !shown;
+  }
+
+  function showAnswer() {
+    const cur = state.game && state.game.current;
+    if (!cur) return;
+    cur.answerShown = true;
+    renderAnswerState();
+    saveState();
+    dom.answerText.focus();
+  }
+
+  /** One row per contestant in their color with Correct (+p) / Wrong (-p). */
+  function renderScoringRows() {
+    const g = state.game;
+    const p = g.current.points;
+    clear(dom.scoreRows);
+    scoringRows = g.contestants.map((c) => {
+      const color = paletteEntry(c.color);
+      const name = h('span', { className: 'srow-name', text: c.name });
+      name.style.backgroundColor = color.value;
+      name.style.color = color.ink;
+      const ref = {
+        contestant: c,
+        score: h('span', { className: 'srow-score', text: formatScore(c.score) }),
+        status: h('span', { className: 'visually-hidden', 'aria-live': 'polite' }),
+        correct: h('button', {
+          type: 'button',
+          className: 'btn btn-correct',
+          text: CHECK + ' Correct (+' + p + ')',
+          'aria-label': 'Correct for ' + c.name + ', plus ' + p + ' points',
+          onclick: () => markContestant(c, 'correct'),
+        }),
+        wrong: h('button', {
+          type: 'button',
+          className: 'btn btn-wrong',
+          text: CROSS + ' Wrong (' + MINUS + p + ')',
+          'aria-label': 'Wrong for ' + c.name + ', minus ' + p + ' points',
+          onclick: () => markContestant(c, 'wrong'),
+        }),
+      };
+      ref.row = h('li', { className: 'srow' }, [name, ref.score, ref.status, ref.correct, ref.wrong]);
+      ref.row.style.borderLeftColor = color.value;
+      dom.scoreRows.appendChild(ref.row);
+      return ref;
+    });
+    updateScoringRows();
+  }
+
+  /** US-14 / D-08: once per contestant; a single Correct; Wrong stays open for unscored contestants. */
+  function updateScoringRows() {
+    const cur = state.game.current;
+    const someoneCorrect = correctContestantId(cur) !== null;
+    scoringRows.forEach((ref) => {
+      const key = String(ref.contestant.id);
+      const mark = hasOwn(cur.marks, key) ? cur.marks[key] : null;
+      ref.correct.disabled = mark !== null || someoneCorrect;
+      ref.wrong.disabled = mark !== null;
+      ref.correct.classList.toggle('is-chosen', mark === 'correct');
+      ref.wrong.classList.toggle('is-chosen', mark === 'wrong');
+      ref.row.classList.toggle('is-scored', mark !== null);
+      ref.score.textContent = formatScore(ref.contestant.score);
+      ref.status.textContent = mark === 'correct' ? ref.contestant.name + ' marked correct'
+        : mark === 'wrong' ? ref.contestant.name + ' marked wrong' : '';
+    });
+  }
+
+  /** Apply a Correct / Wrong mark. No undo inside a question (D-06): use the board's +/- buttons. */
+  function markContestant(contestant, result) {
+    const cur = state.game && state.game.current;
+    if (!cur) return;
+    const key = String(contestant.id);
+    if (hasOwn(cur.marks, key)) return;
+    if (result === 'correct' && correctContestantId(cur) !== null) return;
+    cur.marks[key] = result;
+    contestant.score += result === 'correct' ? cur.points : -cur.points;
+    updateScoringRows();
+    saveState();
+    focusNextScoringButton();
+  }
+
+  /** Keep keyboard focus on the scoring panel after the clicked button disables. */
+  function focusNextScoringButton() {
+    const next = dom.scoreRows.querySelector('button:not(:disabled)');
+    (next || dom.backBtn).focus();
+  }
+
+  /** US-13: stop the timer, mark the cell used (owner = the Correct contestant, else grey). */
+  function backToBoard() {
+    const g = state.game;
+    const cur = g && g.current;
+    if (!cur) return;
+    stopTimer();
+    g.used[cellKey(cur.catId, cur.points)] = { owner: correctContestantId(cur) };
+    g.current = null;
+    renderGame();
+    showScreen('board'); // also saves the state
+    if (allCellsUsed(g)) dom.boardDoneBtn.focus();
+  }
+
+  // ---------- Timer (US-12) ----------
+
+  function now() {
+    return window.performance && performance.now ? performance.now() : Date.now();
+  }
+
+  function startTimer(seconds) {
+    stopTimer();
+    timer.totalMs = seconds * 1000;
+    timer.remainingMs = timer.totalMs;
+    dom.timerStatus.textContent = '';
+    resumeTimer();
+  }
+
+  function resumeTimer() {
+    if (timer.running || timer.remainingMs <= 0) return;
+    timer.endAt = now() + timer.remainingMs;
+    timer.running = true;
+    timer.handle = window.setInterval(tickTimer, TIMER_TICK_MS);
+    renderTimer();
+  }
+
+  function pauseTimer() {
+    if (!timer.running) return;
+    timer.remainingMs = Math.max(0, timer.endAt - now());
+    stopTimer();
+    renderTimer();
+  }
+
+  function stopTimer() {
+    if (timer.handle !== null) window.clearInterval(timer.handle);
+    timer.handle = null;
+    timer.running = false;
+  }
+
+  /** Remaining time comes from the end timestamp, so throttled intervals never drift. */
+  function tickTimer() {
+    timer.remainingMs = Math.max(0, timer.endAt - now());
+    if (timer.remainingMs === 0) {
+      stopTimer(); // D-03: stop at 0, beep, nothing is auto-scored or closed
+      dom.timerStatus.textContent = "Time's up!";
+      beep();
+    }
+    renderTimer();
+  }
+
+  function renderTimer() {
+    const fraction = timer.totalMs > 0 ? timer.remainingMs / timer.totalMs : 0;
+    dom.timerValue.textContent = String(Math.ceil(timer.remainingMs / 1000));
+    dom.timerBar.style.transform = 'scaleX(' + fraction + ')';
+    dom.timerBox.classList.toggle('is-low', timer.remainingMs <= timer.totalMs / 3); // red in the last third
+    dom.timerPause.textContent = timer.running || timer.remainingMs <= 0 ? 'Pause' : 'Resume';
+    dom.timerPause.disabled = timer.remainingMs <= 0;
+  }
+
+  function onPauseClick() {
+    if (timer.running) pauseTimer();
+    else resumeTimer();
+  }
+
+  function onResetClick() {
+    if (state.game && state.game.current) startTimer(state.game.timerSeconds);
+  }
+
+  // ---------- Beep (Web Audio) ----------
+  // Browsers only allow audio after a user gesture, so the context is created/resumed
+  // on the first click or key press. After a refresh with no click yet, the beep is silent.
+
+  function unlockAudio() {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    try {
+      if (!audioCtx) audioCtx = new Ctx();
+      if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+    } catch (err) {
+      audioCtx = null; // audio unavailable: the timer still works silently
+    }
+  }
+
+  function beep() {
+    if (!audioCtx || audioCtx.state !== 'running') return;
+    try {
+      const t = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
+      gain.gain.setValueAtTime(0.25, t + 0.6);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + 0.85);
+    } catch (err) {
+      // ignore audio errors; the visual "Time's up!" is still shown
+    }
+  }
+
+  // ---------- Results (US-15, US-16) ----------
+
+  /** Score descending; equal scores keep the setup order. */
+  function rankedContestants(g) {
+    return g.contestants
+      .map((c, index) => ({ c: c, index: index }))
+      .sort((a, b) => (b.c.score - a.c.score) || (a.index - b.index))
+      .map((item) => item.c);
+  }
+
+  /** "X and Y" / "X, Y and Z" (D-10). */
+  function joinNames(names) {
+    if (names.length <= 1) return names.join('');
+    return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+  }
+
+  function renderResults() {
+    const ranked = rankedContestants(state.game);
+    const top = ranked[0].score;
+    const winners = ranked.filter((c) => c.score === top); // D-10: everyone on the top score
+    dom.resultsWinner.textContent = winners.length === 1
+      ? winners[0].name + ' wins!'
+      : "It's a tie between " + joinNames(winners.map((c) => c.name));
+    clear(dom.resultsList);
+    ranked.forEach((c) => {
+      const isWinner = c.score === top;
+      // Shared scores share a rank (1, 1, 3).
+      const rank = ranked.findIndex((other) => other.score === c.score) + 1;
+      const swatch = h('span', { className: 'result-swatch', 'aria-hidden': 'true' });
+      swatch.style.backgroundColor = paletteEntry(c.color).value;
+      const row = h('li', { className: 'result-row' + (isWinner ? ' is-winner' : '') }, [
+        h('span', { className: 'result-rank', text: rank + '.' }),
+        swatch,
+        h('span', { className: 'result-name', text: c.name }),
+        isWinner ? h('span', { className: 'result-badge', text: 'Winner' }) : null,
+        h('span', { className: 'result-score', text: formatScore(c.score) }),
+      ]);
+      row.style.borderLeftColor = paletteEntry(c.color).value;
+      dom.resultsList.appendChild(row);
+    });
+  }
+
+  /** US-16 / D-15: clear the saved game and show an empty Setup with settings reloaded. */
+  function newGame() {
+    stopTimer();
     state.game = null;
     clearSavedState();
     startSetup();
@@ -796,7 +1243,29 @@
     dom.entryAdd.addEventListener('click', addEntry);
     dom.modeInputs.forEach((input) => input.addEventListener('change', onModeChange));
     dom.timerInput.addEventListener('input', () => setTimerError(''));
-    dom.quitBtn.addEventListener('click', quitGame);
+    dom.endBtn.addEventListener('click', endGame);
+    dom.boardDoneBtn.addEventListener('click', endGame);
+    dom.answerBtn.addEventListener('click', showAnswer);
+    dom.timerPause.addEventListener('click', onPauseClick);
+    dom.timerReset.addEventListener('click', onResetClick);
+    dom.backBtn.addEventListener('click', backToBoard);
+    dom.newGameBtn.addEventListener('click', newGame);
+    // Audio may only start after a user gesture (see unlockAudio).
+    document.addEventListener('pointerdown', unlockAudio, true);
+    document.addEventListener('keydown', unlockAudio, true);
+  }
+
+  /** US-17: reopen the saved screen. An open question restarts its timer at full length (D-04). */
+  function restoreGame(saved) {
+    state.game = saved.game;
+    if (saved.screen === 'results') {
+      renderResults();
+      showScreen('results');
+      return;
+    }
+    renderGame();
+    if (saved.screen === 'question') showQuestion();
+    else showScreen('board');
   }
 
   function init() {
@@ -806,10 +1275,15 @@
     bindEvents();
     const saved = loadState();
     if (saved) {
-      state.game = saved.game;
-      renderGame();
-      showScreen('board'); // Sprint 4 restores the question and results screens too (US-17)
-      return;
+      try {
+        restoreGame(saved);
+        return;
+      } catch (err) {
+        // Validated data should never fail here; if it does, fall back to a clean Setup.
+        stopTimer();
+        state.game = null;
+        clearSavedState();
+      }
     }
     startSetup();
   }
