@@ -197,4 +197,4 @@ DoD met (rows 51-55; 0 open bugs; dev note present).
 - **Row 50 / FU-01:** the owner ran the hosted `/password.txt` check after the redeploy and confirmed it is blocked. **PASS** (owner-confirmed). No Sprint 4 checks remain PENDING.
 - **FU-02:** won't do, by owner decision. `password.txt` stays in the project folder; it is git-ignored and blocked by `.htaccess` on Apache and the host, but the local `php -S` server still serves it.
 - **FU-07:** done. The owner updated the local XAMPP Apache checkout.
-- **FU-06:** MariaDB restarted and the leftover point value 1000 deleted; all 6 categories are playable again. The antivirus exclusion check is still open.
+- **FU-06:** MariaDB restarted and the leftover point value 1000 deleted; all 6 categories are playable again. The antivirus exclusion for `C:\xampp\mysql\data` was checked by the owner (2026-10-05). Done.
