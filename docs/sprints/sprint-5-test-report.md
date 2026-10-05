@@ -153,3 +153,7 @@ New follow-ups in `docs/product-backlog.md`:
 
 - **OBS-8 and OBS-9:** both accepted as known limits. D-30 now says that on Results, long names that wrap the headline or the rows may cause a vertical scroll. Neither case is realistic, nothing is cut off, and there is no horizontal scroll. Fixing them would need headline scaling in JS, which isn't worth it. No new follow-up.
 - **Visual check:** the tester could not take screenshots. The developer's visual review and the tester's measurements (equal row heights) are enough for this one-line change. FU-09 now includes a look at the Results screen.
+
+### FU-09 (owner check, 2026-10-05)
+
+The owner checked a 6x6 board with 6 players and the Results screen with 6 contestants in a real windowed browser on a 1366x768 laptop: **PASS**. Labels and owner names are readable; no follow-up needed.
