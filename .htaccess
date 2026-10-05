@@ -33,12 +33,14 @@ Options -Indexes
   RewriteRule ^(sql|docs|\.claude)(/|$) - [F,L]
   RewriteRule ^\.git - [F,L]
   RewriteRule ^README\.md$ - [F,L]
+  RewriteRule ^password\.txt$ - [F,L]
   RewriteRule ^api/(config[^/]*|db)\.php$ - [F,L]
 </IfModule>
 
 # Second line of defence (no mod_rewrite needed): never serve config/include-only
-# PHP files, Markdown, SQL dumps or git/htaccess files from any folder.
-<FilesMatch "^(config.*\.php|db\.php|.*\.md|.*\.sql|\.git.*|\.ht.*)$">
+# PHP files, Markdown, SQL dumps, git/htaccess files or the local password.txt
+# from any folder.
+<FilesMatch "^(config.*\.php|db\.php|.*\.md|.*\.sql|\.git.*|\.ht.*|password\.txt)$">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>
