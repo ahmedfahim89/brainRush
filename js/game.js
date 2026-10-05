@@ -10,6 +10,8 @@
   const STORAGE_VERSION = 2; // v2 adds used cells + open question; v1 (Sprint 3) saves are migrated
   const NAME_MAX = 30;
   const TIMER_TICK_MS = 100;
+  const QUESTION_FULL_SIZE_CHARS = 150; // FU-04: longer questions get a smaller font
+  const QUESTION_MIN_SCALE = 0.5;
   const MINUS = String.fromCharCode(0x2212);   // typographic minus sign
   const TIMES = String.fromCharCode(0x00d7);   // multiplication sign
   const DOT = String.fromCharCode(0x00b7);     // middle dot
@@ -385,6 +387,7 @@
     state.screen = name;
     if (name !== 'question') stopTimer();
     SCREENS.forEach((key) => { dom.screens[key].hidden = key !== name; });
+    document.body.setAttribute('data-screen', name); // CSS: one-screen board layout (FU-03)
     window.scrollTo(0, 0);
     saveState();
   }
@@ -961,12 +964,23 @@
     const q = category.questions[String(cur.points)];
     dom.qHeading.textContent = category.name + ' ' + EN_DASH + ' ' + cur.points;
     dom.qText.textContent = q.question;
+    dom.qText.style.setProperty('--q-scale', String(questionScale(q.question)));
     dom.answerValue.textContent = q.answer;
     renderAnswerState();
     renderScoringRows();
     showScreen('question'); // also saves the state
     startTimer(g.timerSeconds);
     dom.qHeading.focus();
+  }
+
+  /**
+   * FU-04: font scale for the question text. Text area grows with length x font size squared,
+   * so past the threshold the size follows 1 / sqrt(length); short questions keep full size.
+   */
+  function questionScale(text) {
+    const length = text.trim().length;
+    if (length <= QUESTION_FULL_SIZE_CHARS) return 1;
+    return Math.max(QUESTION_MIN_SCALE, Math.sqrt(QUESTION_FULL_SIZE_CHARS / length));
   }
 
   function renderAnswerState() {

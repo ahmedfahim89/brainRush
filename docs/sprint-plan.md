@@ -1,6 +1,6 @@
 # BrainRush — Sprint Plan
 
-Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..US-29, decisions D-01..D-30, follow-ups FU-01..FU-07).
+Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..US-29, decisions D-01..D-30, follow-ups FU-01..FU-09).
 Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops) -> product-owner accepts -> scrum-master updates status -> commit on branch `sprint-N` + PR to `main`.
 
 ---
@@ -129,7 +129,32 @@ Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops
 
 **Status:** Done
 
-**Outcome:** US-08, US-10, US-11, US-12, US-13, US-14, US-15, US-16, US-17, US-27 accepted by the Product Owner (see `docs/sprints/sprint-4-test-report.md`; 55/55 runnable checks pass on PHP 8.0.30 / MariaDB 10.4; 1 PENDING: hosted `/password.txt` check, no hosted URL; 1 not run by instruction: `/password.txt` through `php -S`). 0 fix loops, 0 bugs (0 Critical / Major / Minor), 6 non-blocking observations. No story carry-overs; Sprint 2 and 3 carry-overs (O-1..O-5, `expose_php=Off` README note, `password.txt` deploy note) are done and verified. New decisions: D-25 (revealed answer stays shown after refresh), D-26 (End Game on a full board skips the confirm), D-27 (shared ranks on Results), D-28 (saved-game `version`, v1 board save migrated), D-29 (beep may be silent after a refresh with no click), D-30 (target screens 1366x768 and 1920x1080, no horizontal scroll). Environment incident ENV-4-01: second MariaDB InnoDB hang (recurrence of the Sprint 3 incident); it left test point value 1000 in the dev DB, so no category is playable until it is deleted (FU-06). Follow-ups FU-01..FU-07 are listed in "After Sprint 4" below.
+**Outcome:** US-08, US-10, US-11, US-12, US-13, US-14, US-15, US-16, US-17, US-27 accepted by the Product Owner (see `docs/sprints/sprint-4-test-report.md`; 55/55 runnable checks pass on PHP 8.0.30 / MariaDB 10.4; 1 PENDING: hosted `/password.txt` check, no hosted URL; 1 not run by instruction: `/password.txt` through `php -S`). 0 fix loops, 0 bugs (0 Critical / Major / Minor), 6 non-blocking observations. No story carry-overs; Sprint 2 and 3 carry-overs (O-1..O-5, `expose_php=Off` README note, `password.txt` deploy note) are done and verified. New decisions: D-25 (revealed answer stays shown after refresh), D-26 (End Game on a full board skips the confirm), D-27 (shared ranks on Results), D-28 (saved-game `version`, v1 board save migrated), D-29 (beep may be silent after a refresh with no click), D-30 (target screens 1366x768 and 1920x1080, no horizontal scroll). Environment incident ENV-4-01: second MariaDB InnoDB hang (recurrence of the Sprint 3 incident); it left test point value 1000 in the dev DB, so no category is playable until it is deleted (FU-06). Follow-ups FU-01..FU-07 are listed in "Follow-ups" below.
+
+---
+
+## Sprint 5 — Polish (follow-ups FU-03, FU-04, FU-05, FU-08)
+
+**Goal:** Close the optional layout polish follow-ups from Sprint 4 (FU-03, FU-04, FU-05) and the Results-screen follow-up FU-08. Requested by the owner on 2026-10-05 (FU-08: "implement D-30", scoped to FU-08).
+**Stories:** none (no new stories; backlog items FU-03, FU-04, FU-05, FU-08)
+**Dependencies:** Sprint 4 (board, question and results screens).
+
+**Developer tasks**
+1. `css/style.css` + `js/game.js` — FU-03 (Should, D-30): 6x6 board + 6-contestant scoreboard fits 1366x768 with no page scroll (was 22 px over).
+2. `css/style.css` + `js/game.js` — FU-04 (Could): question font scales down with text length so questions up to about 250 characters fit the question column at 1366x768. Long answers are not scaled (D-30).
+3. `css/style.css` — FU-05 (Could): grey (unanswered) cells use the same points-label size as owned cells.
+4. `css/style.css` — FU-08 (Could, D-30): Results with 6 contestants fits 1366x768 with no page scroll (was 3 px over); trim the Results spacing (`line-height: 1.15` on `.result-score`).
+5. `docs/sprints/sprint-5-dev.md`.
+
+**Tester focus:** 1366x768 viewport with 6x6 board and 6 contestants (no vertical or horizontal scroll); 250-character question; grey vs owned cell label size; Results with 6 contestants (no scroll) and ties of 3 or more; regression on the Sprint 4 flows.
+
+**Status:** Done
+
+**Outcome:** Flow: developer, tester, PO. The tester passed 18/18 checks with 0 bugs (see `docs/sprints/sprint-5-test-report.md`). The PO accepted FU-03, FU-04 and FU-05 on 2026-10-05. No carry-overs. Files changed: `css/style.css`, `js/game.js`; dev note `docs/sprints/sprint-5-dev.md`. D-30 amended (sizes mean the browser viewport).
+
+**FU-08 (added after the first three):** on the owner's request ("implement D-30", scoped to FU-08), the developer added `line-height: 1.15` on `.result-score` in `css/style.css`. The tester passed 10/10 FU-08 checks with 0 bugs: Results with 6 contestants is now 768 px at 1366x768, and ties of 3 or more went from 818 to 768 px. The PO accepted FU-08 on 2026-10-05, and accepted OBS-8 (long-name tie headline wraps) and OBS-9 (all-W/M 30-character names) as limits under D-30. D-30 was amended again: Results with up to 6 contestants should fit 1366x768, and vertical scroll is accepted there when very long names make the tie headline or the rows wrap. FU-09 was widened so the owner's laptop check also covers Results with 6 contestants.
+
+New open follow-up FU-09 (Owner) was added by the PO (see "Follow-ups" below).
 
 ---
 
@@ -141,30 +166,33 @@ Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops
 | 2 | US-18, US-19, US-20, US-21, US-22, US-23, US-29 |
 | 3 | US-01, US-02, US-03, US-04, US-05, US-06, US-07, US-09 |
 | 4 | US-08, US-10, US-11, US-12, US-13, US-14, US-15, US-16, US-17, US-27 |
+| 5 (polish) | none (follow-ups FU-03, FU-04, FU-05, FU-08) |
 
-All 29 stories appear exactly once and all 29 are delivered (accepted). US-29 (hosted deployment with protected admin) was built on the `hosting` branch after the Sprint 2 stories and is recorded as part of Sprint 2 (owner decision 2026-10-05). Its follow-ups were handled in Sprint 4: the `docs/deploy-hostinger.md` note is done; the hosted `/password.txt` smoke check is still open (FU-01, owner). Notes: US-17 (persistence) is placed in Sprint 4 because its criteria cover the question and results screens; Sprint 3 builds the save/load layer as an enabler. US-27 (XSS) is accepted in Sprint 4 once all UI exists, but DoD item 4 enforces `textContent` from Sprint 2 onward. US-26 is accepted in Sprint 1 where all SQL lives; DoD item 3 keeps it enforced later.
+All 29 stories appear exactly once and all 29 are delivered (accepted). Sprint 5 (polish) carries no stories, only follow-ups FU-03, FU-04, FU-05 and FU-08. US-29 (hosted deployment with protected admin) was built on the `hosting` branch after the Sprint 2 stories and is recorded as part of Sprint 2 (owner decision 2026-10-05). Its follow-ups were handled in Sprint 4: the `docs/deploy-hostinger.md` note is done; the hosted `/password.txt` smoke check was done by the owner on 2026-10-05 (FU-01). Notes: US-17 (persistence) is placed in Sprint 4 because its criteria cover the question and results screens; Sprint 3 builds the save/load layer as an enabler. US-27 (XSS) is accepted in Sprint 4 once all UI exists, but DoD item 4 enforces `textContent` from Sprint 2 onward. US-26 is accepted in Sprint 1 where all SQL lives; DoD item 3 keeps it enforced later.
 
 ---
 
-## After Sprint 4 / follow-ups
+## Follow-ups (after Sprint 5)
 
-All planned sprints are done and no Sprint 5 is created. Full wording and priorities are in `docs/product-backlog.md` (FU-01..FU-07); this is the by-owner view.
+All sprints (1-5) are done. Sprint 5 (polish) added no stories. Full wording and priorities are in `docs/product-backlog.md` (FU-01..FU-09); this is the by-owner view.
 
 **Owner / environment actions (no developer work)**
 
-| ID | Priority | Action |
-|---|---|---|
-| FU-01 | Must | After the redeploy, check the hosted `/password.txt` (and the other private paths from US-29) returns 403/404, status only, and record it in `docs/sprints/sprint-4-test-report.md`. The redeploy is not done until this passes. |
-| FU-02 | Must | Move `password.txt` out of the project folder (it is the web root; `php -S` serves it). |
-| FU-06 | Must (environment) | Before the next session: restart MariaDB, delete the leftover point value 1000 (no questions) so categories are playable again, check the antivirus exclusion for `C:\xampp\mysql\data` (ENV-4-01). |
-| FU-07 | Could (environment) | Update or repoint the local XAMPP Apache checkout (`C:\xampp\htdocs\BrainRush`) before using it for end-to-end checks. |
+| ID | Priority | Action | Status |
+|---|---|---|---|
+| FU-01 | Must | After the redeploy, check the hosted `/password.txt` (and the other private paths from US-29) returns 403/404, status only, and record it in `docs/sprints/sprint-4-test-report.md`. The redeploy is not done until this passes. | Done 2026-10-05 |
+| FU-02 | Must | Move `password.txt` out of the project folder (it is the web root; `php -S` serves it). | Won't do (owner decision 2026-10-05) |
+| FU-06 | Must (environment) | Before the next session: restart MariaDB, delete the leftover point value 1000 (no questions) so categories are playable again, check the antivirus exclusion for `C:\xampp\mysql\data` (ENV-4-01). | Restart and cleanup done 2026-10-05; **antivirus check open** |
+| FU-07 | Could (environment) | Update or repoint the local XAMPP Apache checkout (`C:\xampp\htdocs\BrainRush`) before using it for end-to-end checks. | Done 2026-10-05 |
+| FU-09 | Could | Owner: quick visual check of a 6x6 board with 6 players, and of the Results screen with 6 contestants, in a real windowed 1366x768 browser. A small scroll is accepted (D-30); raise a follow-up only if labels or owner names are hard to read. | **Open** |
 
-**Optional developer polish**
+**Developer polish**
 
-| ID | Priority | Item |
-|---|---|---|
-| FU-03 | Should | 6x6 board + 6-contestant scoreboard fits 1366x768 with no page scroll (22 px over today, D-30). |
-| FU-04 | Could | Scale the question font with text length so questions up to about 250 characters fit at 1366x768. |
-| FU-05 | Could | Grey (unanswered) cells use the same points-label size as owned cells. |
+| ID | Priority | Item | Status |
+|---|---|---|---|
+| FU-03 | Should | 6x6 board + 6-contestant scoreboard fits 1366x768 with no page scroll (D-30). | Done 2026-10-05 (Sprint 5) |
+| FU-04 | Could | Question font scales with text length so questions up to about 250 characters fit at 1366x768. | Done 2026-10-05 (Sprint 5) |
+| FU-05 | Could | Grey (unanswered) cells use the same points-label size as owned cells. | Done 2026-10-05 (Sprint 5) |
+| FU-08 | Could | Results with 6 contestants fits 1366x768 with no page scroll (was 3 px over, existed before Sprint 5). Long-name ties may still scroll (D-30). Added by the PO. | Done 2026-10-05 (Sprint 5) |
 
-**Next step:** a small polish sprint (FU-03, FU-04, FU-05, all CSS/JS in `css/style.css` and `js/game.js`) can be planned if the owner wants it. It would need the owner's go-ahead and the usual flow (developer, tester, PO acceptance). It would add no new stories unless the PO writes them.
+**Open items:** FU-06 (antivirus exclusion check, Owner / Developer) and FU-09 (laptop visual check, Owner). Neither blocks acceptance, and neither needs developer work.

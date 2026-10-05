@@ -229,9 +229,10 @@ As the owner, I want to deploy BrainRush to Hostinger shared hosting as a public
 | Sprint | Stories | Status |
 |---|---|---|
 | 1 | US-24, US-25, US-26, US-28 | Accepted |
-| 2 | US-18, US-19, US-20, US-21, US-22, US-23, US-29 | Accepted (US-29 hosted `/password.txt` check open, see FU-01) |
+| 2 | US-18, US-19, US-20, US-21, US-22, US-23, US-29 | Accepted (US-29 hosted `/password.txt` check done 2026-10-05, FU-01) |
 | 3 | US-01, US-02, US-03, US-04, US-05, US-06, US-07, US-09 | Accepted |
 | 4 | US-08, US-10, US-11, US-12, US-13, US-14, US-15, US-16, US-17, US-27 | Accepted 2026-10-05 |
+| 5 (polish) | No stories; follow-ups FU-03, FU-04, FU-05, FU-08 | Accepted 2026-10-05 |
 
 All 29 stories accepted. Open items are listed under "Follow-ups after Sprint 4".
 
@@ -272,18 +273,20 @@ Where the spec is silent or ambiguous, the PO chose the simplest party-game beha
 | D-27 | Ranks on Results | Equal scores share a rank (standard competition ranking: 1, 1, 3). Equal scores are listed in setup order. Winner/tie text follows D-10. Added 2026-10-05 (Sprint 4). |
 | D-28 | Saved-game versions | The saved game carries a `version`. A Sprint 3 (v1) save on the board is upgraded and restored; any other older or unknown version is discarded (Setup shown, US-17 corrupt-data rule). Any future change to the saved shape must bump the version and either migrate or discard safely. Added 2026-10-05 (Sprint 4). |
 | D-29 | Beep after refresh | Browsers block audio until the user interacts with the page. After a refresh mid-question with no click or key press, the beep at 0 may be silent. The visible "Time's up!" is the guaranteed signal. Accepted as a known limitation and documented in the README; no "enable sound" prompt. Added 2026-10-05 (Sprint 4). |
-| D-30 | Game screen layout | Targets laptop 1366x768 and projector 1920x1080. Never a horizontal scroll. Vertical scroll is acceptable on Setup (a form), for unusually long question/answer text, and while the "all played" offer is shown. Board + scoreboard should fit one 1366x768 screen up to 6 rows and 6 contestants (currently 22 px over, see FU-03). Added 2026-10-05 (Sprint 4). |
+| D-30 | Game screen layout | Targets laptop 1366x768 and projector 1920x1080. Never a horizontal scroll. Vertical scroll is acceptable on Setup (a form), for unusually long question/answer text, and while the "all played" offer is shown. Board + scoreboard should fit one 1366x768 screen up to 6 rows and 6 contestants (met in Sprint 5, FU-03). Added 2026-10-05 (Sprint 4). **Amended 2026-10-05 (Sprint 5):** sizes mean the browser viewport (inner window). A windowed browser with tabs and an address bar has less height and may scroll a little; that is accepted, as are boards with more than 6 rows. Results with up to 6 contestants should also fit 1366x768 (met by FU-08). Vertical scroll there is accepted when very long names make the tie headline or the rows wrap. |
 
 ---
 
 ## Follow-ups after Sprint 4
 
-| ID | Item | Priority | Owner |
-|---|---|---|---|
-| FU-01 | Hosted smoke check after the Sprint 4 redeploy: `/password.txt` (and the other private paths in US-29) return 403 or 404, status only, never the content. Record the result in `docs/sprints/sprint-4-test-report.md`. The Sprint 4 redeploy is not done until this passes. If it ever returns 200, take the file off the host at once, change every credential in it, and report it per the Celfocus incident process. | Must | Owner |
-| FU-02 | Move `password.txt` out of the project folder. It is the web root, and `php -S` serves every file there (`.htaccess` only protects Apache and the host). | Must | Owner |
-| FU-03 | Make the 6x6 board + 6-contestant scoreboard fit 1366x768 with no page scroll (now 22 px over), per D-30. | Should | Developer |
-| FU-04 | Long question text: scale the question font down with text length so questions up to about 250 characters fit the question column at 1366x768. | Could | Developer |
-| FU-05 | Grey (unanswered) cells: use the same points-label size as owned cells. | Could | Developer |
-| FU-06 | Housekeeping before the next session: restart MariaDB, then delete the leftover point value 1000 (no questions) so categories are playable again; check the antivirus exclusion for `C:\xampp\mysql\data` (ENV-4-01, second InnoDB hang). | Must (environment) | Owner / Developer |
-| FU-07 | Local XAMPP Apache serves an older checkout (`C:\xampp\htdocs\BrainRush`); update it or point it at this repo before relying on it for end-to-end checks. | Could (environment) | Owner |
+| ID | Item | Priority | Owner | Status |
+|---|---|---|---|---|
+| FU-01 | Hosted smoke check after the Sprint 4 redeploy: `/password.txt` (and the other private paths in US-29) return 403 or 404, status only, never the content. Record the result in `docs/sprints/sprint-4-test-report.md`. The Sprint 4 redeploy is not done until this passes. If it ever returns 200, take the file off the host at once, change every credential in it, and report it per the Celfocus incident process. | Must | Owner | Done 2026-10-05 (owner confirmed) |
+| FU-02 | Move `password.txt` out of the project folder. It is the web root, and `php -S` serves every file there (`.htaccess` only protects Apache and the host). | Must | Owner | Won't do (owner decision 2026-10-05). The file stays git-ignored and blocked by `.htaccess`; `php -S` still serves it locally. |
+| FU-03 | Make the 6x6 board + 6-contestant scoreboard fit 1366x768 with no page scroll (now 22 px over), per D-30. | Should | Developer | Done 2026-10-05 (Sprint 5) |
+| FU-04 | Long question text: scale the question font down with text length so questions up to about 250 characters fit the question column at 1366x768. | Could | Developer | Done 2026-10-05 (Sprint 5). Long answers are not scaled (D-30). |
+| FU-05 | Grey (unanswered) cells: use the same points-label size as owned cells. | Could | Developer | Done 2026-10-05 (Sprint 5) |
+| FU-06 | Housekeeping before the next session: restart MariaDB, then delete the leftover point value 1000 (no questions) so categories are playable again; check the antivirus exclusion for `C:\xampp\mysql\data` (ENV-4-01, second InnoDB hang). | Must (environment) | Owner / Developer | Mostly done 2026-10-05: MariaDB restarted, point value 1000 deleted. Antivirus exclusion check still open. |
+| FU-07 | Local XAMPP Apache serves an older checkout (`C:\xampp\htdocs\BrainRush`); update it or point it at this repo before relying on it for end-to-end checks. | Could (environment) | Owner | Done 2026-10-05 (owner confirmed) |
+| FU-08 | Results with 6 contestants is 3 px over at 1366x768 (existed before Sprint 5). Trim the Results spacing slightly so it fits with no page scroll. | Could | Developer | Done 2026-10-05 (Sprint 5). Long-name ties may still scroll (D-30). |
+| FU-09 | Quick visual check of a 6x6 board with 6 players, and of the Results screen with 6 contestants, in a real windowed browser on a 1366x768 laptop. Expect a small scroll, which D-30 accepts. Raise a follow-up only if labels or owner names are hard to read. | Could | Owner | Open |

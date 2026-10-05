@@ -239,7 +239,7 @@ button.slot:hover { filter: brightness(1.3); }
 .legend-swatch { min-width: 1.8rem; height: 1.5rem; margin-left: 0.5rem; }
 
 /* ---------- Game page ---------- */
-.game-main { padding: 1.25rem 1.5rem 2rem; }
+.game-main { padding: 1.25rem 1.5rem 1rem; }
 .screen[hidden] { display: none; }
 .field-error { margin: 0.25rem 0 0; color: #ffb3b3; font-size: 0.9rem; }
 .field-error[hidden] { display: none; }
@@ -339,14 +339,31 @@ button.slot:hover { filter: brightness(1.3); }
 }
 .board-done[hidden] { display: none; }
 .board-done-text { margin: 0; font-size: 1.25rem; font-weight: 700; color: #fff1c2; }
+/* FU-03 (D-30): on the board screen the page is one viewport tall and the board gets the height
+   that header, bar, offer and scoreboard leave over. The page only scrolls once rows hit --row-min.
+   game.js sets body[data-screen]; the flex chain below is only active while the board is shown. */
+body[data-screen="board"] { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+body[data-screen="board"] .game-main { display: flex; flex-direction: column; flex: 1 0 auto; }
+body[data-screen="board"] #screen-board { display: flex; flex-direction: column; flex: 1 0 auto; }
+/* auto side margins would shrink-wrap flex items, so give them the full width (max-width still applies) */
+body[data-screen="board"] #screen-board > * { width: 100%; }
+
 /* --cols, --rows and --digits are always set inline by game.js from the board data */
 .board {
   --gap: 0.5rem;
+  --cat-h: 3.6rem;
+  --row-min: 2.75rem;
+  --row-max: 6.5rem;
   --board-w: min(100vw - 3rem, 90rem);
   --cell-w: calc((var(--board-w) - (var(--cols) - 1) * var(--gap)) / var(--cols));
   display: grid;
   grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  /* rows share the board height equally; "1fr" never goes below a cell's min-height */
+  grid-template-rows: auto repeat(var(--rows), 1fr);
   gap: var(--gap);
+  flex: 1 0 0;
+  /* few rows: stop growing at --row-max so the scoreboard stays right under the board */
+  max-height: calc(var(--cat-h) + var(--rows) * (var(--row-max) + var(--gap)));
   max-width: 90rem;
   margin: 0 auto;
 }
@@ -355,7 +372,7 @@ button.slot:hover { filter: brightness(1.3); }
   align-items: center;
   justify-content: center;
   min-width: 0;
-  min-height: 3.6rem;
+  min-height: var(--cat-h);
   padding: 0.4rem 0.3rem;
   color: var(--text);
   font-size: clamp(0.62rem, calc(var(--cell-w) / 10.5), 1.1rem);
@@ -376,10 +393,12 @@ button.slot:hover { filter: brightness(1.3); }
   justify-content: center;
   gap: 0.2rem;
   min-width: 0;
-  /* taller boards get shorter rows so board + scoreboard stay on one screen */
-  min-height: clamp(3rem, calc(48vh / var(--rows)), 6.5rem);
+  min-height: var(--row-min);
   padding: 0.3rem;
   overflow: hidden;
+  /* size container: the label and owner name scale with the cell's real height (cqh), so content
+     never makes a row taller than its share of the board */
+  container-type: size;
   color: var(--gold);
   background: linear-gradient(#1f2a6b, #161f57);
   border: 1px solid var(--border);
@@ -392,20 +411,22 @@ button.slot:hover { filter: brightness(1.3); }
 .board-cell.is-owned { box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.25); }
 .board-cell.is-unanswered { color: #c3c7d4; background: #4b5163; }
 .board-cell.is-used .cell-points { opacity: 0.85; }
-/* smaller label in owned cells so label + owner name fit without making the row taller */
-.board-cell.is-owned .cell-points { font-size: calc(var(--label-size) * 0.7); }
+/* FU-05: owned and grey cells share one smaller label size (room for the owner name, US-08).
+   55cqh + 28cqh * 1.2 line height + the 0.2rem gap always fit the cell's content height. */
+.board-cell.is-used .cell-points { font-size: min(calc(var(--label-size) * 0.7), 55cqh); }
 .cell-owner {
   max-width: 100%;
   overflow: hidden;
-  font-size: clamp(0.62rem, calc(var(--cell-w) / 11), 0.95rem);
+  font-size: min(clamp(0.62rem, calc(var(--cell-w) / 11), 0.95rem), 28cqh);
   font-weight: 700;
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Label shrinks with column width and digit count so e.g. 10000 never wraps or overflows. */
+/* Label shrinks with column width and digit count so e.g. 10000 never wraps or overflows,
+   and with the cell height (cqh of the cell) on short rows. */
 .cell-points {
-  --label-size: min(2.6rem, calc(var(--cell-w) / (var(--digits) * 0.62 + 1)));
+  --label-size: min(2.6rem, calc(var(--cell-w) / (var(--digits) * 0.62 + 1)), 90cqh);
   font-size: var(--label-size);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -479,9 +500,10 @@ button.slot:hover { filter: brightness(1.3); }
   overflow-wrap: anywhere;
 }
 .question-heading:focus { outline: none; }
+/* FU-04: game.js sets --q-scale (1 for short questions, smaller for long ones) */
 .question-text {
   margin: 0 0 1.2rem;
-  font-size: clamp(1.6rem, 3vw, 3rem);
+  font-size: max(1.15rem, calc(clamp(1.6rem, 3vw, 3rem) * var(--q-scale, 1)));
   font-weight: 700;
   line-height: 1.25;
   white-space: pre-wrap;
@@ -600,4 +622,6 @@ button.slot:hover { filter: brightness(1.3); }
 .result-swatch { flex: none; width: 1.3rem; height: 1.3rem; border: 2px solid rgba(255, 255, 255, 0.85); border-radius: 50%; }
 .result-name { flex: 1; min-width: 0; font-size: 1.3rem; font-weight: 700; overflow-wrap: anywhere; }
 .result-badge { padding: 0.15rem 0.6rem; color: #1a1a1a; font-size: 0.85rem; font-weight: 800; background: var(--gold); border-radius: 999px; }
-.result-score { min-width: 4ch; font-size: 1.8rem; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
+/* FU-08: tight line height; the big score no longer sets a taller row than the name needs,
+   so 6 rows + headline + New Game fit 1366x768 */
+.result-score { min-width: 4ch; font-size: 1.8rem; font-weight: 800; line-height: 1.15; text-align: right; font-variant-numeric: tabular-nums; }
