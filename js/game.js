@@ -50,7 +50,6 @@
 
   // Countdown of the open question (memory only; restarts at full length after a refresh, D-04).
   const timer = { totalMs: 0, remainingMs: 0, endAt: 0, running: false, handle: null };
-  let audioCtx = null;
   let scoringRows = []; // DOM references of the question screen's scoring rows
 
   let nextEntryKey = 1;
@@ -1125,9 +1124,8 @@
   function tickTimer() {
     timer.remainingMs = Math.max(0, timer.endAt - now());
     if (timer.remainingMs === 0) {
-      stopTimer(); // D-03: stop at 0, beep, nothing is auto-scored or closed
+      stopTimer(); // D-03: stop at 0 (silently), nothing is auto-scored or closed
       dom.timerStatus.textContent = "Time's up!";
-      beep();
     }
     renderTimer();
   }
@@ -1148,42 +1146,6 @@
 
   function onResetClick() {
     if (state.game && state.game.current) startTimer(state.game.timerSeconds);
-  }
-
-  // ---------- Beep (Web Audio) ----------
-  // Browsers only allow audio after a user gesture, so the context is created/resumed
-  // on the first click or key press. After a refresh with no click yet, the beep is silent.
-
-  function unlockAudio() {
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return;
-    try {
-      if (!audioCtx) audioCtx = new Ctx();
-      if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
-    } catch (err) {
-      audioCtx = null; // audio unavailable: the timer still works silently
-    }
-  }
-
-  function beep() {
-    if (!audioCtx || audioCtx.state !== 'running') return;
-    try {
-      const t = audioCtx.currentTime;
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'square';
-      osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
-      gain.gain.setValueAtTime(0.25, t + 0.6);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start(t);
-      osc.stop(t + 0.85);
-    } catch (err) {
-      // ignore audio errors; the visual "Time's up!" is still shown
-    }
   }
 
   // ---------- Results (US-15, US-16) ----------
@@ -1264,9 +1226,6 @@
     dom.timerReset.addEventListener('click', onResetClick);
     dom.backBtn.addEventListener('click', backToBoard);
     dom.newGameBtn.addEventListener('click', newGame);
-    // Audio may only start after a user gesture (see unlockAudio).
-    document.addEventListener('pointerdown', unlockAudio, true);
-    document.addEventListener('keydown', unlockAudio, true);
   }
 
   /** US-17: reopen the saved screen. An open question restarts its timer at full length (D-04). */

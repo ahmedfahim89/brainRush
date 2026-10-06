@@ -98,7 +98,7 @@ Screens toggled by JS (single page, state held in a JS object, also saved to `lo
    - "End Game" button (also auto-offered when all 25 cells used).
 3. **Question modal / screen**
    - Shows "Geography – 300" and the question text in large type.
-   - Countdown of the configured length starts automatically (visual bar + number; turns red in the last third; beep via Web Audio when it hits 0). Pause/Resume and Reset buttons.
+   - Countdown of the configured length starts automatically (visual bar + number; turns red in the last third; stops silently with "Time's up!" when it hits 0). Pause/Resume and Reset buttons.
    - "Show Answer" button reveals the stored answer.
    - Per player/team row (in their color): **✓ Correct (+300)** and **✗ Wrong (−300)** buttons; host may score several wrong attempts. Each player can be scored once per question; once someone is marked correct, other "Correct" buttons disable and that player becomes the cell's owner/color.
    - "Back to Board" marks the cell as used.
@@ -126,5 +126,5 @@ Screens toggled by JS (single page, state held in a JS object, also saved to `lo
 1. Install PHP + MariaDB 10.4 (e.g. XAMPP), run `mysql -u root -p < sql/schema.sql`, set credentials in `api/config.php`.
 2. Start server from project root: `php -S localhost:8000`.
 3. Admin (`http://localhost:8000/admin.html`): add a category, add questions for all slots, try a duplicate slot (expect 409 message), edit/delete a question, delete a category. Change settings to 6 categories / 20 s, add point value 1000 → coverage grid shows new empty column; fill it for 6 categories.
-4. Game (`http://localhost:8000/`): try 7 players / 5 teams (blocked), pick 6 categories → board is 6 × 6 with 100…1000; open a cell → timer counts down from 20 and beeps at 0; mark one wrong (−) and one correct (+) → cell takes the correct player's color; a cell with no correct answer turns grey; refresh mid-game (state restored); finish board → results show correct winner/tie.
+4. Game (`http://localhost:8000/`): try 7 players / 5 teams (blocked), pick 6 categories → board is 6 × 6 with 100…1000; open a cell → timer counts down from 20 and stops at 0 with "Time's up!"; mark one wrong (−) and one correct (+) → cell takes the correct player's color; a cell with no correct answer turns grey; refresh mid-game (state restored); finish board → results show correct winner/tie.
 5. Use the built-in browser pane to click through the flow and check the console for JS errors.
