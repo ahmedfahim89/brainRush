@@ -35,7 +35,7 @@ Project documents: `docs/spec.md`, `docs/product-backlog.md` and `docs/sprint-pl
 2. **Board.** Columns are the chosen categories; rows are the point values, smallest first. Click a cell to open its question.
    - The scoreboard below the board shows every player or team. Use **+ / −** to correct a score; each click is one step of the smallest point value. Corrections never change cell colors.
 3. **Question.** The question appears in large type, and a countdown starts automatically.
-   - The number and the bar turn red in the last third. A beep sounds at 0 and the timer stops; nothing is scored automatically.
+   - The number and the bar turn red in the last third. At 0 the timer stops and shows "Time's up!" (no sound); nothing is scored automatically.
    - Use **Pause/Resume** and **Reset** as needed. **Show Answer** reveals the answer.
    - Mark each player or team **✓ Correct (+points)** or **✗ Wrong (−points)**. Each can be scored once per question, and only one can be correct. Wrong answers can still be marked after someone was correct. Marks cannot be undone inside a question; use the scoreboard **+ / −** instead.
    - **Back to Board** marks the cell as played. It takes the color and name of whoever answered correctly, or turns grey if nobody did. Played cells cannot be opened again.
@@ -43,8 +43,6 @@ Project documents: `docs/spec.md`, `docs/product-backlog.md` and `docs/sprint-pl
 5. **Results.** Players or teams are listed by score, and the winner is highlighted. If several share the top score, all of them are highlighted and the text reads "It's a tie between X and Y". **New Game** clears the finished game and returns to an empty setup with the current admin settings.
 
 **Refresh-safe.** The running game (board, played cells, scores, colors and timer length) is saved in the browser's `localStorage`. After an accidental refresh, the same screen comes back. An open question reopens with its scoring kept, and its timer restarts at full length. The setup form itself is not saved.
-
-The browser only allows sound after you have clicked or pressed a key on the page. If the page was just refreshed during a question and nobody has clicked yet, that countdown ends silently.
 
 ## Admin usage (`admin.html`)
 
