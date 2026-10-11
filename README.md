@@ -9,11 +9,17 @@ Project documents: `docs/spec.md`, `docs/product-backlog.md` and `docs/sprint-pl
 ## Setup (local)
 
 1. **Install** PHP 8.0+ (with the `pdo_mysql` extension enabled) and MariaDB 10.4. XAMPP provides both.
-2. **Create the database.** This creates `brainrush`, its tables and sample data: 6 categories with 5 questions each, point values 100–500, 5 categories per game and a 30-second timer.
+2. **Create the database.** This creates `brainrush`, its tables and sample data: 6 categories with 25 questions each (5 per point value), point values 100–500, 5 categories per game and a 30-second timer.
    ```
    mysql -u root -p < sql/schema.sql
    ```
    The script is safe to re-run: it only creates missing tables and inserts missing seed rows. With phpMyAdmin, import `sql/schema.sql` from the **Import** tab.
+
+   **Existing install (created before Sprint 6)?** Do not re-run `schema.sql`; it does not change existing tables. Back up the database first (`mysqldump -u root -p brainrush > brainrush-backup.sql`, kept outside the project folder, or phpMyAdmin **Export**), then run the question-bank migration once:
+   ```
+   mysql -u root -p brainrush < sql/migrate-question-bank.sql
+   ```
+   It removes the old one-question-per-slot limit, keeps every existing question with its category and points, and adds the 120 new questions with their points to the seed categories it finds by name (rows whose category or point value no longer exists are skipped). A database already converted by the first Sprint 6 version of this script (no `points` column) must be restored from its pre-Sprint 6 backup first. It is safe to run again: a second run changes nothing. With phpMyAdmin, select the `brainrush` database and import the file from the **Import** tab.
 3. **Configure credentials.** Copy `api/config.example.php` to `api/config.php` and set your own database host, port, name, user and password.
    `api/config.php` is git-ignored, so never commit real credentials. For local use, leave the two admin keys empty (see Security below).
 4. **Start the server** from the project root:
@@ -29,10 +35,11 @@ Project documents: `docs/spec.md`, `docs/product-backlog.md` and `docs/sprint-pl
 
 1. **Setup.** Choose **Players** (up to 6) or **Teams** (up to 4), then enter the names. Names must be unique and at most 30 characters.
    - Each entry gets its own color. Click the color circle to switch to the next free color.
-   - Tick exactly the number of categories the game asks for. The board columns follow the order you tick them.
+   - Tick between 1 and the configured maximum number of categories (admin setting "Max categories per game"). The board columns follow the order you tick them.
    - Optionally change the timer for this game only (5–600 seconds). The admin setting is not changed.
    - Click **Start Game**.
 2. **Board.** Columns are the chosen categories; rows are the point values, smallest first. Click a cell to open its question.
+   - **Question bank.** A category can hold several questions for each point value. When a new game starts, the server picks one of them at random for every cell (category × point value), so the same group can play again with mostly new questions. The draw is purely random: a question from an earlier game can come back. Each question keeps its own point value, so a 500 question is still meant to be harder than a 100 one.
    - The scoreboard below the board shows every player or team. Use **+ / −** to correct a score; each click is one step of the smallest point value. Corrections never change cell colors.
 3. **Question.** The question appears in large type, and a countdown starts automatically.
    - The number and the bar turn red in the last third. At 0 the timer stops and shows "Time's up!" (no sound); nothing is scored automatically.
@@ -42,16 +49,15 @@ Project documents: `docs/spec.md`, `docs/product-backlog.md` and `docs/sprint-pl
 4. **End Game.** Click **End Game** at any time; while questions are still open, it asks for a confirmation first. When every cell has been played, the board offers **End Game and show results**.
 5. **Results.** Players or teams are listed by score, and the winner is highlighted. If several share the top score, all of them are highlighted and the text reads "It's a tie between X and Y". **New Game** clears the finished game and returns to an empty setup with the current admin settings.
 
-**Refresh-safe.** The running game (board, played cells, scores, colors and timer length) is saved in the browser's `localStorage`. After an accidental refresh, the same screen comes back. An open question reopens with its scoring kept, and its timer restarts at full length. The setup form itself is not saved.
+**Refresh-safe.** The running game (the drawn board, played cells, scores, colors and timer length) is saved in the browser's `localStorage`. After an accidental refresh, the same screen and the same questions come back (no new draw). An open question reopens with its scoring kept, and its timer restarts at full length. The setup form itself is not saved.
 
 ## Admin usage (`admin.html`)
 
 - **Game settings:** categories per game (1–10) and the default timer (5–600 seconds).
-- **Point values:** these are the board rows. Add values such as 1000 or 10000, or delete unused ones. A value that still has questions cannot be deleted.
-- **Categories:** each shows "questions / point values". You can add, rename inline, or delete; deleting a category also deletes its questions, after a confirmation.
-- **Questions:** filter by category, then add, edit or delete. A category has exactly one question per point value; the points list only offers free slots.
-- **Coverage grid:** categories × point values. A category is *playable*, and offered in game setup, only when every slot is filled. After adding a new point value, fill it for enough categories.
-- A game already running keeps the board it loaded at Start. Admin changes apply to the next game.
+- **Point values:** these are the board rows, each with its number of questions. Add values such as 1000 or 10000, or delete unused ones. A value that still has questions cannot be deleted.
+- **Categories:** each shows its number of questions and a status. A category is *playable*, and offered in game setup, when it has at least one question for every point value; otherwise it shows "Not playable: missing 600" (the values without a question). You can add, rename inline, or delete; deleting a category also deletes its questions, after a confirmation.
+- **Questions:** filter by category, then add, edit or delete. Each question has a category, a point value (any value; several questions may share a category and value), a question text and an answer. The list is sorted by category, then points. More questions per cell mean more variety between games. The same question text twice in one category is refused (not case-sensitive).
+- A game already running keeps the board it drew at Start. Admin changes apply to the next game.
 
 ## Security
 
@@ -79,4 +85,4 @@ Other rules:
 - Keep `display_errors = Off` on public servers. BrainRush never puts error details in API responses, but PHP's own warnings could.
 - Upload `.htaccess` together with the code; it carries the HTTPS redirect and the access blocks.
 
-**Deploying to Hostinger** (public staging site): follow [`docs/deploy-hostinger.md`](docs/deploy-hostinger.md). The database for phpMyAdmin import is `sql/schema-hosted.sql`; it is the same as `sql/schema.sql`, minus `CREATE DATABASE`/`USE`, and the two files must be kept in sync.
+**Deploying to Hostinger** (public staging site): follow [`docs/deploy-hostinger.md`](docs/deploy-hostinger.md). The database for phpMyAdmin import is `sql/schema-hosted.sql`; it is the same as `sql/schema.sql`, minus `CREATE DATABASE`/`USE`, and the two files must be kept in sync. To bring an existing hosted database from before Sprint 6 up to date, import `sql/migrate-question-bank.sql` (see the deploy guide).

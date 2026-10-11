@@ -44,7 +44,8 @@ You need:
    Do **not** use `sql/schema.sql`. It contains `CREATE DATABASE`/`USE`, which shared hosting does not allow.
 4. Leave the other options as they are and click **Import** (or **Go**).
 5. Expected result: a green success message, and four tables in the sidebar: `categories`, `point_values`, `questions`, `settings`.
-   The sample data has 6 categories with 5 questions each and point values 100–500.
+   The sample data has 6 categories with 25 questions each (5 per point value) and point values 100–500.
+   This step is for a **new, empty** database only. A database that was imported before Sprint 6 is updated with `sql/migrate-question-bank.sql` instead (step 8.4).
 
 ## 4. Upload the website files
 
@@ -156,7 +157,13 @@ The database content and `api/config.php` belong to the live site. A redeploy on
    - **File Manager/FTP:** upload the changed files from the list in step 4 and overwrite the old ones, including `.htaccess` whenever it changed. **Never** upload or overwrite `api/config.php`, never upload `password.txt` or other local credential files, and never delete the whole `api/` folder.
 4. Database changes: only if that sprint's dev note (`docs/sprints/sprint-N-dev.md`) says the schema changed.
    - **Do not** re-import `schema-hosted.sql` "just in case". It never overwrites existing rows, but it **re-adds any sample category or question you deleted**. It also cannot change existing tables. A schema change comes with its own instructions or migration script in the dev note.
-5. Open the site and press **Ctrl+F5** (hard refresh) so the browser loads the new JavaScript and CSS. Then repeat the quick checks: the game loads, admin asks for the login, a save works, and `/sql/schema.sql` and `/password.txt` are blocked (403/404).
+   - **Sprint 6 (question bank): import `sql/migrate-question-bank.sql` once.** Questions keep their point value, but a category may now hold several questions per value, and each new game draws one at random for every board cell. Do this right after the code update in step 3. Until then the old one-per-slot key still blocks a second question at the same category and point value; the game keeps working.
+     1. Back up first (step 2). The migration changes the `questions` table.
+     2. In phpMyAdmin, click your database in the left sidebar so it is selected, open **Import**, choose **`sql/migrate-question-bank.sql`** and click **Import** (or **Go**). The file has no `CREATE DATABASE`/`USE`, so it runs on the selected database.
+     3. Expected result: a green success message. Under **Structure** → **Indexes** for `questions`, `uq_slot` is gone and `uq_category_question` and `idx_questions_slot` exist; the `points` column stays. Each of the 6 sample categories gains up to 20 questions, 4 per point value 100–500 (a category that still has only its 5 sample questions ends up with 25, 5 per value). Every existing question is kept with its points.
+     4. It is safe to import again by mistake: it then only reports notes and adds nothing. A category you renamed or deleted, or a point value you deleted, does not get the new questions.
+     5. If it stops at the first step with **"Duplicate entry … for key uq_category_question"**, one category has the same question text twice (the old model allowed that). Nothing has changed at that point. The file header has a query that lists the duplicates; edit or delete one of each pair, then import again.
+5. Open the site and press **Ctrl+F5** (hard refresh) so the browser loads the new JavaScript and CSS. JavaScript and CSS may be cached for up to 7 days; if the admin page still shows old content (for example a Coverage panel still showing after Sprint 6), purge the Hostinger CDN cache (step 6) and hard-refresh again. Then repeat the quick checks: the game loads, admin asks for the login, a save works, and `/sql/schema.sql` and `/password.txt` are blocked (403/404).
    A game that was running in a browser before the redeploy is restored if its saved data is still valid. Otherwise that browser simply shows a fresh setup.
 
 ## Troubleshooting

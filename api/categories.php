@@ -1,6 +1,7 @@
 <?php
 // GET    /api/categories.php             -> [{ id, name, question_count }] sorted by name
-// GET    /api/categories.php?playable=1  -> only categories with a question for every point value
+// GET    /api/categories.php?playable=1  -> only playable categories: at least one question for
+//                                        every point value (D-31 amended)
 // POST   /api/categories.php             body { name } -> 201 created category
 // PUT    /api/categories.php?id=<id>     body { name } -> 200 renamed category
 // DELETE /api/categories.php?id=<id>     -> 200 (its questions are deleted by FK cascade)
@@ -20,10 +21,11 @@ function category_row(array $r): array
 
 function list_categories(PDO $pdo, bool $playableOnly): array
 {
-    // FK + uq_slot guarantee each question fills a distinct existing point value,
-    // so "count of questions == count of point values" means every slot is filled.
+    // The FK guarantees every question uses an existing point value, so "distinct
+    // values used == number of point values" means every board cell has a question
+    // to draw from (D-31 amended). COUNT(q.id) > 0 excludes the no-point-values case.
     $having = $playableOnly
-        ? 'HAVING COUNT(q.id) > 0 AND COUNT(q.id) = (SELECT COUNT(*) FROM point_values)'
+        ? 'HAVING COUNT(q.id) > 0 AND COUNT(DISTINCT q.points) = (SELECT COUNT(*) FROM point_values)'
         : '';
     $rows = $pdo->query(
         "SELECT c.id, c.name, COUNT(q.id) AS question_count

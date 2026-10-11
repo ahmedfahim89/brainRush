@@ -6,7 +6,7 @@ Greenfield project in `C:\Users\NB28970\Desktop\claude\BrainRush` (folder is emp
 Decisions confirmed with user:
 - Admin manages categories; host picks N of them at game setup (N configurable, default 5).
 - **Nothing hard-coded about board size**: number of categories, the list of point values (e.g. 100…500 today, 100…10000 tomorrow) and the timer length are all configuration stored in the DB and editable in admin.
-- Exactly **one question per category + point value slot** (enforced by DB unique key).
+- ~~Exactly **one question per category + point value slot** (enforced by DB unique key).~~ Changed 2026-10-11 (D-31, amended 2026-10-11): each question still has a point value, but a category may have **any number of questions per point value** (a question bank per category + point value). For each new game, every board cell gets a **random** question from that category's questions with that point value (pure random, no play history). An exact duplicate question text in the same category (case-insensitive) is rejected (409). (The first D-31 version, with no point value on questions, was replaced the same day.)
 - Each player/team gets a color; an answered cell is filled with the color of whoever answered it correctly.
 - ~~Admin page is **not** password-protected.~~ Changed 2026-10-04 (D-20): admin **write** operations are protected by HTTP Basic Auth when admin credentials are configured; otherwise writes are allowed only from localhost. See Security notes.
 
@@ -15,7 +15,7 @@ The work is done by a simulated Scrum team, defined as project subagents in `Bra
 
 | File | Agent | Role | Tools | Output |
 |---|---|---|---|---|
-| `product-owner.md` | **product-owner** | Owns BrainRush business rules (players/teams limits, dynamic board, one question per slot, scoring +/−, timer, cell coloring, winner/tie, admin rules). Turns this spec into a product backlog of user stories with acceptance criteria (Given/When/Then); answers rule questions from other agents; accepts/rejects sprint results against acceptance criteria. | Read, Write, Edit, Glob, Grep | `docs/product-backlog.md` |
+| `product-owner.md` | **product-owner** | Owns BrainRush business rules (players/teams limits, dynamic board, ~~one question per slot~~ question bank per category + point value (changed 2026-10-11, D-31 amended), scoring +/−, timer, cell coloring, winner/tie, admin rules). Turns this spec into a product backlog of user stories with acceptance criteria (Given/When/Then); answers rule questions from other agents; accepts/rejects sprint results against acceptance criteria. | Read, Write, Edit, Glob, Grep | `docs/product-backlog.md` |
 | `scrum-master.md` | **scrum-master** | Reads the backlog, splits it into ordered sprints with goals, story list, task breakdown, dependencies and Definition of Done; tracks status after each sprint. Does not write code. | Read, Write, Edit, Glob, Grep | `docs/sprint-plan.md` (status updated per sprint) |
 | `game-developer.md` | **game-developer** | Senior full-stack game developer (PHP 8 + PDO, MariaDB, vanilla JS/HTML/CSS). Implements only the stories of the current sprint, following the architecture/security rules below (prepared statements, `textContent`, no hard-coded board size). Writes a short sprint dev note. | Read, Write, Edit, Glob, Grep, Bash | code + `docs/sprints/sprint-N-dev.md` |
 | `game-tester.md` | **game-tester** | Senior QA. After each sprint, verifies every acceptance criterion: `php -l` on all PHP, API checks with `curl`, UI flows in the browser pane (setup limits, dynamic grid, timer, scoring, colors, refresh restore, results/tie, admin CRUD + 409s). Reports bugs with steps to reproduce; does not fix code. | Read, Glob, Grep, Bash, browser tools | `docs/sprints/sprint-N-test-report.md` |
@@ -51,7 +51,7 @@ BrainRush/
   api/db.php            # PDO connection helper + json_response()/read_json_body()
   api/settings.php      # GET/PUT game settings (categories_per_game, timer_seconds)
   api/points.php        # GET/POST/DELETE point values (the board's y-axis)
-  api/categories.php    # GET list (?playable=1 → only categories with every point value filled), POST, PUT, DELETE
+  api/categories.php    # GET list (?playable=1 → only categories with at least one question for every point value), POST, PUT, DELETE
   api/questions.php     # GET list (?category_id=), GET for board (?board=1&categories=1,2,...), POST, PUT, DELETE
   sql/schema.sql        # tables + sample seed data (5–6 categories × 5 questions)
   sql/schema-hosted.sql # same tables + seed, no CREATE DATABASE/USE (phpMyAdmin import on hosting)
@@ -69,17 +69,19 @@ categories(id PK AI, name VARCHAR(100) UNIQUE NOT NULL, created_at)
 questions(id PK AI, category_id FK→categories ON DELETE CASCADE,
           points INT UNSIGNED NOT NULL,   -- FK→point_values(points) ON UPDATE CASCADE, ON DELETE RESTRICT
           question TEXT NOT NULL, answer TEXT NOT NULL,
-          UNIQUE KEY uq_slot (category_id, points))
+          UNIQUE KEY uq_category_question (category_id, question(191)))   -- case-insensitive (_ci collation)
 ```
-Seed: settings defaults, point values 100–500, and Geography, Science, History, Sports, Movies, Technology each with one question per point value so the game is playable immediately.
+Changed 2026-10-11 (D-31, amended 2026-10-11): ~~`UNIQUE KEY uq_slot (category_id, points)`~~ is removed, so a category may have several questions per point value. `points` and its FK stay. The new unique key blocks duplicate question text within a category. Existing databases are converted by `sql/migrate-question-bank.sql`, which keeps all existing questions and their points.
 
-Board size is derived at runtime: columns = `categories_per_game`, rows = all `point_values` sorted ascending. A category is "playable" only if it has a question for every point value, so changing the scale (e.g. adding 1000…10000) automatically shows which categories need more questions. Deleting a point value that still has questions is blocked with a clear error (409).
+Seed: settings defaults, point values 100–500, and Geography, Science, History, Sports, Movies, Technology ~~each with one question per point value~~ each with 5 questions per point value, 25 in total (changed 2026-10-11, D-31 amended: the original seed question plus 4 from `docs/question-bank.md` per value), so the game is playable immediately.
+
+Board size is derived at runtime: columns = `categories_per_game`, rows = all `point_values` sorted ascending. A category is "playable" only if it has a question for every point value, so changing the scale (e.g. adding 1000…10000) automatically shows which categories need more questions. Deleting a point value that still has questions is blocked with a clear error (409). Changed 2026-10-11 (D-31, amended 2026-10-11): these two rules are unchanged. New: when a game starts, each cell gets a random question from the questions of that category and point value.
 
 ## API (PHP, JSON in/out)
 - `db.php`: PDO with `ERRMODE_EXCEPTION`, prepared statements everywhere; helpers `json_response($data, $code)` and `read_json_body()`; method routing via `$_SERVER['REQUEST_METHOD']`.
-- Validation: name/question/answer non-empty, points exists in `point_values`, category exists; settings: categories_per_game 1–10, timer_seconds 5–600. Duplicate slot → catch SQLSTATE 23000 → HTTP 409 "This category already has a 300 question".
+- Validation: name/question/answer non-empty, points exists in `point_values`, category exists; settings: categories_per_game 1–10, timer_seconds 5–600. ~~Duplicate slot → catch SQLSTATE 23000 → HTTP 409 "This category already has a 300 question".~~ Changed 2026-10-11 (D-31, amended): duplicate question text in the same category → catch SQLSTATE 23000 → HTTP 409 "This category already has this question". Several questions may share a category and point value.
 - `categories.php?playable=1` returns only categories with every point value filled (used by game setup).
-- `questions.php?board=1&categories=...` returns `{ points: [...], categories: [{id, name, questions: {points: {question, answer}}}] }` for the board (includes answer so host can reveal it).
+- `questions.php?board=1&categories=...` returns `{ points: [...], categories: [{id, name, questions: {points: {question, answer}}}] }` for the board (includes answer so host can reveal it). Changed 2026-10-11 (D-31, amended): same shape; each cell is a random pick from that category's questions with that point value; a category missing a point value → 400.
 
 ## Game page (`index.html` + `js/game.js`)
 Screens toggled by JS (single page, state held in a JS object, also saved to `localStorage` so an accidental refresh doesn't lose the game):
@@ -88,7 +90,7 @@ Screens toggled by JS (single page, state held in a JS object, also saved to `lo
    - Mode toggle: Players (max 6) / Teams (max 4).
    - Dynamic name inputs with "Add"/"Remove" (min 1 … max per mode); reject empty/duplicate names.
    - Each player/team auto-assigned a distinct color from a 6-color palette (shown as a swatch, clickable to change).
-   - Category picker: checklist of playable categories, must select exactly `categories_per_game` (loaded from settings).
+   - Category picker: checklist of playable categories, select at least 1 and up to `categories_per_game` (loaded from settings). Changed 2026-10-11 (D-32): was "exactly `categories_per_game`".
    - Timer seconds field pre-filled from settings (`timer_seconds`), host can override for this game.
    - "Start Game" → fetch board questions.
 2. **Board**
@@ -107,10 +109,10 @@ Screens toggled by JS (single page, state held in a JS object, also saved to `lo
 
 ## Admin page (`admin.html` + `js/admin.js`)
 - **Settings panel**: categories per game, default timer seconds — saved via `settings.php`.
-- **Point values panel**: list of point values (board rows); add new value (e.g. 1000, 10000), delete unused ones.
-- **Categories panel**: list with question count (x / number of point values), add, rename (inline edit), delete (confirm dialog warns it deletes its questions).
-- **Questions panel**: filter by category; table of question / answer / points; Add/Edit form (category dropdown, points dropdown showing only free slots when adding, question textarea, answer input); delete with confirm.
-- Coverage grid view: categories × points showing which slots are filled — makes it easy to see what's missing.
+- **Point values panel**: list of point values (board rows) with the number of questions per value; add new value (e.g. 1000, 10000), delete unused ones (a used value → 409).
+- **Categories panel**: list with question count ~~(x / number of point values)~~ and status "Playable" or "Not playable: missing 600" listing the point values without a question (changed 2026-10-11, D-31 amended), add, rename (inline edit), delete (confirm dialog warns it deletes its questions).
+- **Questions panel**: filter by category; table of category / points / question / answer, sorted by category, then points, then id; Add/Edit form (category dropdown, points dropdown ~~showing only free slots when adding~~ listing all point values, question textarea, answer input); delete with confirm. Changed 2026-10-11 (D-31 amended): no free-slot filtering, since several questions may share a point value.
+- ~~Coverage grid view: categories × points showing which slots are filled — makes it easy to see what's missing.~~ Removed 2026-10-11 (D-31, kept removed by the amendment): the categories status and the per-value counts show what is missing.
 - Errors from API (409 duplicates, validation) shown inline.
 - Link back to the game.
 
@@ -125,6 +127,6 @@ Screens toggled by JS (single page, state held in a JS object, also saved to `lo
 ## Verification
 1. Install PHP + MariaDB 10.4 (e.g. XAMPP), run `mysql -u root -p < sql/schema.sql`, set credentials in `api/config.php`.
 2. Start server from project root: `php -S localhost:8000`.
-3. Admin (`http://localhost:8000/admin.html`): add a category, add questions for all slots, try a duplicate slot (expect 409 message), edit/delete a question, delete a category. Change settings to 6 categories / 20 s, add point value 1000 → coverage grid shows new empty column; fill it for 6 categories.
+3. Admin (`http://localhost:8000/admin.html`): add a category, add questions for all slots, try a duplicate slot (expect 409 message), edit/delete a question, delete a category. Change settings to 6 categories / 20 s, add point value 1000 → coverage grid shows new empty column; fill it for 6 categories. Changed 2026-10-11 (D-31, amended): there is no coverage grid and a second question per slot is allowed. Instead, add questions for every point value to a new category (including two at the same value), try a duplicate question text (expect 409), add point value 1000 and check that the categories panel shows "missing 1000", and try to delete a used point value (expect 409). Full checks in US-30.
 4. Game (`http://localhost:8000/`): try 7 players / 5 teams (blocked), pick 6 categories → board is 6 × 6 with 100…1000; open a cell → timer counts down from 20 and stops at 0 with "Time's up!"; mark one wrong (−) and one correct (+) → cell takes the correct player's color; a cell with no correct answer turns grey; refresh mid-game (state restored); finish board → results show correct winner/tie.
 5. Use the built-in browser pane to click through the flow and check the console for JS errors.

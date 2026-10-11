@@ -24,7 +24,7 @@
     <section class="panel" id="settings-panel" aria-labelledby="settings-title">
       <h2 id="settings-title">Game settings</h2>
       <form id="settings-form" class="stack" novalidate>
-        <label for="setting-categories">Categories per game</label>
+        <label for="setting-categories">Max categories per game</label>
         <input id="setting-categories" name="categories_per_game" type="number" min="1" max="10" step="1" required>
         <label for="setting-timer">Default timer (seconds)</label>
         <input id="setting-timer" name="timer_seconds" type="number" min="5" max="600" step="1" required>
@@ -70,6 +70,7 @@
     <!-- Questions (US-21) -->
     <section class="panel panel-wide" id="questions-panel" aria-labelledby="questions-title">
       <h2 id="questions-title">Questions</h2>
+      <p class="hint">A category can have several questions per point value. Every new game draws one of them at random for each board cell.</p>
 
       <form id="question-form" class="question-form" novalidate>
         <h3 id="question-form-title">Add question</h3>
@@ -105,19 +106,6 @@
           </thead>
           <tbody id="questions-body"></tbody>
         </table>
-      </div>
-    </section>
-
-    <!-- Coverage grid (US-22) -->
-    <section class="panel panel-wide" id="coverage-panel" aria-labelledby="coverage-title">
-      <h2 id="coverage-title">Coverage</h2>
-      <p class="hint">Categories &times; point values. Click an empty slot to add its question, or a filled slot to edit it.</p>
-      <p class="legend">
-        <span class="slot slot-filled legend-swatch" aria-hidden="true">&#10003;</span> filled
-        <span class="slot slot-empty legend-swatch" aria-hidden="true">&ndash;</span> empty
-      </p>
-      <div class="table-wrap">
-        <table class="coverage-table" id="coverage-table"></table>
       </div>
     </section>
   </main>
