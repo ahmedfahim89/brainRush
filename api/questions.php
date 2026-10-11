@@ -6,6 +6,10 @@
 // PUT    /api/questions.php?id=<id>                  body: any of the POST fields -> 200
 // DELETE /api/questions.php?id=<id>                  -> 200
 // Writes need admin access (require_admin: 401/403 otherwise).
+//
+// Question bank (D-31 amended): every question has a category and a point value, and a
+// category may have any number of questions per point value. The board draws one
+// random question per cell (category x point value) (US-30).
 require_once __DIR__ . '/db.php';
 
 const QUESTION_TEXT_MAX = 5000;
@@ -39,7 +43,7 @@ function find_question(PDO $pdo, int $id): ?array
 function list_questions(PDO $pdo): array
 {
     if (!isset($_GET['category_id'])) {
-        $rows = $pdo->query(QUESTION_SELECT . ' ORDER BY c.name ASC, q.points ASC')->fetchAll();
+        $rows = $pdo->query(QUESTION_SELECT . ' ORDER BY c.name ASC, q.points ASC, q.id ASC')->fetchAll();
         return array_map('question_row', $rows);
     }
 
@@ -49,7 +53,7 @@ function list_questions(PDO $pdo): array
     if (!$stmt->fetchColumn()) {
         not_found('Category not found');
     }
-    $stmt = $pdo->prepare(QUESTION_SELECT . ' WHERE q.category_id = :id ORDER BY q.points ASC');
+    $stmt = $pdo->prepare(QUESTION_SELECT . ' WHERE q.category_id = :id ORDER BY q.points ASC, q.id ASC');
     $stmt->execute([':id' => $categoryId]);
     return array_map('question_row', $stmt->fetchAll());
 }
@@ -78,7 +82,11 @@ function parse_board_ids($raw): array
     return $ids;
 }
 
-/** Board payload: { points: [...asc], categories: [{id, name, questions: {<points>: {question, answer}}}] } */
+/**
+ * Board payload: { points: [...asc], categories: [{id, name, questions: {<points>: {question, answer}}}] }
+ * Every cell (category x point value) gets one random question from that cell's
+ * questions (US-30). Cells hold different questions, so a board never repeats one.
+ */
 function board(PDO $pdo, array $ids): array
 {
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
@@ -94,12 +102,12 @@ function board(PDO $pdo, array $ids): array
     $points = array_map('intval', $pdo->query('SELECT points FROM point_values ORDER BY points ASC')->fetchAll(PDO::FETCH_COLUMN));
 
     $stmt = $pdo->prepare(
-        "SELECT category_id, points, question, answer FROM questions WHERE category_id IN ($placeholders)"
+        "SELECT category_id, points, question, answer FROM questions WHERE category_id IN ($placeholders) ORDER BY id ASC"
     );
     $stmt->execute($ids);
-    $slots = [];
+    $pools = [];
     foreach ($stmt->fetchAll() as $r) {
-        $slots[(int) $r['category_id']][(int) $r['points']] = ['question' => $r['question'], 'answer' => $r['answer']];
+        $pools[(int) $r['category_id']][(int) $r['points']][] = ['question' => $r['question'], 'answer' => $r['answer']];
     }
 
     $categories = [];
@@ -107,11 +115,12 @@ function board(PDO $pdo, array $ids): array
         $questions = [];
         $missing = [];
         foreach ($points as $p) {
-            if (isset($slots[$id][$p])) {
-                $questions[$p] = $slots[$id][$p];
-            } else {
+            $pool = $pools[$id][$p] ?? [];
+            if (!$pool) {
                 $missing[] = $p;
+                continue;
             }
+            $questions[$p] = $pool[random_int(0, count($pool) - 1)];
         }
         if ($missing) {
             bad_request("Category \"{$names[$id]}\" is missing questions for: " . implode(', ', $missing));
@@ -150,13 +159,14 @@ function validate_question(PDO $pdo, array $data): array
 }
 
 /** Execute an INSERT/UPDATE of a question, mapping constraint errors to 409/400. */
-function save_question(PDOStatement $stmt, array $params, int $points): void
+function save_question(PDOStatement $stmt, array $params): void
 {
     try {
         $stmt->execute($params);
     } catch (PDOException $e) {
+        // uq_category_question: same text (case-insensitive) already in this category.
         if (is_duplicate_key($e)) {
-            conflict("This category already has a $points question");
+            conflict('This category already has this question');
         }
         if (is_foreign_key_error($e)) {
             bad_request('Category or point value no longer exists');
@@ -177,7 +187,7 @@ function create_question(PDO $pdo, array $body): void
         ':points'      => $points,
         ':question'    => $question,
         ':answer'      => $answer,
-    ], $points);
+    ]);
     json_response(find_question($pdo, (int) $pdo->lastInsertId()), 201);
 }
 
@@ -204,7 +214,7 @@ function update_question(PDO $pdo, int $id, array $body): void
         ':question'    => $question,
         ':answer'      => $answer,
         ':id'          => $id,
-    ], $points);
+    ]);
     json_response(find_question($pdo, $id));
 }
 

@@ -1,6 +1,18 @@
 # BrainRush — Sprint Plan
 
-Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..US-29, decisions D-01..D-30, follow-ups FU-01..FU-09).
+Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..US-30, decisions D-01..D-32, follow-ups FU-01..FU-15).
+
+**Overall status (2026-10-11):** Sprints 1-5 Done. Sprint 6 (Question bank) Done (accepted 2026-10-11 after rework), but not yet shipped: the owner's local Chrome check, the commit/PR to `main` and the hosted migration (FU-11) are still open. D-32 (pick 1..N categories) was delivered alongside in the same working tree.
+
+| Sprint | Goal | Status |
+|---|---|---|
+| 1 | Foundation (DB + API) | Done |
+| 2 | Admin page (+ US-29 hosting) | Done |
+| 3 | Game setup and dynamic board | Done |
+| 4 | Question, timer, scoring, results, persistence | Done |
+| 5 | Polish (FU-03, FU-04, FU-05, FU-08) | Done |
+| 6 | Question bank: random questions per new game (US-30, D-31; D-32 alongside) | Done (accepted 2026-10-11 after rework); owner Chrome check, commit/PR and hosted migration (FU-11) open |
+
 Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops) -> product-owner accepts -> scrum-master updates status -> commit on branch `sprint-N` + PR to `main`.
 
 ---
@@ -158,17 +170,86 @@ New open follow-up FU-09 (Owner) was added by the PO (see "Follow-ups" below).
 
 ---
 
+## Sprint 6 — Question bank (US-30, D-31)
+
+**Goal:** "Question bank — random questions per new game." Each category holds a bank of questions; every new game draws a random question for each board cell, so the same group can replay without seeing the same board. Owner decision D-31 (2026-10-11) replaces the old "exactly one question per category + point value slot" rule. **Reworked after owner review (2026-10-11):** the first version dropped the point value from questions and drew P distinct questions per category onto random rows. The owner asked to show the score value in the questions list and amended D-31: **each question has a point value again**, and each board cell draws one random question from that category's questions at that value (several questions allowed per category + value).
+**Stories:** US-30 (new, Must; rewritten in the rework). Amendments to already-delivered stories: US-19, US-20, US-21, US-24, US-25 (re-amended in the rework). US-22 (coverage grid) stays **retired** by D-31 (no code left, not tested any more).
+**Delivered alongside (not a Sprint 6 story):** D-32 (host picks 1..N categories; `categories_per_game` becomes "Max categories per game"; US-04 amended), built by another session in the same working tree. It touched `js/game.js`, `js/admin.js`, `admin.html`, `css/style.css` and `README.md`, and was regression-checked in the re-test (4 checks, all PASS: setup text and counter, ticking 1..N with the other boxes locking at N, Start with 0 blocked and with fewer than N working, admin label). It is noted by the PO, not part of the Sprint 6 acceptance.
+**Dependencies:** Sprints 1-5 (schema, API, admin page, game page). The board payload keeps its shape and D-12 still holds (the board is drawn once at Start and kept in local state, so a refresh does not redraw). `index.html`, `api/db.php` and `.htaccess` are unchanged; the rework did not touch `js/game.js` (only D-32 did).
+
+**Developer tasks (first version; superseded where the rework tasks below say otherwise)**
+1. `sql/schema.sql` + `sql/schema-hosted.sql` — `questions` loses `points`, `uq_slot`, `idx_questions_points` and the FK to `point_values`; new `UNIQUE KEY uq_category_question (category_id, question(191))` (case-insensitive via collation); FK to categories ON DELETE CASCADE kept. Seed: 30 original questions plus 120 from `docs/question-bank.md` = 25 per category (150). Re-importable with no errors or duplicates. The two files stay identical after their CREATE DATABASE/USE lines.
+2. `docs/question-bank.md` (PO content) — exactly 120 questions, 20 per category, no overlap with the seed or each other; Science #5 reworded at acceptance (OBS-5).
+3. `sql/migrate-question-bank.sql` (new) — one-off, re-runnable migration for existing databases (local and hosted): add unique key, drop FK/slot key/`points` column, insert the 120 bank questions by category name with `INSERT IGNORE`. Aborts cleanly on an existing same-text duplicate in one category.
+4. `api/questions.php` — no `points` anywhere (a `points` field in a body is ignored); duplicate text in a category -> 409 "This category already has this question"; `board()` draws P distinct questions per category with a secure shuffle and returns the same payload shape; category with M < P -> 400 `Category "X" needs at least P questions (has M)`.
+5. `api/categories.php` — playable = at least 1 question and at least as many questions as point values.
+6. `api/points.php` — list returns `{id, points}` only; delete has no 409/FK logic (200 or 404).
+7. `admin.html` + `js/admin.js` — Points field/column and the Coverage panel removed; categories show "M questions (needs P)" and a red "Not playable: X more needed" badge; point-value add/delete messages state how many questions each category now needs; question form is category + question + answer.
+8. `css/style.css` — remove admin-only rules left dead by the removed UI (`.item-meta`, `.coverage-table*`, `.slot*`, `.legend*`).
+9. `README.md` + `docs/deploy-hostinger.md` — question bank and random draw, 25 questions per category, migration for existing installs (hosted: backup, phpMyAdmin import, `CREATE TEMPORARY TABLES` privilege, 7-day JS/CSS cache and CDN purge).
+10. `docs/sprints/sprint-6-dev.md`.
+
+**Rework tasks (2026-10-11, D-31 amended; as delivered, these win over tasks 1, 3-9)**
+11. `sql/schema.sql` + `sql/schema-hosted.sql` — `questions.points INT UNSIGNED NOT NULL` is back with `fk_questions_points` to `point_values(points)` ON UPDATE CASCADE / ON DELETE RESTRICT. Keys: `uq_category_question (category_id, question(191))`, `idx_questions_slot (category_id, points)`, `idx_questions_points (points)`; no `uq_slot`. Seed: 30 original rows plus 120 bank rows with the points from `docs/question-bank.md` = 150 questions, exactly 5 per (category, value 100-500). Bodies stay identical in both files.
+12. `docs/question-bank.md` (PO) — 4 questions per value 100-500 per category (20 per category), ranked by relative difficulty; Science #5 reworded.
+13. `sql/migrate-question-bank.sql` — rewritten to convert the **pre-Sprint 6 slot schema** and keep `points`: add `uq_category_question` and `idx_questions_slot`, drop `uq_slot`, load the 120 bank rows (with points) by category name and point value with `INSERT IGNORE`. Skips renamed/deleted categories, missing point values and duplicate text; re-runnable; aborts cleanly on a same-text duplicate in a category and on a DB converted by the first version (which has no `points`; restore it first).
+14. `api/questions.php` — `points` required again and must exist in `point_values` (400 otherwise), returned in rows; list ordered by category, points, id. `board()` picks `random_int` per (category, points) cell; a category with an empty cell gives 400 `Category "X" is missing questions for: 600` (all missing values, ascending). Payload shape unchanged. `shuffle_secure()` removed.
+15. `api/categories.php` — playable = has questions and `COUNT(DISTINCT points)` equals the number of point values.
+16. `api/points.php` — back to the pre-Sprint 6 behaviour: `question_count` per value; deleting a used value gives 409.
+17. `admin.html` + `js/admin.js` — Points dropdown (required, "Choose a point value.") and Points column are back; categories show "M questions" and "Playable" or "Not playable: missing V1, V2"; point-value list shows per-value counts; add message "Categories need at least one V question to stay playable." No Coverage panel. D-32 edits kept.
+18. `css/style.css` — `.item-meta` restored for the per-value counts; coverage rules stay removed.
+19. `README.md` + `docs/deploy-hostinger.md` — per-cell draw, per-value counts, 409 on used point values, "missing V", what the migration keeps and skips.
+20. **FU-13 (local DB, Done 2026-10-11):** safety dump of the first-version state (`brainrush-backup-sprint6-v1.sql`, outside the repo), restore of `brainrush-backup-pre-sprint6.sql`, migration run twice (155 questions, point values 100-600), settings put back to `categories_per_game = 6`, `timer_seconds = 30`. Science 500 has 4 questions (the owner's "How many bones" row is at 500), and each category has one 600 question (the Egypt set).
+21. `docs/sprints/sprint-6-dev.md` — "Rework 2026-10-11" section.
+
+**Tester focus (first run):** draw randomness and distinctness over repeated board requests; board payload shape and 400s; refresh keeps the drawn board (D-12) and New Game draws a fresh one; playable rule when adding/deleting a point value; case-insensitive duplicate 409; fresh install and migration (including re-run and duplicate abort) on scratch DBs; admin UI without points/coverage; US-29 auth regression; game-flow, 1366x768 / 1920x1080 and console regression.
+
+**Tester focus (re-test after rework):** required and existing `points` (400s); several questions per (category, value); playable only when every value has a question; per-cell random draw (10 boards, every cell valid, no repeats, single-question pools fixed); 400 listing every missing value; delete of a used point value 409; fresh install (150, 5 per cell) and migration of the pre-Sprint 6 backup (36 to 155, re-run, skip test, duplicate abort, first-version DB refused); admin Points column, dropdown and per-value counts; bank content (4 per value, no duplicates); US-29 auth regression; D-32 regression; game cycle, Results, refresh, layout and console; local DB restored to its starting state.
+
+**Definition of Done (Sprint 6, against the global DoD)**
+
+| # | DoD item | Status |
+|---|---|---|
+| 1 | Spec file structure; no hard-coded board size, point values or timer | Met (playable rule compares with `COUNT(*)` of point values; admin "missing V" comes from the point-value list) |
+| 2 | `php -l` clean on all `api/*.php` | Met (8 files, re-checked after the rework) |
+| 3 | Prepared statements only | Met (`board()` builds only `?` placeholders) |
+| 4 | `textContent` / DOM APIs only | Met (no `innerHTML` with data) |
+| 5 | No credentials committed; `api/config.php` git-ignored | Met |
+| 6 | Tester report, no open Critical/Major bugs | Met: first run 35 PASS; re-test after rework 36 PASS, 0 FAIL, 0 PENDING, 0 bugs, 5 observations (`docs/sprints/sprint-6-test-report.md`) |
+| 7 | Developer note | Met (`docs/sprints/sprint-6-dev.md`, incl. "Rework 2026-10-11") |
+| 8 | PO accepted | Met, re-accepted after rework 2026-10-11 |
+| + | PHP 8.0 / MariaDB 10.4 compatible (D-17) | Met (tested on PHP 8.0.30, MariaDB 10.4.32) |
+| + | Owner's local Chrome check | **Open** |
+| + | Commit on `sprint-6` and PR to `main` (owner merges) | **Open** (working tree uncommitted) |
+| + | Hosted migration and smoke check (FU-11) | **Open** |
+
+**Status:** Done (accepted 2026-10-11 after rework)
+
+**Outcome:** The first version (no points on questions) was developed, tested (35 PASS) and accepted on 2026-10-11, then reworked after the owner's review (D-31 amended: points per question, per-cell random draw). The rework was re-tested (36 PASS, 0 FAIL, 0 PENDING, 0 bugs, 5 observations OBS-R1..OBS-R5) and **re-accepted by the Product Owner on 2026-10-11**: US-30 (rewritten, 17 criteria) and the re-amended US-19, US-20, US-21, US-24, US-25 accepted; US-22 stays retired. The first-version PO acceptance is superseded. Fresh install gives 150 questions (5 per category and value); the migration takes the pre-Sprint 6 local DB to 155 and is re-runnable. FU-13 (local DB restore and re-migration) is Done. No story carry-overs. D-31 as amended at the first acceptance still applies: a duplicate question text is rejected case- and accent-insensitively in the first 191 characters (OBS-2, OBS-3 of the first run). D-32 was delivered alongside and regression-checked (PASS).
+
+**Still open (the sprint is accepted but not shipped):**
+- **Owner's local Chrome check** before any commit or push (the tester measured 1366x768 in an iframe and could not run `node --check`, Node.js not being installed). MariaDB was left running for this check.
+- **Commit and PR:** nothing is committed or pushed; the work, including the D-32 changes, is an uncommitted working tree on branch `sprint-6` (modified files plus new `docs/question-bank.md`, `docs/questions-600.md`, `docs/sprints/sprint-6-*.md`, `sql/migrate-question-bank.sql`). Commit, push and PR to `main` follow the owner's Chrome check; the owner merges.
+- **FU-11 (Must, Owner with Developer): hosted migration.** Back up, deploy the code, import `sql/migrate-question-bank.sql` right away (it converts the old slot schema and keeps `points`; the hosted DB was never migrated with the first version, so it is a supported source), check the `CREATE TEMPORARY TABLES` privilege, Ctrl+F5 and CDN purge, smoke check. The hosted Sprint 6 redeploy is not done until this passes. Steps are in `docs/deploy-hostinger.md` 8.4 and 8.5.
+- **FU-10 (Should, Owner):** remove or reword one question of each local near-duplicate pair: Science Mercury (keep the 600 one; the bank one at 400 can go) and Geography Japan (Fuji at 400 or the bank question at 200). Repeat on the hosted DB if present.
+- **FU-12 (Could, Developer):** "Cancel edit" is visible in Add mode (pre-existing, OBS-1); fix with `.btn[hidden] { display: none; }`. Not scheduled; candidate for a later polish sprint.
+- **FU-14 (Could, Owner):** the 600 row is not random locally (one Egypt question per category). Add more 600 questions in Admin to randomise it, without duplicating the bank. Not needed for playability.
+- **FU-15 (Could, PO):** some bank difficulty ranks are debatable (Geography 500 "capital of Brazil", Technology 500 "decimal 5 in binary"). Kept for now; review after the owner has played.
+
+---
+
 ## Story coverage
 
 | Sprint | Stories |
 |---|---|
 | 1 | US-24, US-25, US-26, US-28 |
-| 2 | US-18, US-19, US-20, US-21, US-22, US-23, US-29 |
+| 2 | US-18, US-19, US-20, US-21, US-22 (retired in Sprint 6), US-23, US-29 |
 | 3 | US-01, US-02, US-03, US-04, US-05, US-06, US-07, US-09 |
 | 4 | US-08, US-10, US-11, US-12, US-13, US-14, US-15, US-16, US-17, US-27 |
 | 5 (polish) | none (follow-ups FU-03, FU-04, FU-05, FU-08) |
+| 6 | US-30 (amends US-19, US-20, US-21, US-24, US-25; US-22 stays retired); D-32 (US-04 amended) delivered alongside |
 
-All 29 stories appear exactly once and all 29 are delivered (accepted). Sprint 5 (polish) carries no stories, only follow-ups FU-03, FU-04, FU-05 and FU-08. US-29 (hosted deployment with protected admin) was built on the `hosting` branch after the Sprint 2 stories and is recorded as part of Sprint 2 (owner decision 2026-10-05). Its follow-ups were handled in Sprint 4: the `docs/deploy-hostinger.md` note is done; the hosted `/password.txt` smoke check was done by the owner on 2026-10-05 (FU-01). Notes: US-17 (persistence) is placed in Sprint 4 because its criteria cover the question and results screens; Sprint 3 builds the save/load layer as an enabler. US-27 (XSS) is accepted in Sprint 4 once all UI exists, but DoD item 4 enforces `textContent` from Sprint 2 onward. US-26 is accepted in Sprint 1 where all SQL lives; DoD item 3 keeps it enforced later.
+All 30 stories appear exactly once; 29 are delivered (accepted) and US-22 is retired (D-31). The amended stories stay in the sprint that first delivered them; Sprint 6 changed their behaviour. Sprint 5 (polish) carries no stories, only follow-ups FU-03, FU-04, FU-05 and FU-08. US-29 (hosted deployment with protected admin) was built on the `hosting` branch after the Sprint 2 stories and is recorded as part of Sprint 2 (owner decision 2026-10-05). Its follow-ups were handled in Sprint 4: the `docs/deploy-hostinger.md` note is done; the hosted `/password.txt` smoke check was done by the owner on 2026-10-05 (FU-01). Notes: US-17 (persistence) is placed in Sprint 4 because its criteria cover the question and results screens; Sprint 3 builds the save/load layer as an enabler. US-27 (XSS) is accepted in Sprint 4 once all UI exists, but DoD item 4 enforces `textContent` from Sprint 2 onward. US-26 is accepted in Sprint 1 where all SQL lives; DoD item 3 keeps it enforced later.
 
 ---
 
@@ -195,4 +276,23 @@ All sprints (1-5) are done. Sprint 5 (polish) added no stories. Full wording and
 | FU-05 | Could | Grey (unanswered) cells use the same points-label size as owned cells. | Done 2026-10-05 (Sprint 5) |
 | FU-08 | Could | Results with 6 contestants fits 1366x768 with no page scroll (was 3 px over, existed before Sprint 5). Long-name ties may still scroll (D-30). Added by the PO. | Done 2026-10-05 (Sprint 5) |
 
-**Open items:** none. All follow-ups FU-01..FU-09 are closed (FU-02 won't do, by owner decision).
+**Open items after Sprint 5:** none. All follow-ups FU-01..FU-09 are closed (FU-02 won't do, by owner decision).
+
+---
+
+## Follow-ups (after Sprint 6)
+
+Added by the PO at Sprint 6 acceptance and re-acceptance on 2026-10-11. Full wording is in `docs/product-backlog.md` ("Follow-ups after Sprint 6").
+
+| ID | Priority | Owner | Item | Status |
+|---|---|---|---|---|
+| FU-10 | Should | Owner | Remove or reword one question of each local near-duplicate pair: Science "only metal that is liquid at room temperature" vs bank "metal liquid at normal room temperature" (Mercury); Geography "Mount Fuji is located in which country?" vs bank "islands of Honshu" question (Japan). Keep Science's only 600 question; Fuji (400) or the bank Japan question (200) can go. Repeat on the hosted DB if present. | Open |
+| FU-11 | Must | Owner (with Developer) | Hosted Sprint 6 migration: backup, deploy code, import `sql/migrate-question-bank.sql` right away, check `CREATE TEMPORARY TABLES` privilege, Ctrl+F5 and CDN purge, smoke check. The hosted redeploy is not done until this passes. | Open |
+| FU-12 | Could | Developer | "Cancel edit" visible in Add mode on the admin Questions form (pre-existing); add `.btn[hidden] { display: none; }`. | Open |
+| FU-13 | Must (environment) | Developer | Local DB after the D-31 amendment: restore the pre-Sprint 6 backup and re-run the new migration (155 questions, point values 100-600, settings 6 / 30). | Done 2026-10-11 |
+| FU-14 | Could | Owner | The 600 row is not random locally (one Egypt question per category); add more 600 questions in Admin to randomise it, without duplicating the bank. Not needed for playability. | Open |
+| FU-15 | Could | PO | Some bank difficulty ranks are debatable; kept for now, review after the owner has played. | Open (review after play feedback) |
+
+**Other open Sprint 6 steps (not follow-ups):** the owner's local Chrome check, then commit on `sprint-6` and PR to `main`.
+
+**Open items:** FU-10, FU-11, FU-12, FU-14, FU-15, plus the owner's Chrome check and the commit/PR above.

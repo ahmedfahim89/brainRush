@@ -1,11 +1,12 @@
-// BrainRush admin page: settings, point values, categories, questions and coverage grid.
+// BrainRush admin page: settings, point values, categories and questions.
+// Question bank (D-31 amended): every question has a point value, a category may have
+// several questions per value, and it is playable when every point value has one.
 // All API/user text is rendered with textContent / DOM APIs (never innerHTML).
 'use strict';
 
 (function () {
   const API_BASE = 'api/';
-  const SLOT_FILLED = String.fromCharCode(0x2713); // check mark
-  const SLOT_EMPTY = String.fromCharCode(0x2013);  // en dash
+  const LABEL_MAX = 60; // question text length used in confirms and button labels
 
   const state = {
     settings: null,    // { categories_per_game, timer_seconds }
@@ -47,7 +48,6 @@
     questionsMsg: byId('questions-msg'),
     qFilter: byId('question-filter'),
     questionsBody: byId('questions-body'),
-    coverage: byId('coverage-table'),
   };
 
   // ---------- Generic helpers ----------
@@ -77,6 +77,11 @@
 
   function plural(count, word, pluralWord) {
     return count + ' ' + (count === 1 ? word : (pluralWord || word + 's'));
+  }
+
+  /** Shorten long text for confirms and labels (questions have no other short name). */
+  function shortText(text) {
+    return text.length > LABEL_MAX ? text.slice(0, LABEL_MAX - 3) + '...' : text;
   }
 
   class ApiError extends Error {
@@ -251,7 +256,6 @@
     renderCategories();
     renderQuestionSelects();
     renderQuestions();
-    renderCoverage();
   }
 
   function findCategory(id) {
@@ -278,7 +282,7 @@
   function onSettingsSubmit(event) {
     event.preventDefault();
     clearMessage(dom.settingsMsg);
-    const perGame = readIntField(dom.settingCategories, 'Categories per game');
+    const perGame = readIntField(dom.settingCategories, 'Max categories per game');
     const timer = readIntField(dom.settingTimer, 'Timer');
     const errors = [perGame.error, timer.error].filter(Boolean);
     if (errors.length) {
@@ -332,7 +336,8 @@
       await api('points.php', 'POST', { points: parsed.value });
       dom.pointNew.value = '';
       await refreshData();
-      showSuccess(dom.pointsMsg, 'Point value ' + parsed.value + ' added. Categories need a ' + parsed.value + ' question to stay playable.');
+      showSuccess(dom.pointsMsg, 'Point value ' + parsed.value + ' added. Categories need at least one ' +
+        parsed.value + ' question to stay playable.');
     });
   }
 
@@ -347,17 +352,26 @@
 
   // ---------- Categories (US-20) ----------
 
+  /** Point values (ascending) that have no question in the category yet. */
+  function missingPoints(categoryId) {
+    const used = {};
+    state.questions.forEach((q) => {
+      if (q.category_id === categoryId) used[q.points] = true;
+    });
+    return state.points.map((p) => p.points).filter((p) => !used[p]);
+  }
+
   function isPlayable(category) {
-    return state.points.length > 0 && category.question_count >= state.points.length;
+    return state.points.length > 0 && missingPoints(category.id).length === 0;
   }
 
   function renderCategorySummary() {
     const total = state.categories.length;
     const playable = state.categories.filter(isPlayable).length;
     let text = playable + ' of ' + plural(total, 'category', 'categories') +
-      (total === 1 ? ' is' : ' are') + ' playable (a question for every point value).';
+      (total === 1 ? ' is' : ' are') + ' playable (at least one question for every point value).';
     if (state.settings && state.settings.categories_per_game !== null) {
-      text += ' A game needs ' + state.settings.categories_per_game + '.';
+      text += ' A game can use up to ' + state.settings.categories_per_game + '.';
     }
     dom.categoriesSummary.textContent = text;
   }
@@ -385,14 +399,19 @@
     return renameInput;
   }
 
+  /** Count cell "M questions" and a status badge: "Playable" or "Not playable: missing V1, V2". */
   function categoryCells(c) {
-    const total = state.points.length;
-    const missing = Math.max(total - c.question_count, 0);
-    const status = isPlayable(c)
-      ? h('span', { className: 'badge badge-ok', text: 'Playable' })
-      : h('span', { className: 'badge badge-missing', text: missing + ' missing' });
+    const missing = missingPoints(c.id);
+    let status;
+    if (isPlayable(c)) {
+      status = h('span', { className: 'badge badge-ok', text: 'Playable' });
+    } else if (!state.points.length) {
+      status = h('span', { className: 'badge badge-missing', text: 'Not playable: no point values' });
+    } else {
+      status = h('span', { className: 'badge badge-missing', text: 'Not playable: missing ' + missing.join(', ') });
+    }
     return [
-      h('td', { className: 'num', text: c.question_count + ' / ' + total }),
+      h('td', { className: 'num', text: plural(c.question_count, 'question') }),
       h('td', {}, [status]),
     ];
   }
@@ -537,43 +556,22 @@
     select.value = findCategory(Number(previous)) ? previous : '';
   }
 
+  /** All point values (no free-slot filtering: a value may hold several questions). */
+  function fillPointOptions() {
+    const previous = dom.qPoints.value;
+    clear(dom.qPoints);
+    const firstLabel = state.points.length ? 'Choose points' : 'Add a point value first';
+    dom.qPoints.appendChild(h('option', { value: '', text: firstLabel }));
+    state.points.forEach((p) => {
+      dom.qPoints.appendChild(h('option', { value: String(p.points), text: String(p.points) }));
+    });
+    dom.qPoints.value = state.points.some((p) => String(p.points) === previous) ? previous : '';
+  }
+
   function renderQuestionSelects() {
     fillCategoryOptions(dom.qFilter, 'All categories');
     fillCategoryOptions(dom.qCategory, 'Choose a category');
-    renderPointOptions();
-  }
-
-  /** Point values of a category that have no question yet (the edited question's own slot counts as free). */
-  function freeSlots(categoryId) {
-    const taken = {};
-    state.questions.forEach((q) => {
-      if (q.category_id === categoryId) taken[q.points] = true;
-    });
-    if (state.editing && state.editing.category_id === categoryId) delete taken[state.editing.points];
-    return state.points.map((p) => p.points).filter((p) => !taken[p]);
-  }
-
-  /** Rebuild the points dropdown for the selected category; keeps `preferred` (or the current value) if still free. */
-  function renderPointOptions(preferred) {
-    const categoryId = Number(dom.qCategory.value);
-    const wanted = Number(preferred !== undefined ? preferred : dom.qPoints.value);
-    clear(dom.qPoints);
-    if (!categoryId) {
-      dom.qPoints.appendChild(h('option', { value: '', text: 'Choose a category first' }));
-      dom.qPoints.disabled = true;
-      return;
-    }
-    const free = freeSlots(categoryId);
-    if (!free.length) {
-      dom.qPoints.appendChild(h('option', { value: '', text: 'No free slots - category is full' }));
-      dom.qPoints.disabled = true;
-      return;
-    }
-    dom.qPoints.disabled = false;
-    free.forEach((p) => {
-      dom.qPoints.appendChild(h('option', { value: String(p), text: String(p) }));
-    });
-    dom.qPoints.value = String(free.indexOf(wanted) !== -1 ? wanted : free[0]);
+    fillPointOptions();
   }
 
   function renderQuestions() {
@@ -588,7 +586,7 @@
     }
     rows.forEach((q) => {
       const isEditing = state.editing !== null && state.editing.id === q.id;
-      const label = q.category_name + ' ' + q.points;
+      const label = '"' + shortText(q.question) + '" (' + q.category_name + ' - ' + q.points + ')';
       dom.questionsBody.appendChild(h('tr', { className: isEditing ? 'is-editing' : '' }, [
         h('td', { className: 'name-cell', text: q.category_name }),
         h('td', { className: 'num', text: String(q.points) }),
@@ -641,7 +639,7 @@
     clearMessage(dom.questionsMsg);
     state.editing = q;
     dom.qCategory.value = String(q.category_id);
-    renderPointOptions(q.points);
+    dom.qPoints.value = String(q.points);
     dom.qText.value = q.question;
     dom.qAnswer.value = q.answer;
     setFormMode();
@@ -649,20 +647,9 @@
     focusQuestionForm();
   }
 
-  /** Prefill the add form for an empty coverage slot. */
-  function startAddFor(categoryId, points) {
-    clearMessage(dom.questionsMsg);
-    if (state.editing) resetQuestionForm();
-    dom.qCategory.value = String(categoryId);
-    renderPointOptions(points);
-    renderQuestions();
-    focusQuestionForm();
-  }
-
   function cancelEdit() {
     clearMessage(dom.questionsMsg);
     resetQuestionForm();
-    renderPointOptions();
     renderQuestions();
   }
 
@@ -670,11 +657,8 @@
     const errors = [];
     const categoryId = Number(dom.qCategory.value);
     const points = Number(dom.qPoints.value);
-    if (!categoryId) {
-      errors.push('Choose a category.');
-    } else if (!points) {
-      errors.push('This category has no free point slot. Add a point value or edit an existing question.');
-    }
+    if (!categoryId) errors.push('Choose a category.');
+    if (!points) errors.push(state.points.length ? 'Choose a point value.' : 'Add a point value first.');
     if (!dom.qText.value.trim()) errors.push('Question is required.');
     if (!dom.qAnswer.value.trim()) errors.push('Answer is required.');
     return {
@@ -712,7 +696,8 @@
   }
 
   function deleteQuestion(q) {
-    if (!window.confirm('Delete the ' + q.points + ' question of "' + q.category_name + '"?')) return;
+    const prompt = 'Delete this ' + q.points + ' question from "' + q.category_name + '"?\n\n' + shortText(q.question);
+    if (!window.confirm(prompt)) return;
     runAction(dom.questionsMsg, [], async () => {
       await api('questions.php?id=' + encodeURIComponent(q.id), 'DELETE');
       if (state.editing && state.editing.id === q.id) resetQuestionForm();
@@ -726,50 +711,7 @@
     // In add mode, preselect the filtered category in the form for faster entry.
     if (!state.editing && dom.qFilter.value) {
       dom.qCategory.value = dom.qFilter.value;
-      renderPointOptions();
     }
-  }
-
-  // ---------- Coverage grid (US-22) ----------
-
-  function renderCoverage() {
-    const table = dom.coverage;
-    clear(table);
-    if (!state.categories.length || !state.points.length) {
-      table.appendChild(h('caption', { className: 'hint', text: 'Add categories and point values to see coverage.' }));
-      return;
-    }
-    const filled = {};
-    state.questions.forEach((q) => { filled[q.category_id + ':' + q.points] = q; });
-
-    const head = h('tr', {}, [h('th', { scope: 'col', className: 'cat-name', text: 'Category' })]);
-    state.points.forEach((p) => {
-      head.appendChild(h('th', { scope: 'col', className: 'point-head', text: String(p.points) }));
-    });
-    head.appendChild(h('th', { scope: 'col', text: 'Filled' }));
-    table.appendChild(h('thead', {}, [head]));
-
-    const body = h('tbody');
-    state.categories.forEach((c) => {
-      const row = h('tr', {}, [h('th', { scope: 'row', className: 'cat-name', text: c.name, title: c.name })]);
-      let count = 0;
-      state.points.forEach((p) => {
-        const q = filled[c.id + ':' + p.points] || null;
-        if (q) count += 1;
-        const label = c.name + ' - ' + p.points + ': ' + (q ? 'filled (click to edit)' : 'empty (click to add)');
-        row.appendChild(h('td', {}, [h('button', {
-          type: 'button',
-          className: 'slot ' + (q ? 'slot-filled' : 'slot-empty'),
-          text: q ? SLOT_FILLED : SLOT_EMPTY,
-          title: label,
-          'aria-label': label,
-          onclick: () => (q ? startEdit(q) : startAddFor(c.id, p.points)),
-        })]));
-      });
-      row.appendChild(h('td', { className: 'total', text: count + ' / ' + state.points.length }));
-      body.appendChild(row);
-    });
-    table.appendChild(body);
   }
 
   // ---------- Startup ----------
@@ -780,7 +722,6 @@
     dom.categoryForm.addEventListener('submit', onCategorySubmit);
     dom.qForm.addEventListener('submit', onQuestionSubmit);
     dom.qCancel.addEventListener('click', cancelEdit);
-    dom.qCategory.addEventListener('change', () => renderPointOptions());
     dom.qFilter.addEventListener('change', onFilterChange);
     dom.authRetry.addEventListener('click', checkAuth);
   }

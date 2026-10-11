@@ -549,7 +549,7 @@
 
   function renderCategories() {
     const s = state.setup;
-    dom.catLegend.textContent = s.perGame ? 'Select ' + plural(s.perGame, 'category', 'categories') : 'Select categories';
+    dom.catLegend.textContent = s.perGame ? 'Select up to ' + plural(s.perGame, 'category', 'categories') : 'Select categories';
     clear(dom.catList);
     clearMessage(dom.catWarning);
     if (s.loading || s.loadError === 'network') {
@@ -570,33 +570,35 @@
     if (!s.playable.length) {
       dom.catList.appendChild(h('li', { className: 'hint', text: 'No playable categories yet.' }));
     }
-    if (s.perGame !== null && s.playable.length < s.perGame) renderNotEnough();
+    if (s.perGame !== null && !s.playable.length) renderNotEnough();
     renderCategorySelection();
   }
 
-  /** D-11: fewer playable categories than a game needs -> message with Admin link, Start disabled. */
+  /** D-11 (amended by D-32): no playable category at all -> message with Admin link, Start disabled. */
   function renderNotEnough() {
-    const s = state.setup;
     clear(dom.catWarning);
     dom.catWarning.appendChild(document.createTextNode(
-      'Not enough playable categories ' + String.fromCharCode(0x2014) + ' add questions in '));
+      'No playable categories ' + String.fromCharCode(0x2014) + ' add questions in '));
     dom.catWarning.appendChild(h('a', { href: 'admin.html', text: 'Admin' }));
     dom.catWarning.appendChild(document.createTextNode(
-      '. A game needs ' + s.perGame + '; ' + s.playable.length + ' ' +
-      (s.playable.length === 1 ? 'is' : 'are') + ' playable (a question for every point value).'));
+      '. A category is playable when it has a question for every point value.'));
     dom.catWarning.hidden = false;
   }
 
-  /** Update the "k of N selected" text and the selection-order badges (board column order). */
+  /** Update the "k of up to N selected" text, the selection-order badges (board column order)
+   *  and lock the unticked boxes once N are ticked (D-32). */
   function renderCategorySelection() {
     const s = state.setup;
     const count = s.selected.length;
+    const full = s.perGame !== null && count >= s.perGame;
     dom.catCount.textContent = s.perGame
-      ? count + ' of ' + s.perGame + ' selected. Columns follow the order you tick them.'
+      ? count + ' of up to ' + s.perGame + ' selected. Columns follow the order you tick them.'
       : count + ' selected.';
     Array.prototype.forEach.call(dom.catList.querySelectorAll('.cat-label'), (label) => {
       const order = s.selected.indexOf(Number(label.getAttribute('data-cat')));
       label.classList.toggle('is-selected', order !== -1);
+      label.classList.toggle('is-locked', full && order === -1);
+      label.querySelector('input').disabled = full && order === -1;
       label.querySelector('.cat-order').textContent = order === -1 ? '' : String(order + 1);
     });
   }
@@ -683,7 +685,7 @@
     if (s.loading) return 'loading';
     if (s.starting) return 'starting';
     if (s.loadError) return 'load error';
-    if (s.perGame === null || s.playable.length < s.perGame) return 'not enough categories';
+    if (s.perGame === null || !s.playable.length) return 'not enough categories';
     if (s.entries.length > currentMode().limit) return 'too many entries';
     return '';
   }
@@ -713,14 +715,17 @@
     return ok;
   }
 
+  /** D-32: at least 1 and at most N categories. */
   function validateCategoryCount() {
     const s = state.setup;
-    if (s.selected.length === s.perGame) {
+    const count = s.selected.length;
+    if (count >= 1 && count <= s.perGame) {
       clearMessage(dom.catError);
       return true;
     }
-    showMessage(dom.catError, 'Select exactly ' + plural(s.perGame, 'category', 'categories') +
-      ' (' + s.selected.length + ' selected).', 'error');
+    showMessage(dom.catError, count < 1
+      ? 'Select at least 1 category.'
+      : 'Select up to ' + plural(s.perGame, 'category', 'categories') + ' (' + count + ' selected).', 'error');
     return false;
   }
 
