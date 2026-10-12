@@ -1,0 +1,3 @@
+#!/bin/sh
+# Give changed JS/CSS files a new content-hashed name before each commit.
+exec sh "$(git rev-parse --show-toplevel)/.githooks/hash-assets.sh"

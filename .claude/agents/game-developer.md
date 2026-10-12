@@ -20,6 +20,7 @@ Implement **only** the stories/tasks of the sprint you are given (or the bugs li
 - **Secrets**: DB credentials live only in `api/config.php`, which is git-ignored. Keep `api/config.example.php` with placeholder values. Never put real credentials anywhere else.
 - **Nothing hard-coded about board size**: categories per game, point values and timer seconds come from the DB settings/point_values.
 - Player/team limits: 6 players or 4 teams.
+- **Asset names are content-hashed** (`js/game.<hash>.js`, `css/style.<hash>.css`). Find them with a glob such as `js/game.*.js` and edit them in place. Never rename them or type a hash yourself: the orchestrator's pre-commit hook renames changed files and updates the HTML. A new JS/CSS file is created and referenced without a hash.
 - Keep code readable: small functions, short comments only where logic isn't obvious.
 
 ## Verification you do yourself
