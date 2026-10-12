@@ -104,6 +104,7 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 }
 @media (hover: hover) { .btn:hover:not(:disabled) { border-color: var(--gold); } }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn[hidden] { display: none; }
 .btn-primary { background: var(--gold); color: #1a1a1a; border-color: var(--gold); font-weight: 600; }
 @media (hover: hover) { .btn-primary:hover:not(:disabled) { background: #ffd84a; } }
 .btn-danger { color: var(--danger); border-color: rgba(255, 107, 107, 0.5); }
@@ -526,7 +527,7 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 }
 .answer-text:focus { outline: none; }
 #answer-value { white-space: pre-wrap; }
-.answer-text[hidden], .answer-block .btn[hidden] { display: none; }
+.answer-text[hidden] { display: none; }
 .answer-label { display: block; color: var(--muted); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
 
 .scoring h3 { color: var(--gold); margin-bottom: 0.2rem; }
