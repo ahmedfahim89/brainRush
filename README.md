@@ -30,6 +30,18 @@ Project documents: `docs/spec.md`, `docs/product-backlog.md` and `docs/sprint-pl
    - the game: `http://localhost:8000/`
    - the admin page: `http://localhost:8000/admin.html`
    - the API: `http://localhost:8000/api/` (for example `/api/settings.php`)
+5. **Turn on the git hook** once per clone (only needed if you commit):
+   ```
+   git config core.hooksPath .githooks
+   ```
+
+### Asset file names (cache busting)
+
+The host caches JavaScript and CSS for 7 days. To make sure browsers always get the current version, each file name contains a hash of the file's content, for example `js/game.dfec3b1c.js`. The pre-commit hook (`.githooks/pre-commit`, which runs `.githooks/hash-assets.sh`) renames every changed `js/*.js` and `css/*.css` file and updates the `<script>`/`<link>` tags in the HTML pages. Files that did not change keep their names.
+
+- Edit the file under its current name. Don't rename it by hand and don't write the hash anywhere else.
+- To add a new file, create it without a hash (`js/foo.js`), reference it under that name in the HTML, and `git add` both. The hook renames the file and updates the reference.
+- The hook only sees staged content. It runs on a plain `git commit` or `git commit -a`. To rename by hand, stage your changes and run `sh .githooks/hash-assets.sh`.
 
 ## How to play
 
