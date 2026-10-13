@@ -2,7 +2,8 @@
 // GET    /api/questions.php                          -> all questions
 // GET    /api/questions.php?category_id=<id>         -> one category's questions
 // GET    /api/questions.php?board=1&categories=3,1,2 -> board payload (requested order)
-// POST   /api/questions.php                          body { category_id, points, question, answer } -> 201
+// POST   /api/questions.php                          body { category_id, points, question, answer,
+//                                                          question_ar?, answer_ar? } -> 201
 // PUT    /api/questions.php?id=<id>                  body: any of the POST fields -> 200
 // DELETE /api/questions.php?id=<id>                  -> 200
 // Writes need admin access (require_admin: 401/403 otherwise).
@@ -16,7 +17,8 @@ const QUESTION_TEXT_MAX = 5000;
 const BOARD_MAX_CATEGORIES = 50;
 
 const QUESTION_SELECT =
-    'SELECT q.id, q.category_id, c.name AS category_name, q.points, q.question, q.answer
+    'SELECT q.id, q.category_id, c.name AS category_name, q.points, q.question, q.answer,
+           q.question_ar, q.answer_ar
        FROM questions q
        JOIN categories c ON c.id = q.category_id';
 
@@ -29,6 +31,8 @@ function question_row(array $r): array
         'points'        => (int) $r['points'],
         'question'      => $r['question'],
         'answer'        => $r['answer'],
+        'question_ar'   => $r['question_ar'],
+        'answer_ar'     => $r['answer_ar'],
     ];
 }
 
@@ -83,7 +87,7 @@ function parse_board_ids($raw): array
 }
 
 /**
- * Board payload: { points: [...asc], categories: [{id, name, questions: {<points>: {question, answer}}}] }
+ * Board payload: { points: [...asc], categories: [{id, name, questions: {<points>: {question, answer, question_ar, answer_ar}}}] }
  * Every cell (category x point value) gets one random question from that cell's
  * questions (US-30). Cells hold different questions, so a board never repeats one.
  */
@@ -102,12 +106,17 @@ function board(PDO $pdo, array $ids): array
     $points = array_map('intval', $pdo->query('SELECT points FROM point_values ORDER BY points ASC')->fetchAll(PDO::FETCH_COLUMN));
 
     $stmt = $pdo->prepare(
-        "SELECT category_id, points, question, answer FROM questions WHERE category_id IN ($placeholders) ORDER BY id ASC"
+        "SELECT category_id, points, question, answer, question_ar, answer_ar FROM questions WHERE category_id IN ($placeholders) ORDER BY id ASC"
     );
     $stmt->execute($ids);
     $pools = [];
     foreach ($stmt->fetchAll() as $r) {
-        $pools[(int) $r['category_id']][(int) $r['points']][] = ['question' => $r['question'], 'answer' => $r['answer']];
+        $pools[(int) $r['category_id']][(int) $r['points']][] = [
+            'question'    => $r['question'],
+            'answer'      => $r['answer'],
+            'question_ar' => $r['question_ar'],
+            'answer_ar'   => $r['answer_ar'],
+        ];
     }
 
     $categories = [];
@@ -131,7 +140,23 @@ function board(PDO $pdo, array $ids): array
     return ['points' => $points, 'categories' => $categories];
 }
 
-/** Validate question fields; returns [category_id, points, question, answer] or sends 400. */
+/** Optional text: null/empty -> null; otherwise trimmed and within $maxChars. */
+function optional_text($value, string $label, int $maxChars): ?string
+{
+    if ($value !== null && !is_string($value)) {
+        bad_request("$label must be text");
+    }
+    $text = trim((string) $value);
+    if ($text === '') {
+        return null;
+    }
+    if (text_length($text) > $maxChars) {
+        bad_request("$label must be at most $maxChars characters");
+    }
+    return $text;
+}
+
+/** Validate question fields; returns [category_id, points, question, answer, question_ar, answer_ar] or sends 400. */
 function validate_question(PDO $pdo, array $data): array
 {
     $categoryId = parse_int($data['category_id'] ?? null);
@@ -144,6 +169,12 @@ function validate_question(PDO $pdo, array $data): array
     }
     $question = require_text($data['question'] ?? null, 'Question', QUESTION_TEXT_MAX);
     $answer = require_text($data['answer'] ?? null, 'Answer', QUESTION_TEXT_MAX);
+    $questionAr = optional_text($data['question_ar'] ?? null, 'Arabic question', QUESTION_TEXT_MAX);
+    $answerAr = optional_text($data['answer_ar'] ?? null, 'Arabic answer', QUESTION_TEXT_MAX);
+    // All-or-nothing so a revealed question never mixes languages.
+    if (($questionAr === null) !== ($answerAr === null)) {
+        bad_request('Provide both the Arabic question and the Arabic answer, or neither');
+    }
 
     $stmt = $pdo->prepare('SELECT 1 FROM categories WHERE id = :id');
     $stmt->execute([':id' => $categoryId]);
@@ -155,7 +186,7 @@ function validate_question(PDO $pdo, array $data): array
     if (!$stmt->fetchColumn()) {
         bad_request("Point value $points does not exist");
     }
-    return [$categoryId, $points, $question, $answer];
+    return [$categoryId, $points, $question, $answer, $questionAr, $answerAr];
 }
 
 /** Execute an INSERT/UPDATE of a question, mapping constraint errors to 409/400. */
@@ -177,16 +208,18 @@ function save_question(PDOStatement $stmt, array $params): void
 
 function create_question(PDO $pdo, array $body): void
 {
-    [$categoryId, $points, $question, $answer] = validate_question($pdo, $body);
+    [$categoryId, $points, $question, $answer, $questionAr, $answerAr] = validate_question($pdo, $body);
     $stmt = $pdo->prepare(
-        'INSERT INTO questions (category_id, points, question, answer)
-         VALUES (:category_id, :points, :question, :answer)'
+        'INSERT INTO questions (category_id, points, question, answer, question_ar, answer_ar)
+         VALUES (:category_id, :points, :question, :answer, :question_ar, :answer_ar)'
     );
     save_question($stmt, [
         ':category_id' => $categoryId,
         ':points'      => $points,
         ':question'    => $question,
         ':answer'      => $answer,
+        ':question_ar' => $questionAr,
+        ':answer_ar'   => $answerAr,
     ]);
     json_response(find_question($pdo, (int) $pdo->lastInsertId()), 201);
 }
@@ -199,13 +232,14 @@ function update_question(PDO $pdo, int $id, array $body): void
     }
     // Fields not sent keep their current value.
     $merged = [];
-    foreach (['category_id', 'points', 'question', 'answer'] as $field) {
+    foreach (['category_id', 'points', 'question', 'answer', 'question_ar', 'answer_ar'] as $field) {
         $merged[$field] = array_key_exists($field, $body) ? $body[$field] : $existing[$field];
     }
-    [$categoryId, $points, $question, $answer] = validate_question($pdo, $merged);
+    [$categoryId, $points, $question, $answer, $questionAr, $answerAr] = validate_question($pdo, $merged);
     $stmt = $pdo->prepare(
         'UPDATE questions
-            SET category_id = :category_id, points = :points, question = :question, answer = :answer
+            SET category_id = :category_id, points = :points, question = :question, answer = :answer,
+                question_ar = :question_ar, answer_ar = :answer_ar
           WHERE id = :id'
     );
     save_question($stmt, [
@@ -213,6 +247,8 @@ function update_question(PDO $pdo, int $id, array $body): void
         ':points'      => $points,
         ':question'    => $question,
         ':answer'      => $answer,
+        ':question_ar' => $questionAr,
+        ':answer_ar'   => $answerAr,
         ':id'          => $id,
     ]);
     json_response(find_question($pdo, $id));

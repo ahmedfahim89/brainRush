@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BrainRush - Admin</title>
-  <link rel="stylesheet" href="css/style.b200ad92.css">
+  <link rel="stylesheet" href="css/style.3ca39c35.css">
 </head>
 <body class="admin">
   <header class="page-header">
@@ -88,6 +88,10 @@
         <textarea id="question-text" rows="3" maxlength="5000" required></textarea>
         <label for="question-answer">Answer</label>
         <input id="question-answer" type="text" maxlength="5000" required>
+        <label for="question-text-ar">Arabic question (optional)</label>
+        <textarea id="question-text-ar" rows="3" maxlength="5000" dir="rtl" lang="ar"></textarea>
+        <label for="question-answer-ar">Arabic answer (optional, required if the Arabic question is filled)</label>
+        <input id="question-answer-ar" type="text" maxlength="5000" dir="rtl" lang="ar">
         <div class="actions">
           <button type="submit" id="question-save" class="btn btn-primary">Add question</button>
           <button type="button" id="question-cancel" class="btn" hidden>Cancel edit</button>
@@ -102,7 +106,7 @@
       <div class="table-wrap">
         <table class="data-table">
           <thead>
-            <tr><th scope="col">Category</th><th scope="col">Points</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Actions</th></tr>
+            <tr><th scope="col">Category</th><th scope="col">Points</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Arabic</th><th scope="col">Actions</th></tr>
           </thead>
           <tbody id="questions-body"></tbody>
         </table>
@@ -110,6 +114,6 @@
     </section>
   </main>
 
-  <script src="js/admin.e4f80f2b.js"></script>
+  <script src="js/admin.2975f08a.js"></script>
 </body>
 </html>
