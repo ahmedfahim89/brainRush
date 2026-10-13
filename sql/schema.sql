@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS questions (
   points      INT UNSIGNED NOT NULL,
   question    TEXT         NOT NULL,
   answer      TEXT         NOT NULL,
+  question_ar TEXT         NULL,
+  answer_ar   TEXT         NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_category_question (category_id, question(191)),
   KEY idx_questions_slot (category_id, points),

@@ -92,6 +92,7 @@
     timerPause: byId('timer-pause'),
     timerReset: byId('timer-reset'),
     timerStatus: byId('timer-status'),
+    langBtn: byId('lang-btn'),
     answerBtn: byId('answer-btn'),
     answerText: byId('answer-text'),
     answerValue: byId('answer-value'),
@@ -763,7 +764,15 @@
         const questions = {};
         points.forEach((p) => {
           const q = c.questions[String(p)];
-          questions[String(p)] = { question: q.question, answer: q.answer };
+          // The Arabic version only counts when both halves are present.
+          const arabic = typeof q.question_ar === 'string' && q.question_ar.trim() &&
+            typeof q.answer_ar === 'string' && q.answer_ar.trim();
+          questions[String(p)] = {
+            question: q.question,
+            answer: q.answer,
+            question_ar: arabic ? q.question_ar : null,
+            answer_ar: arabic ? q.answer_ar : null,
+          };
         });
         return { id: c.id, name: c.name, questions: questions };
       }),
@@ -967,14 +976,50 @@
     const category = findCategory(g, cur.catId);
     const q = category.questions[String(cur.points)];
     dom.qHeading.textContent = category.name + ' ' + EN_DASH + ' ' + cur.points;
-    dom.qText.textContent = q.question;
-    dom.qText.style.setProperty('--q-scale', String(questionScale(q.question)));
-    dom.answerValue.textContent = q.answer;
+    // Arabic first when the question has an Arabic version; a restored choice is kept.
+    if (!hasArabic(q)) cur.lang = 'en';
+    else if (cur.lang !== 'en' && cur.lang !== 'ar') cur.lang = 'ar';
+    renderQuestionLang(q);
     renderAnswerState();
     renderScoringRows();
     showScreen('question'); // also saves the state
     startTimer(g.timerSeconds);
     dom.qHeading.focus();
+  }
+
+  function hasArabic(q) {
+    return typeof q.question_ar === 'string' && q.question_ar !== '' &&
+      typeof q.answer_ar === 'string' && q.answer_ar !== '';
+  }
+
+  /** Show the question and its answer in the open question's language (cur.lang). */
+  function renderQuestionLang(q) {
+    const arabic = state.game.current.lang === 'ar';
+    const question = arabic ? q.question_ar : q.question;
+    const dir = arabic ? 'rtl' : 'ltr';
+    const lang = arabic ? 'ar' : 'en';
+    dom.qText.textContent = question;
+    dom.qText.dir = dir;
+    dom.qText.lang = lang;
+    dom.qText.style.setProperty('--q-scale', String(questionScale(question)));
+    dom.answerValue.textContent = arabic ? q.answer_ar : q.answer;
+    dom.answerValue.dir = dir;
+    dom.answerValue.lang = lang;
+    dom.answerText.classList.toggle('is-rtl', arabic);
+    dom.langBtn.hidden = !hasArabic(q);
+    dom.langBtn.textContent = arabic ? 'English' : 'العربية';
+    dom.langBtn.lang = arabic ? 'en' : 'ar';
+    dom.langBtn.setAttribute('aria-label', arabic ? 'Show question in English' : 'Show question in Arabic');
+  }
+
+  function toggleLang() {
+    const cur = state.game && state.game.current;
+    if (!cur) return;
+    const q = findCategory(state.game, cur.catId).questions[String(cur.points)];
+    if (!hasArabic(q)) return;
+    cur.lang = cur.lang === 'ar' ? 'en' : 'ar';
+    renderQuestionLang(q);
+    saveState();
   }
 
   /**
@@ -1227,6 +1272,7 @@
     dom.endBtn.addEventListener('click', endGame);
     dom.boardDoneBtn.addEventListener('click', endGame);
     dom.answerBtn.addEventListener('click', showAnswer);
+    dom.langBtn.addEventListener('click', toggleLang);
     dom.timerPause.addEventListener('click', onPauseClick);
     dom.timerReset.addEventListener('click', onResetClick);
     dom.backBtn.addEventListener('click', backToBoard);

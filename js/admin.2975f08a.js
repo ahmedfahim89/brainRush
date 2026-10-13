@@ -43,6 +43,8 @@
     qPoints: byId('question-points'),
     qText: byId('question-text'),
     qAnswer: byId('question-answer'),
+    qTextAr: byId('question-text-ar'),
+    qAnswerAr: byId('question-answer-ar'),
     qSave: byId('question-save'),
     qCancel: byId('question-cancel'),
     questionsMsg: byId('questions-msg'),
@@ -580,7 +582,7 @@
     clear(dom.questionsBody);
     if (!rows.length) {
       dom.questionsBody.appendChild(h('tr', {}, [
-        h('td', { className: 'empty-row', colSpan: 5, text: 'No questions yet.' }),
+        h('td', { className: 'empty-row', colSpan: 6, text: 'No questions yet.' }),
       ]));
       return;
     }
@@ -592,6 +594,7 @@
         h('td', { className: 'num', text: String(q.points) }),
         h('td', { className: 'text-cell', text: q.question }),
         h('td', { className: 'text-cell', text: q.answer }),
+        h('td', { className: 'text-cell', text: q.question_ar ? 'Yes' : '-' }),
         h('td', { className: 'row-actions' }, [
           h('button', {
             type: 'button',
@@ -627,6 +630,8 @@
     state.editing = null;
     dom.qText.value = '';
     dom.qAnswer.value = '';
+    dom.qTextAr.value = '';
+    dom.qAnswerAr.value = '';
     setFormMode();
   }
 
@@ -642,6 +647,8 @@
     dom.qPoints.value = String(q.points);
     dom.qText.value = q.question;
     dom.qAnswer.value = q.answer;
+    dom.qTextAr.value = q.question_ar || '';
+    dom.qAnswerAr.value = q.answer_ar || '';
     setFormMode();
     renderQuestions();
     focusQuestionForm();
@@ -661,6 +668,9 @@
     if (!points) errors.push(state.points.length ? 'Choose a point value.' : 'Add a point value first.');
     if (!dom.qText.value.trim()) errors.push('Question is required.');
     if (!dom.qAnswer.value.trim()) errors.push('Answer is required.');
+    if (!dom.qTextAr.value.trim() !== !dom.qAnswerAr.value.trim()) {
+      errors.push('Fill in both the Arabic question and the Arabic answer, or leave both empty.');
+    }
     return {
       errors: errors,
       body: {
@@ -668,6 +678,8 @@
         points: points,
         question: dom.qText.value.trim(),
         answer: dom.qAnswer.value.trim(),
+        question_ar: dom.qTextAr.value.trim(),
+        answer_ar: dom.qAnswerAr.value.trim(),
       },
     };
   }
