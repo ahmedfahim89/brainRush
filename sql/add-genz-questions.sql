@@ -12,9 +12,6 @@
 -- exist. A row is skipped when its category was renamed or deleted, when its
 -- point value does not exist, or when the category already has that question
 -- (INSERT IGNORE + uq_category_question).
---
--- NOTE: the Arabic was drafted by an AI assistant. Have an Arabic speaker review
--- the wording before using it on the live site.
 
 SET NAMES utf8mb4;
 

@@ -6,9 +6,6 @@
 -- the admin is never overwritten. Safe to run again.
 --   local:   mysql -u root brainrush < sql/add-arabic-translations.sql
 --   hosted:  phpMyAdmin -> select the database -> Import this file
---
--- NOTE: drafted by an AI assistant. Have an Arabic speaker review the wording before
--- using it on the live site.
 
 SET NAMES utf8mb4;
 
