@@ -2,7 +2,7 @@
 
 Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..US-30, decisions D-01..D-32, follow-ups FU-01..FU-15).
 
-**Overall status (2026-10-11):** Sprints 1-5 Done. Sprint 6 (Question bank) Done (accepted 2026-10-11 after rework), but not yet shipped: the owner's local Chrome check, the commit/PR to `main` and the hosted migration (FU-11) are still open. D-32 (pick 1..N categories) was delivered alongside in the same working tree.
+**Overall status (2026-10-14):** Sprints 1-6 Done and shipped. Sprint 6 (Question bank) and D-32 (pick 1..N categories) were merged via PR #11 on 2026-10-11, and the hosted DB is migrated (FU-11). Follow-ups FU-10..FU-15 are all Done; no open items. Later owner requests were shipped outside the sprint cycle: Egypt questions (PR #13, #16), Arabic localization (PR #17, #19), the Gen Z set (PR #18) and the AI set (PR #20).
 
 | Sprint | Goal | Status |
 |---|---|---|
@@ -219,22 +219,15 @@ New open follow-up FU-09 (Owner) was added by the PO (see "Follow-ups" below).
 | 7 | Developer note | Met (`docs/sprints/sprint-6-dev.md`, incl. "Rework 2026-10-11") |
 | 8 | PO accepted | Met, re-accepted after rework 2026-10-11 |
 | + | PHP 8.0 / MariaDB 10.4 compatible (D-17) | Met (tested on PHP 8.0.30, MariaDB 10.4.32) |
-| + | Owner's local Chrome check | **Open** |
-| + | Commit on `sprint-6` and PR to `main` (owner merges) | **Open** (working tree uncommitted) |
-| + | Hosted migration and smoke check (FU-11) | **Open** |
+| + | Owner's local Chrome check | Met (before the PR, 2026-10-11) |
+| + | Commit on `sprint-6` and PR to `main` (owner merges) | Met (PR #11, merged 2026-10-11) |
+| + | Hosted migration and smoke check (FU-11) | Met (owner confirmed 2026-10-12) |
 
-**Status:** Done (accepted 2026-10-11 after rework)
+**Status:** Done and shipped (accepted 2026-10-11 after rework, merged via PR #11 on 2026-10-11, hosted DB migrated by 2026-10-12)
 
 **Outcome:** The first version (no points on questions) was developed, tested (35 PASS) and accepted on 2026-10-11, then reworked after the owner's review (D-31 amended: points per question, per-cell random draw). The rework was re-tested (36 PASS, 0 FAIL, 0 PENDING, 0 bugs, 5 observations OBS-R1..OBS-R5) and **re-accepted by the Product Owner on 2026-10-11**: US-30 (rewritten, 17 criteria) and the re-amended US-19, US-20, US-21, US-24, US-25 accepted; US-22 stays retired. The first-version PO acceptance is superseded. Fresh install gives 150 questions (5 per category and value); the migration takes the pre-Sprint 6 local DB to 155 and is re-runnable. FU-13 (local DB restore and re-migration) is Done. No story carry-overs. D-31 as amended at the first acceptance still applies: a duplicate question text is rejected case- and accent-insensitively in the first 191 characters (OBS-2, OBS-3 of the first run). D-32 was delivered alongside and regression-checked (PASS).
 
-**Still open (the sprint is accepted but not shipped):**
-- **Owner's local Chrome check** before any commit or push (the tester measured 1366x768 in an iframe and could not run `node --check`, Node.js not being installed). MariaDB was left running for this check.
-- **Commit and PR:** nothing is committed or pushed; the work, including the D-32 changes, is an uncommitted working tree on branch `sprint-6` (modified files plus new `docs/question-bank.md`, `docs/questions-600.md`, `docs/sprints/sprint-6-*.md`, `sql/migrate-question-bank.sql`). Commit, push and PR to `main` follow the owner's Chrome check; the owner merges.
-- **FU-11 (Must, Owner with Developer): hosted migration.** Back up, deploy the code, import `sql/migrate-question-bank.sql` right away (it converts the old slot schema and keeps `points`; the hosted DB was never migrated with the first version, so it is a supported source), check the `CREATE TEMPORARY TABLES` privilege, Ctrl+F5 and CDN purge, smoke check. The hosted Sprint 6 redeploy is not done until this passes. Steps are in `docs/deploy-hostinger.md` 8.4 and 8.5.
-- **FU-10 (Should, Owner):** remove or reword one question of each local near-duplicate pair: Science Mercury (keep the 600 one; the bank one at 400 can go) and Geography Japan (Fuji at 400 or the bank question at 200). Repeat on the hosted DB if present.
-- **FU-12 (Could, Developer):** "Cancel edit" is visible in Add mode (pre-existing, OBS-1); fix with `.btn[hidden] { display: none; }`. Not scheduled; candidate for a later polish sprint.
-- **FU-14 (Could, Owner):** the 600 row is not random locally (one Egypt question per category). Add more 600 questions in Admin to randomise it, without duplicating the bank. Not needed for playability.
-- **FU-15 (Could, PO):** some bank difficulty ranks are debatable (Geography 500 "capital of Brazil", Technology 500 "decimal 5 in binary"). Kept for now; review after the owner has played.
+**Shipping:** the owner checked the sprint locally in Chrome, then the work (including D-32) was merged to `main` via PR #11 on 2026-10-11. The hosted migration (FU-11) was confirmed by the owner on 2026-10-12. The follow-ups from the acceptance (FU-10, FU-12, FU-14, FU-15) are all done; see "Follow-ups (after Sprint 6)" below.
 
 ---
 
@@ -286,13 +279,13 @@ Added by the PO at Sprint 6 acceptance and re-acceptance on 2026-10-11. Full wor
 
 | ID | Priority | Owner | Item | Status |
 |---|---|---|---|---|
-| FU-10 | Should | Owner | Remove or reword one question of each local near-duplicate pair: Science "only metal that is liquid at room temperature" vs bank "metal liquid at normal room temperature" (Mercury); Geography "Mount Fuji is located in which country?" vs bank "islands of Honshu" question (Japan). Keep Science's only 600 question; Fuji (400) or the bank Japan question (200) can go. Repeat on the hosted DB if present. | Open |
-| FU-11 | Must | Owner (with Developer) | Hosted Sprint 6 migration: backup, deploy code, import `sql/migrate-question-bank.sql` right away, check `CREATE TEMPORARY TABLES` privilege, Ctrl+F5 and CDN purge, smoke check. The hosted redeploy is not done until this passes. | Open |
-| FU-12 | Could | Developer | "Cancel edit" visible in Add mode on the admin Questions form (pre-existing); add `.btn[hidden] { display: none; }`. | Open |
+| FU-10 | Should | Owner | Remove or reword one question of each local near-duplicate pair: Science "only metal that is liquid at room temperature" vs bank "metal liquid at normal room temperature" (Mercury); Geography "Mount Fuji is located in which country?" vs bank "islands of Honshu" question (Japan). Keep Science's only 600 question; Fuji (400) or the bank Japan question (200) can go. Repeat on the hosted DB if present. | Done (owner confirmed 2026-10-12) |
+| FU-11 | Must | Owner (with Developer) | Hosted Sprint 6 migration: backup, deploy code, import `sql/migrate-question-bank.sql` right away, check `CREATE TEMPORARY TABLES` privilege, Ctrl+F5 and CDN purge, smoke check. The hosted redeploy is not done until this passes. | Done (owner confirmed 2026-10-12) |
+| FU-12 | Could | Developer | "Cancel edit" visible in Add mode on the admin Questions form (pre-existing); add `.btn[hidden] { display: none; }`. | Done 2026-10-12 |
 | FU-13 | Must (environment) | Developer | Local DB after the D-31 amendment: restore the pre-Sprint 6 backup and re-run the new migration (155 questions, point values 100-600, settings 6 / 30). | Done 2026-10-11 |
-| FU-14 | Could | Owner | The 600 row is not random locally (one Egypt question per category); add more 600 questions in Admin to randomise it, without duplicating the bank. Not needed for playability. | Open |
-| FU-15 | Could | PO | Some bank difficulty ranks are debatable; kept for now, review after the owner has played. | Open (review after play feedback) |
+| FU-14 | Could | Owner | The 600 row is not random locally (one Egypt question per category); add more 600 questions in Admin to randomise it, without duplicating the bank. Not needed for playability. | Done 2026-10-12 (Egypt 600 questions) |
+| FU-15 | Could | PO | Some bank difficulty ranks are debatable; kept for now, review after the owner has played. | Done 2026-10-14 (Brazil 400, Australia 500, bits in a byte 400) |
 
-**Other open Sprint 6 steps (not follow-ups):** the owner's local Chrome check, then commit on `sprint-6` and PR to `main`.
+**Other Sprint 6 steps (not follow-ups):** the owner's local Chrome check and the PR to `main` are done (PR #11, merged 2026-10-11).
 
-**Open items:** FU-10, FU-11, FU-12, FU-14, FU-15, plus the owner's Chrome check and the commit/PR above.
+**Open items:** none (2026-10-14).
