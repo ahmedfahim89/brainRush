@@ -15,6 +15,7 @@ The `#` column is the question's fixed ID in this file. It is not its position: 
 Changes:
 - 2026-10-11 (Sprint 6 acceptance, OBS-5): Science #5 was "Which vitamin does the human body make when the skin is exposed to sunlight?". That text hinted at Science #7 ("The skin") and #16 ("The Sun"), so it was reworded. The answer is unchanged.
 - 2026-10-11 (D-31 amended): Points column added. Question and answer texts are unchanged.
+- 2026-10-14 (FU-15, owner decision after play): Geography #19 "capital of Brazil" moved from 500 to 400, Geography #1 "capital of Australia" from 400 to 500, and Technology #6 "bits in a byte" from 300 to 400. Technology now has 3 bank questions at 300 and 5 at 400.
 
 ## Geography
 
@@ -32,14 +33,14 @@ Changes:
 | 9 | 300 | Counting Australia as a continent, which is the largest island in the world? | Greenland |
 | 12 | 300 | The Rialto Bridge is a famous landmark in which Italian city? | Venice |
 | 15 | 300 | Which salt lake, whose shore is the lowest point on land on Earth, lets swimmers float with ease? | The Dead Sea |
-| 1 | 400 | What is the capital city of Australia? | Canberra |
 | 7 | 400 | What is the capital city of Turkey? | Ankara |
 | 14 | 400 | Which South American country takes its name from the Spanish word for "equator"? | Ecuador |
 | 16 | 400 | Table Mountain overlooks which South African city? | Cape Town |
+| 19 | 400 | What is the capital city of Brazil? | Brasilia |
+| 1 | 500 | What is the capital city of Australia? | Canberra |
 | 5 | 500 | What is the largest country in Africa by area? | Algeria |
 | 8 | 500 | In which country is the ancient rock-cut city of Petra? | Jordan |
 | 10 | 500 | Which river flows through the city of Baghdad? | The Tigris |
-| 19 | 500 | What is the capital city of Brazil? | Brasilia |
 
 ## Science
 
@@ -155,8 +156,8 @@ Changes:
 | 15 | 200 | Which company created the Game Boy and the Super Mario games? | Nintendo |
 | 1 | 300 | In computing, what does "RAM" stand for? | Random Access Memory |
 | 3 | 300 | What does "PDF" stand for? | Portable Document Format |
-| 6 | 300 | How many bits make up one byte? | 8 |
 | 10 | 300 | Which popular programming language was named after a British comedy group, not a snake? | Python |
+| 6 | 400 | How many bits make up one byte? | 8 |
 | 9 | 400 | Which British mathematician proposed a famous test of machine intelligence in 1950? | Alan Turing |
 | 11 | 400 | Which German inventor introduced movable-type printing to Europe around 1440? | Johannes Gutenberg |
 | 16 | 400 | Which computer input device did Douglas Engelbart invent in the 1960s? | The mouse |
