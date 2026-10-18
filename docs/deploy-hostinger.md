@@ -72,7 +72,7 @@ Upload only what the website needs. Keep the folder structure:
 | `index.html`, `admin.html` | `docs/`, `.claude/`, `.git/`, `.gitignore`, `README.md` |
 | `css/` (whole folder) | **`api/config.php` from your computer** (it holds your *local* database settings; create a new one on the server in step 5) |
 | `js/` (whole folder) | **`password.txt`**, and any other local file with passwords or notes (never, under any name) |
-| `api/` (all `.php` files: `auth.php`, `categories.php`, `config.example.php`, `db.php`, `points.php`, `questions.php`, `settings.php`) | |
+| `api/` (all `.php` files: `auth.php`, `categories.php`, `config.example.php`, `db.php`, `game-log.php`, `points.php`, `questions.php`, `settings.php`) | `logs/` (the server writes its own daily `logs/game-YYYY-MM-DD.log`) |
 
 In hPanel, **Files → File Manager** can upload a `.zip` and extract it. Zip the files from the left column, upload the zip into `public_html`, extract it, then delete the zip. Build the zip from the left column only. Do **not** zip the whole project folder: that would pull in `password.txt` and your local `api/config.php`.
 
@@ -134,6 +134,7 @@ Do these checks in a normal browser window, replacing `your-domain.example`.
 - [ ] `https://your-domain.example/docs/spec.md` and `/README.md` (Git deployment only; with Option B they do not exist → 404)
 - [ ] `https://your-domain.example/.claude/agents/game-developer.md` (Git deployment only)
 - [ ] `https://your-domain.example/password.txt` (403 from `.htaccess` if a file were there by mistake, otherwise 404; it must never show content)
+- [ ] `https://your-domain.example/logs/game-YYYY-MM-DD.log` with today's date, after one game was started (game start log; read it in File Manager, never over the web)
 - [ ] `https://your-domain.example/css/` (directory listing disabled → 403)
 
 **Optional command-line checks** (any terminal with `curl`):
