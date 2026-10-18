@@ -10,7 +10,7 @@ Decisions confirmed with user:
 - Each player/team gets a color; an answered cell is filled with the color of whoever answered it correctly.
 - ~~Admin page is **not** password-protected.~~ Changed 2026-10-04 (D-20): admin **write** operations are protected by HTTP Basic Auth when admin credentials are configured; otherwise writes are allowed only from localhost. See Security notes.
 
-## Delivery team: 4 project agents
+## Delivery team: 5 project agents
 The work is done by a simulated Scrum team, defined as project subagents in `BrainRush/.claude/agents/` (Markdown with frontmatter: `name`, `description`, `tools`, `model`, and a system prompt body). The product spec in the rest of this plan is the input to the Product Owner.
 
 | File | Agent | Role | Tools | Output |
@@ -19,6 +19,7 @@ The work is done by a simulated Scrum team, defined as project subagents in `Bra
 | `scrum-master.md` | **scrum-master** | Reads the backlog, splits it into ordered sprints with goals, story list, task breakdown, dependencies and Definition of Done; tracks status after each sprint. Does not write code. | Read, Write, Edit, Glob, Grep | `docs/sprint-plan.md` (status updated per sprint) |
 | `game-developer.md` | **game-developer** | Senior full-stack game developer (PHP 8 + PDO, MariaDB, vanilla JS/HTML/CSS). Implements only the stories of the current sprint, following the architecture/security rules below (prepared statements, `textContent`, no hard-coded board size). Writes a short sprint dev note. | Read, Write, Edit, Glob, Grep, Bash | code + `docs/sprints/sprint-N-dev.md` |
 | `game-tester.md` | **game-tester** | Senior QA. After each sprint, verifies every acceptance criterion: `php -l` on all PHP, API checks with `curl`, UI flows in the browser pane (setup limits, dynamic grid, timer, scoring, colors, refresh restore, results/tie, admin CRUD + 409s). Reports bugs with steps to reproduce; does not fix code. | Read, Glob, Grep, Bash, browser tools | `docs/sprints/sprint-N-test-report.md` |
+| `question-producer.md` | **question-producer** | Trivia content producer (added 2026-10-18, outside the sprint flow). Writes question sets with answers, `(accept X)` variants and Arabic text, checks every answer in 2+ reputable sources, assigns point values by relative difficulty and balances categories, then packages the set as an idempotent SQL file and loads it into the local DB. No multiple-choice distractors (the host judges spoken answers). | Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch | `sql/add-<set>-questions.sql` + `docs/question-sets/<set>-review.md` |
 
 ### Workflow (I orchestrate)
 1. **product-owner** → writes `docs/product-backlog.md` from this plan.
@@ -40,7 +41,7 @@ Note: project agents are loaded at session start; if they aren't picked up right
 ## File structure
 ```
 BrainRush/
-  .claude/agents/       # product-owner.md, scrum-master.md, game-developer.md, game-tester.md
+  .claude/agents/       # product-owner.md, scrum-master.md, game-developer.md, game-tester.md, question-producer.md
   docs/                 # product-backlog.md, sprint-plan.md, sprints/sprint-N-{dev,test-report}.md
   index.html            # game (setup → board → question → results), single page
   admin.html            # admin CRUD page
