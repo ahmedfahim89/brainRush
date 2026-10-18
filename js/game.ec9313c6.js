@@ -824,6 +824,19 @@
     };
     renderGame();
     showScreen('board'); // also saves the state
+    logGameStart(state.game);
+  }
+
+  /** Record the started game in the server's game log. Fire-and-forget: a failure never blocks play. */
+  function logGameStart(game) {
+    fetch(API_BASE + 'game-log.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        players: game.contestants.map((c) => c.name),
+        categories: game.categories.map((c) => c.id),
+      }),
+    }).catch(() => {});
   }
 
   // ---------- Board and scoreboard (US-07, US-08, US-09, US-10) ----------

@@ -30,7 +30,7 @@ Options -Indexes
 
   # --- Block private files and folders (403) ---
   # Paths are relative to this folder, so this also works in a sub-folder install.
-  RewriteRule ^(sql|docs|\.claude)(/|$) - [F,L]
+  RewriteRule ^(sql|docs|logs|\.claude)(/|$) - [F,L]
   RewriteRule ^\.git - [F,L]
   RewriteRule ^README\.md$ - [F,L]
   RewriteRule ^password\.txt$ - [F,L]
@@ -38,9 +38,9 @@ Options -Indexes
 </IfModule>
 
 # Second line of defence (no mod_rewrite needed): never serve config/include-only
-# PHP files, Markdown, SQL dumps, git/htaccess files or the local password.txt
-# from any folder.
-<FilesMatch "^(config.*\.php|db\.php|.*\.md|.*\.sql|\.git.*|\.ht.*|password\.txt)$">
+# PHP files, Markdown, SQL dumps, log files, git/htaccess files or the local
+# password.txt from any folder.
+<FilesMatch "^(config.*\.php|db\.php|.*\.md|.*\.sql|.*\.log|\.git.*|\.ht.*|password\.txt)$">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>
