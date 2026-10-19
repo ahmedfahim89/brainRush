@@ -1,9 +1,10 @@
 -- BrainRush: Food & Drink question set (owner request 2026-10-19)
 --
--- Adds a new "Food & Drink" category with 25 questions: 5 at 100, 4 at 200,
--- 4 at 300, 3 at 400, 4 at 500 and 5 at 600 (the owner removed the sandwich,
--- goulash, mate, Andes and ceviche questions after review). The set mixes Egyptian dishes and food
--- history (koshari, ful medames, karkadeh, Om Ali, fesikh, dukkah and the
+-- Adds a new "Food & Drink" category with 22 questions: 5 at 100, 4 at 200,
+-- 4 at 300, 3 at 400, 3 at 500 and 3 at 600. After review the owner removed
+-- the sandwich, goulash, mate, Andes, ceviche, umami, mace and injera
+-- questions and swapped ciabatta for focaccia. The set mixes Egyptian dishes
+-- and food history (koshari, ful medames, karkadeh, Om Ali, fesikh, dukkah and the
 -- Fatimid ban on molokhia) with world dishes, drinks, breads and cheeses, spices
 -- and food history, with several sub-topics at every point value. Every row
 -- comes with its Arabic question and answer. The fact-check log is in
@@ -76,19 +77,13 @@ INSERT INTO food_seed (category_name, points, question, answer, question_ar, ans
    'أي خلطة مصرية جافة من المكسرات أو البذور المطحونة خشنًا مع توابل مثل الكزبرة والكمون، تُغمس فيها قطع العيش؟', 'الدُّقة'),
   ('Food & Drink', 500, 'The word "mocha" comes from Mokha, a historic coffee-exporting port in which country?', 'Yemen',
    'كلمة "موكا" مأخوذة من "المخا"، الميناء التاريخي لتصدير البن. في أي دولة يقع هذا الميناء؟', 'اليمن'),
-  ('Food & Drink', 500, 'Which basic taste, described as savoury, was identified and named in 1908 by the Japanese chemist Kikunae Ikeda?', 'Umami',
-   'أي طعم أساسي، يوصف بأنه الطعم المالح الشهي الذي يشبه طعم المرق، اكتشفه الكيميائي الياباني كيكوناي إيكيدا وسمّاه عام 1908؟', 'الأومامي'),
-  ('Food & Drink', 500, 'Which flat, airy Italian bread has a name that means "slipper" in Italian?', 'Ciabatta',
-   'أي خبز إيطالي مسطح كثير الفراغات يعني اسمه بالإيطالية "الشبشب"؟', 'الشياباتا'),
+  ('Food & Drink', 500, 'Which flat Italian bread, often topped with olive oil and herbs, takes its name from the Latin word for "hearth"?', 'Focaccia',
+   'أي خبز إيطالي مسطح، يُغطّى عادةً بزيت الزيتون والأعشاب، يأتي اسمه من الكلمة اللاتينية التي تعني "الموقد"؟', 'الفوكاتشا'),
 
   ('Food & Drink', 600, 'Which Fatimid caliph of Egypt banned the eating of molokhia in the early 11th century, along with other foods?', 'Al-Hakim bi-Amr Allah (accept al-Hakim)',
    'أي خليفة فاطمي حكم مصر منع أكل الملوخية في أوائل القرن الحادي عشر الميلادي، ضمن أطعمة أخرى؟', 'الحاكم بأمر الله'),
-  ('Food & Drink', 600, 'Which spice is made from the red, lacy covering that wraps around the nutmeg seed?', 'Mace',
-   'أي توابل تُصنع من الغلاف الأحمر الشبكي الذي يلتف حول بذرة جوزة الطيب؟', 'البسباسة'),
   ('Food & Drink', 600, 'The Caesar salad is named after the restaurant owner Caesar Cardini. In which Mexican city was it created, in the 1920s?', 'Tijuana',
    'سلطة السيزر تحمل اسم صاحب المطعم سيزر كارديني. في أي مدينة مكسيكية ابتُكرت في عشرينيات القرن العشرين؟', 'تيخوانا'),
-  ('Food & Drink', 600, 'What is the name of the large, spongy, sour flatbread of Ethiopia and Eritrea, made from the tiny grain teff?', 'Injera',
-   'ما اسم الخبز المسطح الكبير الإسفنجي ذي الطعم الحامض في إثيوبيا وإريتريا، المصنوع من حبوب "التيف" الدقيقة؟', 'الإنجيرا'),
   ('Food & Drink', 600, 'Earl Grey tea is flavoured with the oil of which citrus fruit?', 'Bergamot (accept bergamot orange)',
    'شاي "إيرل جراي" مُنكّه بزيت أي ثمرة حمضية؟', 'البرغموت');
 
