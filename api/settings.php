@@ -1,6 +1,6 @@
 <?php
-// GET  /api/settings.php  -> { categories_per_game, timer_seconds }
-// PUT  /api/settings.php  body { categories_per_game?, timer_seconds? } -> updated settings
+// GET  /api/settings.php  -> { categories_per_game, timer_seconds, banner_enabled, banner_text }
+// PUT  /api/settings.php  body { categories_per_game?, timer_seconds?, banner_enabled?, banner_text? } -> updated settings
 // Writes need admin access (require_admin: 401/403 otherwise).
 require_once __DIR__ . '/db.php';
 
@@ -8,9 +8,15 @@ require_once __DIR__ . '/db.php';
 const SETTING_RULES = [
     'categories_per_game' => [1, 10],
     'timer_seconds'       => [5, 600],
+    'banner_enabled'      => [0, 1], // "new questions" banner on the game setup screen
 ];
 
-/** Current settings as integers (null if a row is missing). */
+// Editable text settings and their maximum length in characters.
+const TEXT_SETTING_RULES = [
+    'banner_text' => 150,
+];
+
+/** Current settings: integers and text (null if a row is missing). */
 function load_settings(PDO $pdo): array
 {
     $rows = $pdo->query('SELECT name, value FROM settings')->fetchAll(PDO::FETCH_KEY_PAIR);
@@ -18,10 +24,13 @@ function load_settings(PDO $pdo): array
     foreach (array_keys(SETTING_RULES) as $name) {
         $settings[$name] = isset($rows[$name]) ? (int) $rows[$name] : null;
     }
+    foreach (array_keys(TEXT_SETTING_RULES) as $name) {
+        $settings[$name] = isset($rows[$name]) ? (string) $rows[$name] : null;
+    }
     return $settings;
 }
 
-/** Validate the PUT body; returns [name => int] or sends 400. */
+/** Validate the PUT body; returns [name => int|string] or sends 400. */
 function validate_settings(array $body): array
 {
     $updates = [];
@@ -35,8 +44,14 @@ function validate_settings(array $body): array
         }
         $updates[$name] = $value;
     }
+    foreach (TEXT_SETTING_RULES as $name => $maxChars) {
+        if (array_key_exists($name, $body)) {
+            $updates[$name] = require_text($body[$name], $name, $maxChars);
+        }
+    }
     if (!$updates) {
-        bad_request('Provide categories_per_game and/or timer_seconds');
+        bad_request('Provide at least one of: ' . implode(', ', array_merge(
+            array_keys(SETTING_RULES), array_keys(TEXT_SETTING_RULES))));
     }
     return $updates;
 }

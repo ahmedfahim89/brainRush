@@ -7,9 +7,11 @@
 (function () {
   const API_BASE = 'api/';
   const LABEL_MAX = 60; // question text length used in confirms and button labels
+  const BANNER_MAX = 150; // banner_text limit in api/settings.php
+  const BANNER_DEFAULT = 'New questions added - try them now!'; // same as the seed in sql/schema.sql
 
   const state = {
-    settings: null,    // { categories_per_game, timer_seconds }
+    settings: null,    // { categories_per_game, timer_seconds, banner_enabled, banner_text }
     points: [],        // [{ id, points, question_count }] ascending
     categories: [],    // [{ id, name, question_count }] sorted by name
     questions: [],     // [{ id, category_id, category_name, points, question, answer }]
@@ -27,6 +29,8 @@
     settingsForm: byId('settings-form'),
     settingCategories: byId('setting-categories'),
     settingTimer: byId('setting-timer'),
+    settingBannerEnabled: byId('setting-banner-enabled'),
+    settingBannerText: byId('setting-banner-text'),
     settingsMsg: byId('settings-msg'),
     pointsForm: byId('points-form'),
     pointNew: byId('point-new'),
@@ -270,6 +274,8 @@
     state.settings = settings;
     dom.settingCategories.value = settings.categories_per_game === null ? '' : String(settings.categories_per_game);
     dom.settingTimer.value = settings.timer_seconds === null ? '' : String(settings.timer_seconds);
+    dom.settingBannerEnabled.checked = settings.banner_enabled === 1;
+    dom.settingBannerText.value = typeof settings.banner_text === 'string' ? settings.banner_text : BANNER_DEFAULT;
     renderCategorySummary();
   }
 
@@ -286,7 +292,12 @@
     clearMessage(dom.settingsMsg);
     const perGame = readIntField(dom.settingCategories, 'Max categories per game');
     const timer = readIntField(dom.settingTimer, 'Timer');
-    const errors = [perGame.error, timer.error].filter(Boolean);
+    const bannerText = dom.settingBannerText.value.trim();
+    let bannerError = '';
+    if (!bannerText) bannerError = 'Banner text is required.';
+    // Array.from counts characters like the server does (an emoji is one, not two)
+    else if (Array.from(bannerText).length > BANNER_MAX) bannerError = 'Banner text must be at most ' + BANNER_MAX + ' characters.';
+    const errors = [perGame.error, timer.error, bannerError].filter(Boolean);
     if (errors.length) {
       showError(dom.settingsMsg, errors.join('\n'));
       return;
@@ -296,6 +307,8 @@
       const saved = await api('settings.php', 'PUT', {
         categories_per_game: perGame.value,
         timer_seconds: timer.value,
+        banner_enabled: dom.settingBannerEnabled.checked ? 1 : 0,
+        banner_text: bannerText,
       });
       fillSettings(saved);
       showSuccess(dom.settingsMsg, 'Settings saved.');

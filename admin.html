@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BrainRush - Admin</title>
-  <link rel="stylesheet" href="css/style.3ca39c35.css">
+  <link rel="stylesheet" href="css/style.50b2f2b3.css">
 </head>
 <body class="admin">
   <header class="page-header">
@@ -28,6 +28,14 @@
         <input id="setting-categories" name="categories_per_game" type="number" min="1" max="10" step="1" required>
         <label for="setting-timer">Default timer (seconds)</label>
         <input id="setting-timer" name="timer_seconds" type="number" min="5" max="600" step="1" required>
+        <!-- "New questions" banner on the game setup screen -->
+        <label class="check-label" for="setting-banner-enabled">
+          <input id="setting-banner-enabled" name="banner_enabled" type="checkbox">
+          Show the "new questions" banner on the game screen
+        </label>
+        <label for="setting-banner-text">Banner text</label>
+        <input id="setting-banner-text" name="banner_text" class="wide-input" type="text" maxlength="150" required aria-describedby="setting-banner-hint">
+        <p id="setting-banner-hint" class="hint">For example: New questions added in Egyptians category &mdash; try it now!</p>
         <div class="actions">
           <button type="submit" class="btn btn-primary">Save settings</button>
         </div>
@@ -114,6 +122,6 @@
     </section>
   </main>
 
-  <script src="js/admin.2975f08a.js"></script>
+  <script src="js/admin.c3683d09.js"></script>
 </body>
 </html>

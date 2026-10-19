@@ -64,6 +64,7 @@
     },
     setupForm: byId('setup-form'),
     loadMsg: byId('setup-load-msg'),
+    newBanner: byId('new-banner'),
     modeInputs: Array.prototype.slice.call(document.querySelectorAll('input[name="mode"]')),
     entryList: byId('entry-list'),
     entryLimitMsg: byId('entry-limit-msg'),
@@ -641,6 +642,13 @@
     dom.loadMsg.hidden = true;
   }
 
+  /** "New questions" banner on the setup screen: shown when the admin turned it on and gave a text. */
+  function renderBanner(settings) {
+    const text = typeof settings.banner_text === 'string' ? settings.banner_text.trim() : '';
+    dom.newBanner.textContent = text;
+    dom.newBanner.hidden = !(settings.banner_enabled === 1 && text);
+  }
+
   /** Load settings and playable categories from the API (GET only). */
   async function loadSetupData() {
     const s = state.setup;
@@ -659,6 +667,7 @@
       s.perGame = Number.isInteger(settings.categories_per_game) && settings.categories_per_game > 0
         ? settings.categories_per_game : null;
       s.timerDefault = Number.isInteger(settings.timer_seconds) ? settings.timer_seconds : null;
+      renderBanner(settings);
       s.playable = results[1].filter((c) => isPlainObject(c) && Number.isInteger(c.id) && typeof c.name === 'string')
         .map((c) => ({ id: c.id, name: c.name }));
       s.selected = s.selected.filter((id) => s.playable.some((c) => c.id === id));

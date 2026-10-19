@@ -148,6 +148,11 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 .panel-wide { grid-column: 1 / -1; }
 
 .stack input { max-width: 12rem; }
+.stack input.wide-input { max-width: none; }
+.stack .hint { margin: 0.2rem 0 0; }
+/* Checkbox and its text on one line (banner on/off in Game settings) */
+.check-label { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.8rem; color: var(--text); cursor: pointer; }
+.check-label input { flex: none; width: 1.1rem; height: 1.1rem; margin: 0; accent-color: var(--gold); }
 
 .inline-form { display: flex; gap: 0.5rem; align-items: center; }
 .inline-form input { flex: 1; min-width: 0; }
@@ -292,6 +297,59 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 
 .timer-input { max-width: 8rem; }
 .start-row { justify-content: center; margin: 0.5rem 0; }
+
+/* "New questions" banner on the setup screen (text and on/off come from Admin settings):
+   gold strip with a pulsing NEW pill and a light shine sweeping across it */
+.new-banner {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  margin: 0 0 1rem;
+  padding: 0.65rem 1rem;
+  color: #1a1a1a;
+  font-family: "Comic Sans MS", "Comic Sans", "Comic Neue", cursive;
+  font-size: 1.15rem;
+  font-weight: 800;
+  text-align: center;
+  overflow-wrap: anywhere;
+  background: linear-gradient(90deg, var(--gold-dark), var(--gold) 30%, #ffe27a 70%, var(--gold));
+  border-radius: var(--radius);
+  box-shadow: 0 0 18px rgba(245, 197, 24, 0.35);
+}
+.new-banner[hidden] { display: none; }
+.new-banner::before {
+  content: "\2728  NEW";
+  flex: none;
+  padding: 0.1rem 0.6rem;
+  color: var(--gold);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  white-space: pre;
+  background: var(--bg);
+  border-radius: 999px;
+  animation: banner-pulse 1.6s ease-in-out infinite;
+}
+.new-banner::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -40%;
+  width: 30%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+  animation: banner-shine 3.5s ease-in-out infinite;
+}
+@keyframes banner-pulse { 50% { transform: scale(1.1); } }
+@keyframes banner-shine { 0% { left: -40%; } 60%, 100% { left: 120%; } }
+@media (prefers-reduced-motion: reduce) {
+  .new-banner::before { animation: none; }
+  .new-banner::after { display: none; }
+}
 
 /* Board: columns = categories, rows = point values (both from data; JS sets --cols and --digits) */
 .board-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem 1rem; max-width: 90rem; margin: 0 auto 0.8rem; }
@@ -613,6 +671,7 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
   h1 { font-size: 1.5rem; }
   .game-main { padding: 0.9rem 0.75rem 0.75rem; }
   .setup-block { padding: 0.7rem 0.8rem 0.9rem; }
+  .new-banner { gap: 0.5rem; padding: 0.5rem 0.7rem; font-size: 0.95rem; }
   .entry-row { grid-template-columns: 2.4rem minmax(0, 1fr) auto; }
   .entry-row .entry-label { grid-column: 1 / -1; }
   .entry-row .field-error { grid-column: 2 / -1; }
