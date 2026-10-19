@@ -1,13 +1,15 @@
 <?php
-// POST /api/game-log.php  body { players: [name, ...], categories: [id, ...] } -> 201 { logged: true }
+// POST /api/game-log.php  body { mode: 'players'|'teams', players: [name, ...], categories: [id, ...] } -> 201 { logged: true }
+// mode is optional and defaults to 'players'; players holds the player or team names.
 // Appends one line per started game to that day's log file, logs/game-YYYY-MM-DD.log:
 //   <YYYY-MM-DD HH:MM, server time> | players: <name>, <name> | categories: <name>, <name>
+//   <YYYY-MM-DD HH:MM, server time> | teams: <name>, <name> | categories: <name>, <name>
 // Category names come from the database, so the log never holds client-made category text.
 // Public on purpose (every game start calls it); read_json_body() forces a CORS preflight.
 require_once __DIR__ . '/db.php';
 
 const GAME_LOG_DIR = __DIR__ . '/../logs';
-const GAME_LOG_MAX_PLAYERS = 6;    // MODES limit in js/game.js
+const GAME_LOG_MAX_BY_MODE = ['players' => 6, 'teams' => 4]; // MODES limits in js/game.js
 const GAME_LOG_NAME_MAX = 30;      // NAME_MAX in js/game.js (D-22)
 const GAME_LOG_MAX_CATEGORIES = 10; // categories_per_game upper bound
 
@@ -17,11 +19,24 @@ function log_text(string $text): string
     return trim((string) preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $text));
 }
 
-/** Validated player names (1..6, each 1-30 chars after trimming). */
-function read_players($value): array
+/** The game mode, one of the keys of GAME_LOG_MAX_BY_MODE; absent means 'players'. */
+function read_mode($value): string
 {
-    if (!is_array($value) || !$value || count($value) > GAME_LOG_MAX_PLAYERS) {
-        bad_request('players must be a list of 1 to ' . GAME_LOG_MAX_PLAYERS . ' names');
+    if ($value === null) {
+        return 'players';
+    }
+    if (!is_string($value) || !isset(GAME_LOG_MAX_BY_MODE[$value])) {
+        bad_request('mode must be one of: ' . implode(', ', array_keys(GAME_LOG_MAX_BY_MODE)));
+    }
+    return $value;
+}
+
+/** Validated player or team names (1..limit of the mode, each 1-30 chars after trimming). */
+function read_players($value, string $mode): array
+{
+    $max = GAME_LOG_MAX_BY_MODE[$mode];
+    if (!is_array($value) || !$value || count($value) > $max) {
+        bad_request("players must be a list of 1 to $max names");
     }
     return array_map(fn($name) => log_text(require_text($name, 'Player name', GAME_LOG_NAME_MAX)), array_values($value));
 }
@@ -55,7 +70,8 @@ function read_category_names(PDO $pdo, $value): array
 switch ($_SERVER['REQUEST_METHOD']) {
     case 'POST':
         $body = read_json_body();
-        $players = read_players($body['players'] ?? null);
+        $mode = read_mode($body['mode'] ?? null);
+        $players = read_players($body['players'] ?? null, $mode);
         $categories = read_category_names(db(), $body['categories'] ?? null);
 
         if (!is_dir(GAME_LOG_DIR)) {
@@ -64,8 +80,9 @@ switch ($_SERVER['REQUEST_METHOD']) {
         $now = time(); // one clock reading, so a game started at midnight lands in the file its line names
         $file = GAME_LOG_DIR . '/game-' . date('Y-m-d', $now) . '.log';
         $line = sprintf(
-            "%s | players: %s | categories: %s\n",
+            "%s | %s: %s | categories: %s\n",
             date('Y-m-d H:i', $now),
+            $mode,
             implode(', ', $players),
             implode(', ', $categories)
         );

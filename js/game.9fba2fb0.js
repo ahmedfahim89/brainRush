@@ -842,6 +842,7 @@
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
+        mode: game.mode,
         players: game.contestants.map((c) => c.name),
         categories: game.categories.map((c) => c.id),
       }),
