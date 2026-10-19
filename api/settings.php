@@ -1,6 +1,6 @@
 <?php
-// GET  /api/settings.php  -> { categories_per_game, timer_seconds, banner_enabled, banner_text }
-// PUT  /api/settings.php  body { categories_per_game?, timer_seconds?, banner_enabled?, banner_text? } -> updated settings
+// GET  /api/settings.php  -> { categories_per_game, timer_seconds, banner_enabled, banner_text, start_game_hidden }
+// PUT  /api/settings.php  body { categories_per_game?, timer_seconds?, banner_enabled?, banner_text?, start_game_hidden? } -> updated settings
 // Writes need admin access (require_admin: 401/403 otherwise).
 require_once __DIR__ . '/db.php';
 
@@ -9,6 +9,7 @@ const SETTING_RULES = [
     'categories_per_game' => [1, 10],
     'timer_seconds'       => [5, 600],
     'banner_enabled'      => [0, 1], // "new questions" banner on the game setup screen
+    'start_game_hidden'   => [0, 1], // maintenance mode: hides Start Game and shows an overlay
 ];
 
 // Editable text settings and their maximum length in characters.

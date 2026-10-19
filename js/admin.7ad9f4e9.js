@@ -31,6 +31,7 @@
     settingTimer: byId('setting-timer'),
     settingBannerEnabled: byId('setting-banner-enabled'),
     settingBannerText: byId('setting-banner-text'),
+    settingStartHidden: byId('setting-start-hidden'),
     settingsMsg: byId('settings-msg'),
     pointsForm: byId('points-form'),
     pointNew: byId('point-new'),
@@ -275,6 +276,7 @@
     dom.settingCategories.value = settings.categories_per_game === null ? '' : String(settings.categories_per_game);
     dom.settingTimer.value = settings.timer_seconds === null ? '' : String(settings.timer_seconds);
     dom.settingBannerEnabled.checked = settings.banner_enabled === 1;
+    dom.settingStartHidden.checked = settings.start_game_hidden === 1;
     dom.settingBannerText.value = typeof settings.banner_text === 'string' ? settings.banner_text : BANNER_DEFAULT;
     renderCategorySummary();
   }
@@ -309,6 +311,7 @@
         timer_seconds: timer.value,
         banner_enabled: dom.settingBannerEnabled.checked ? 1 : 0,
         banner_text: bannerText,
+        start_game_hidden: dom.settingStartHidden.checked ? 1 : 0,
       });
       fillSettings(saved);
       showSuccess(dom.settingsMsg, 'Settings saved.');

@@ -4,13 +4,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BrainRush</title>
-  <link rel="stylesheet" href="css/style.50b2f2b3.css">
+  <link rel="stylesheet" href="css/style.87a7c741.css">
 </head>
 <body class="game">
   <header class="page-header">
     <h1>BrainRush</h1>
     <nav><a class="nav-link" href="admin.html">Admin</a></nav>
   </header>
+
+  <!-- Maintenance mode: shown when the admin hides the Start Game button (Admin > Game settings) -->
+  <div id="maintenance-overlay" class="maintenance-overlay" role="alertdialog" aria-modal="true" aria-labelledby="maintenance-text" hidden>
+    <div class="maintenance-card">
+      <img class="maintenance-img" src="img/maintenance.jpg" alt="" width="1024" height="559">
+      <p id="maintenance-text">Poor AI agents are working late tonight to deliver the cool features you asked for. The game will be playable again within 24 hours.</p>
+    </div>
+  </div>
 
   <main class="game-main">
     <!-- Setup (US-01..US-06) -->
@@ -128,6 +136,6 @@
     </section>
   </main>
 
-  <script src="js/game.9fba2fb0.js"></script>
+  <script src="js/game.f4efbfce.js"></script>
 </body>
 </html>

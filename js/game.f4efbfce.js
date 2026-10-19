@@ -77,6 +77,7 @@
     timerInput: byId('timer-input'),
     timerError: byId('timer-error'),
     startBtn: byId('start-btn'),
+    maintenanceOverlay: byId('maintenance-overlay'),
     startMsg: byId('start-msg'),
     boardInfo: byId('board-info'),
     board: byId('board'),
@@ -403,6 +404,7 @@
     return {
       mode: 'players',
       entries: [],
+      maintenance: false, // start_game_hidden from settings (maintenance mode)
       perGame: null,      // categories_per_game from settings
       timerDefault: null, // timer_seconds from settings
       playable: [],       // [{id, name}] from categories.php?playable=1
@@ -668,6 +670,7 @@
         ? settings.categories_per_game : null;
       s.timerDefault = Number.isInteger(settings.timer_seconds) ? settings.timer_seconds : null;
       renderBanner(settings);
+      s.maintenance = settings.start_game_hidden === 1;
       s.playable = results[1].filter((c) => isPlainObject(c) && Number.isInteger(c.id) && typeof c.name === 'string')
         .map((c) => ({ id: c.id, name: c.name }));
       s.selected = s.selected.filter((id) => s.playable.some((c) => c.id === id));
@@ -692,6 +695,7 @@
   function startBlockReason() {
     const s = state.setup;
     if (!s) return 'no setup';
+    if (s.maintenance) return 'maintenance';
     if (s.loading) return 'loading';
     if (s.starting) return 'starting';
     if (s.loadError) return 'load error';
@@ -702,6 +706,9 @@
 
   function updateStartButton() {
     dom.startBtn.disabled = startBlockReason() !== '';
+    const down = !!state.setup && state.setup.maintenance;
+    dom.startBtn.hidden = down;
+    dom.maintenanceOverlay.hidden = !down;
   }
 
   /** D-02: required, unique after trimming, case-insensitive. Marks each bad entry inline. */

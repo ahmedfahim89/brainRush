@@ -65,6 +65,34 @@ a { color: var(--gold); }
 .nav-link { font-weight: 600; text-decoration: none; }
 @media (hover: hover) { .nav-link:hover { text-decoration: underline; } }
 
+/* ---------- Maintenance overlay ---------- */
+.page-header { position: relative; z-index: 101; } /* keeps the Admin link usable above the overlay */
+.maintenance-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(5, 8, 22, 0.88);
+}
+.maintenance-overlay[hidden] { display: none; }
+.maintenance-card {
+  max-width: 36rem;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 1.25rem;
+  border: 2px solid var(--gold);
+  border-radius: var(--radius);
+  background: var(--panel);
+  text-align: center;
+  font-size: 1.2rem;
+  line-height: 1.5;
+}
+.maintenance-card p { margin: 0; }
+.maintenance-img { display: block; width: 100%; height: auto; margin-bottom: 1rem; border-radius: var(--radius); }
+
 /* ---------- Form controls ---------- */
 input, select, textarea, button { font: inherit; }
 /* No double-tap zoom when the host taps buttons quickly (e.g. + / - on the scoreboard) */
