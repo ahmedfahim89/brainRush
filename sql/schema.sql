@@ -17,7 +17,7 @@ CREATE DATABASE IF NOT EXISTS brainrush
 
 USE brainrush;
 
--- Key/value game settings (categories_per_game, timer_seconds)
+-- Key/value game settings (categories_per_game, timer_seconds, banner_enabled, banner_text)
 CREATE TABLE IF NOT EXISTS settings (
   name  VARCHAR(50)  NOT NULL,
   value VARCHAR(255) NOT NULL,
@@ -75,7 +75,9 @@ CREATE TABLE IF NOT EXISTS questions (
 
 INSERT IGNORE INTO settings (name, value) VALUES
   ('categories_per_game', '5'),
-  ('timer_seconds', '30');
+  ('timer_seconds', '30'),
+  ('banner_enabled', '0'),
+  ('banner_text', 'New questions added - try them now!');
 
 INSERT IGNORE INTO point_values (points) VALUES
   (100), (200), (300), (400), (500);
