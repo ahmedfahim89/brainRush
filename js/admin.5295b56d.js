@@ -201,9 +201,9 @@
   }
 
   // ---------- Admin login (US-29) ----------
-  // Reading is always allowed; changes need the admin login (or this computer when
-  // no login is configured). The browser shows its own login prompt on a 401 and
-  // then re-sends the login with every later API request.
+  // The page loads its data only after the admin login (or this computer when no login
+  // is configured). The browser shows its own login prompt on a 401 and then re-sends
+  // the login with every later API request.
 
   function isAuthError(err) {
     return err instanceof ApiError && (err.status === 401 || err.status === 403);
@@ -213,10 +213,10 @@
   function showAuthProblem(err) {
     let text;
     if (isAuthError(err) && err.status === 401) {
-      text = errorText(err) + ' You can still browse the content. Click "Log in" (or save a change) to enter the admin user name and password.';
+      text = errorText(err) + ' Click "Log in" to enter the admin user name and password.';
       dom.authRetry.textContent = 'Log in';
     } else if (isAuthError(err)) {
-      text = errorText(err) + ' You can still browse the content.';
+      text = errorText(err);
       dom.authRetry.textContent = 'Check again';
     } else {
       text = 'Could not check the admin login: ' + errorText(err);
@@ -237,10 +237,20 @@
     try {
       await api('auth.php');
       hideAuthProblem();
+      return true;
     } catch (err) {
       showAuthProblem(err);
+      return false;
     } finally {
       dom.authRetry.disabled = false;
+    }
+  }
+
+  /** Log in again from the banner; once it works, load the data that was held back. */
+  async function onAuthRetry() {
+    if (await checkAuth()) {
+      loadSettings();
+      await loadData();
     }
   }
 
@@ -751,19 +761,25 @@
     dom.qForm.addEventListener('submit', onQuestionSubmit);
     dom.qCancel.addEventListener('click', cancelEdit);
     dom.qFilter.addEventListener('change', onFilterChange);
-    dom.authRetry.addEventListener('click', checkAuth);
+    dom.authRetry.addEventListener('click', onAuthRetry);
+  }
+
+  async function loadData() {
+    try {
+      await refreshData();
+    } catch (err) {
+      showError(dom.globalMsg, 'Could not load admin data: ' + errorText(err));
+    }
   }
 
   async function init() {
     bindEvents();
     setFormMode();
     renderAll();
-    checkAuth(); // up front, so a protected site asks for the login before any edit
-    loadSettings();
-    try {
-      await refreshData();
-    } catch (err) {
-      showError(dom.globalMsg, 'Could not load admin data: ' + errorText(err));
+    // Log in first: nothing (questions and answers included) is loaded until it succeeds.
+    if (await checkAuth()) {
+      loadSettings();
+      await loadData();
     }
   }
 
