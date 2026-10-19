@@ -6,7 +6,8 @@
 //                                                          question_ar?, answer_ar? } -> 201
 // PUT    /api/questions.php?id=<id>                  body: any of the POST fields -> 200
 // DELETE /api/questions.php?id=<id>                  -> 200
-// Writes need admin access (require_admin: 401/403 otherwise).
+// The full list (first two GETs) and all writes need admin access (require_admin: 401/403
+// otherwise); only the board payload is public, it is what the game plays from.
 //
 // Question bank (D-31 amended): every question has a category and a point value, and a
 // category may have any number of questions per point value. The board draws one
@@ -270,6 +271,8 @@ switch ($_SERVER['REQUEST_METHOD']) {
             $ids = parse_board_ids($_GET['categories'] ?? null);
             json_response(board(db(), $ids));
         }
+        // The full list shows every answer, so only the admin page may read it.
+        require_admin();
         json_response(list_questions(db()));
         break;
 
