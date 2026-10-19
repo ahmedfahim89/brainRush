@@ -15,7 +15,7 @@
 -- per category and point value, key uq_slot) must import sql/migrate-question-bank.sql
 -- once instead (D-31).
 
--- Key/value game settings (categories_per_game, timer_seconds, banner_enabled, banner_text)
+-- Key/value game settings (categories_per_game, timer_seconds, banner_enabled, banner_text, start_game_hidden)
 CREATE TABLE IF NOT EXISTS settings (
   name  VARCHAR(50)  NOT NULL,
   value VARCHAR(255) NOT NULL,
@@ -75,6 +75,7 @@ INSERT IGNORE INTO settings (name, value) VALUES
   ('categories_per_game', '5'),
   ('timer_seconds', '30'),
   ('banner_enabled', '0'),
+  ('start_game_hidden', '0'),
   ('banner_text', 'New questions added - try them now!');
 
 INSERT IGNORE INTO point_values (points) VALUES

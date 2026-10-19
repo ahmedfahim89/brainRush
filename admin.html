@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BrainRush - Admin</title>
-  <link rel="stylesheet" href="css/style.50b2f2b3.css">
+  <link rel="stylesheet" href="css/style.87a7c741.css">
 </head>
 <body class="admin">
   <header class="page-header">
@@ -36,6 +36,12 @@
         <label for="setting-banner-text">Banner text</label>
         <input id="setting-banner-text" name="banner_text" class="wide-input" type="text" maxlength="150" required aria-describedby="setting-banner-hint">
         <p id="setting-banner-hint" class="hint">For example: New questions added in Egyptians category &mdash; try it now!</p>
+        <!-- Maintenance mode: hides the Start Game button and shows an overlay on the game screen -->
+        <label class="check-label" for="setting-start-hidden">
+          <input id="setting-start-hidden" name="start_game_hidden" type="checkbox">
+          Maintenance mode: hide the Start Game button
+        </label>
+        <p class="hint">When on, players see a "back within 24 hours" popup instead of the game.</p>
         <div class="actions">
           <button type="submit" class="btn btn-primary">Save settings</button>
         </div>
@@ -122,6 +128,6 @@
     </section>
   </main>
 
-  <script src="js/admin.c3683d09.js"></script>
+  <script src="js/admin.7ad9f4e9.js"></script>
 </body>
 </html>
