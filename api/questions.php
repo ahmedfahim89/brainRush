@@ -104,7 +104,8 @@ function board(PDO $pdo, array $ids): array
         bad_request('Unknown category id(s): ' . implode(', ', $unknown));
     }
 
-    $points = array_map('intval', $pdo->query('SELECT points FROM point_values ORDER BY points ASC')->fetchAll(PDO::FETCH_COLUMN));
+    // Disabled point values are not board rows; their questions are simply not drawn.
+    $points = array_map('intval', $pdo->query('SELECT points FROM point_values WHERE enabled = 1 ORDER BY points ASC')->fetchAll(PDO::FETCH_COLUMN));
 
     $stmt = $pdo->prepare(
         "SELECT category_id, points, question, answer, question_ar, answer_ar FROM questions WHERE category_id IN ($placeholders) ORDER BY id ASC"

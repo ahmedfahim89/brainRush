@@ -1,6 +1,6 @@
 // BrainRush admin page: settings, point values, categories and questions.
 // Question bank (D-31 amended): every question has a point value, a category may have
-// several questions per value, and it is playable when every point value has one.
+// several questions per value, and it is playable when every enabled point value has one.
 // All API/user text is rendered with textContent / DOM APIs (never innerHTML).
 'use strict';
 
@@ -12,7 +12,7 @@
 
   const state = {
     settings: null,    // { categories_per_game, timer_seconds, banner_enabled, banner_text }
-    points: [],        // [{ id, points, question_count }] ascending
+    points: [],        // [{ id, points, enabled, question_count }] ascending
     categories: [],    // [{ id, name, question_count }] sorted by name
     questions: [],     // [{ id, category_id, category_name, points, question, answer }]
     renamingId: null,  // category currently being renamed inline
@@ -337,9 +337,17 @@
       return;
     }
     state.points.forEach((p) => {
-      dom.pointsList.appendChild(h('li', {}, [
+      const meta = plural(p.question_count, 'question') + (p.enabled ? '' : ' - disabled, not on the board');
+      dom.pointsList.appendChild(h('li', { className: p.enabled ? '' : 'is-disabled' }, [
         h('span', { className: 'point-label', text: String(p.points) }),
-        h('span', { className: 'item-meta', text: plural(p.question_count, 'question') }),
+        h('span', { className: 'item-meta', text: meta }),
+        h('button', {
+          type: 'button',
+          className: 'btn btn-small',
+          text: p.enabled ? 'Disable' : 'Enable',
+          'aria-label': (p.enabled ? 'Disable' : 'Enable') + ' point value ' + p.points,
+          onclick: () => togglePoint(p),
+        }),
         h('button', {
           type: 'button',
           className: 'btn btn-small btn-danger',
@@ -369,6 +377,18 @@
     });
   }
 
+  /** Show or hide a value on the board; its questions are kept either way. */
+  function togglePoint(p) {
+    const enable = !p.enabled;
+    runAction(dom.pointsMsg, [], async () => {
+      await api('points.php?id=' + encodeURIComponent(p.id), 'PUT', { enabled: enable });
+      await refreshData();
+      showSuccess(dom.pointsMsg, enable
+        ? 'Point value ' + p.points + ' enabled. It is back on the board for the next game.'
+        : 'Point value ' + p.points + ' disabled. The next game\'s board leaves it out; its questions are kept.');
+    });
+  }
+
   function deletePoint(p) {
     if (!window.confirm('Delete point value ' + p.points + '?')) return;
     runAction(dom.pointsMsg, [], async () => {
@@ -380,24 +400,29 @@
 
   // ---------- Categories (US-20) ----------
 
-  /** Point values (ascending) that have no question in the category yet. */
+  /** Enabled point values: the board rows. Disabled values are not needed to play. */
+  function enabledPoints() {
+    return state.points.filter((p) => p.enabled);
+  }
+
+  /** Enabled point values (ascending) that have no question in the category yet. */
   function missingPoints(categoryId) {
     const used = {};
     state.questions.forEach((q) => {
       if (q.category_id === categoryId) used[q.points] = true;
     });
-    return state.points.map((p) => p.points).filter((p) => !used[p]);
+    return enabledPoints().map((p) => p.points).filter((p) => !used[p]);
   }
 
   function isPlayable(category) {
-    return state.points.length > 0 && missingPoints(category.id).length === 0;
+    return enabledPoints().length > 0 && missingPoints(category.id).length === 0;
   }
 
   function renderCategorySummary() {
     const total = state.categories.length;
     const playable = state.categories.filter(isPlayable).length;
     let text = playable + ' of ' + plural(total, 'category', 'categories') +
-      (total === 1 ? ' is' : ' are') + ' playable (at least one question for every point value).';
+      (total === 1 ? ' is' : ' are') + ' playable (at least one question for every enabled point value).';
     if (state.settings && state.settings.categories_per_game !== null) {
       text += ' A game can use up to ' + state.settings.categories_per_game + '.';
     }
@@ -433,8 +458,8 @@
     let status;
     if (isPlayable(c)) {
       status = h('span', { className: 'badge badge-ok', text: 'Playable' });
-    } else if (!state.points.length) {
-      status = h('span', { className: 'badge badge-missing', text: 'Not playable: no point values' });
+    } else if (!enabledPoints().length) {
+      status = h('span', { className: 'badge badge-missing', text: 'Not playable: no enabled point values' });
     } else {
       status = h('span', { className: 'badge badge-missing', text: 'Not playable: missing ' + missing.join(', ') });
     }
@@ -591,7 +616,9 @@
     const firstLabel = state.points.length ? 'Choose points' : 'Add a point value first';
     dom.qPoints.appendChild(h('option', { value: '', text: firstLabel }));
     state.points.forEach((p) => {
-      dom.qPoints.appendChild(h('option', { value: String(p.points), text: String(p.points) }));
+      // Disabled values still take questions; they are just not on the board.
+      const text = String(p.points) + (p.enabled ? '' : ' (disabled)');
+      dom.qPoints.appendChild(h('option', { value: String(p.points), text: text }));
     });
     dom.qPoints.value = state.points.some((p) => String(p.points) === previous) ? previous : '';
   }

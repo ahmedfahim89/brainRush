@@ -585,7 +585,7 @@
       'No playable categories ' + String.fromCharCode(0x2014) + ' add questions in '));
     dom.catWarning.appendChild(h('a', { href: 'admin.html', text: 'Admin' }));
     dom.catWarning.appendChild(document.createTextNode(
-      '. A category is playable when it has a question for every point value.'));
+      '. A category is playable when it has a question for every enabled point value.'));
     dom.catWarning.hidden = false;
   }
 
