@@ -1,7 +1,7 @@
 <?php
 // GET    /api/categories.php             -> [{ id, name, question_count }] sorted by name
 // GET    /api/categories.php?playable=1  -> only playable categories: at least one question for
-//                                        every point value (D-31 amended)
+//                                        every enabled point value (D-31 amended)
 // POST   /api/categories.php             body { name } -> 201 created category
 // PUT    /api/categories.php?id=<id>     body { name } -> 200 renamed category
 // DELETE /api/categories.php?id=<id>     -> 200 (its questions are deleted by FK cascade)
@@ -22,15 +22,19 @@ function category_row(array $r): array
 function list_categories(PDO $pdo, bool $playableOnly): array
 {
     // The FK guarantees every question uses an existing point value, so "distinct
-    // values used == number of point values" means every board cell has a question
-    // to draw from (D-31 amended). COUNT(q.id) > 0 excludes the no-point-values case.
+    // enabled values used == number of enabled point values" means every board cell
+    // has a question to draw from (D-31 amended). Disabled values are not on the board,
+    // so they are not required. "> 0" excludes the no-enabled-values case.
     $having = $playableOnly
-        ? 'HAVING COUNT(q.id) > 0 AND COUNT(DISTINCT q.points) = (SELECT COUNT(*) FROM point_values)'
+        ? 'HAVING COUNT(DISTINCT CASE WHEN pv.enabled = 1 THEN q.points END) > 0
+              AND COUNT(DISTINCT CASE WHEN pv.enabled = 1 THEN q.points END) =
+                  (SELECT COUNT(*) FROM point_values WHERE enabled = 1)'
         : '';
     $rows = $pdo->query(
         "SELECT c.id, c.name, COUNT(q.id) AS question_count
            FROM categories c
            LEFT JOIN questions q ON q.category_id = c.id
+           LEFT JOIN point_values pv ON pv.points = q.points
           GROUP BY c.id, c.name
           $having
           ORDER BY c.name ASC"

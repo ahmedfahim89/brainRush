@@ -212,6 +212,7 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 .item-list li:last-child { border-bottom: none; }
 .point-label { font-weight: 700; font-size: 1.1rem; color: var(--gold); font-variant-numeric: tabular-nums; }
 .item-meta { flex: 1; color: var(--muted); font-size: 0.85rem; }
+.item-list li.is-disabled .point-label { color: var(--muted); text-decoration: line-through; }
 
 /* Tables */
 .table-wrap { overflow-x: auto; }

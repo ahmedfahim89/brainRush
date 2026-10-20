@@ -26,8 +26,9 @@ CREATE TABLE IF NOT EXISTS settings (
 
 -- Board rows (y-axis). Any set of positive values is allowed.
 CREATE TABLE IF NOT EXISTS point_values (
-  id     INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  points INT UNSIGNED NOT NULL,
+  id      INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  points  INT UNSIGNED NOT NULL,
+  enabled TINYINT(1) NOT NULL DEFAULT 1, -- 0 = hidden from the board, its questions are kept
   PRIMARY KEY (id),
   UNIQUE KEY uq_points (points)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
