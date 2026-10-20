@@ -198,6 +198,21 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 .question-form.editing { border-color: var(--gold); }
 .form-row { display: flex; gap: 1rem; flex-wrap: wrap; }
 .form-row .field { flex: 1 1 12rem; }
+/* Image path + thumbnail of the picture question */
+.image-field { display: flex; gap: 1rem; align-items: flex-start; }
+.image-field-input { flex: 1; min-width: 0; }
+.image-field-input .hint { margin: 0.3rem 0 0; }
+.image-preview {
+  flex: none;
+  display: block;
+  width: 7rem;
+  height: 4.5rem;
+  object-fit: contain;
+  background: #0e1433;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+}
+.image-preview[hidden] { display: none; }
 
 /* Point value list */
 .item-list { list-style: none; margin: 0.6rem 0 0; padding: 0; }
@@ -562,6 +577,29 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
   overflow-wrap: anywhere;
 }
 .question-heading:focus { outline: none; }
+/* Picture questions: a fixed height so every picture (also SVGs without a size) shows at the
+   same size; contain keeps its aspect ratio. The height leaves room for the text, timer and
+   answer with no page scroll at 1366x768 (D-30) and grows to 50vh on taller screens.
+   The outline is a drop-shadow, not a border: it follows the painted picture, so a wide
+   picture narrowed by max-width gets no empty framed bars. The thin light edge keeps white
+   (Japan) and dark flags distinct from the panel. */
+.question-image {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: clamp(7rem, calc(100vh - 32.5rem), 50vh);
+  margin: 0 auto 1rem;
+  object-fit: contain;
+  border-radius: 4px;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.75)) drop-shadow(0 3px 10px rgba(0, 0, 0, 0.5));
+}
+.question-image[hidden] { display: none; }
+/* The picture is the question, so its short prompt gets a smaller font: one line at
+   1366x768, which keeps a long answer on screen without a page scroll. */
+.question-image:not([hidden]) + .question-text {
+  margin-bottom: 0.9rem;
+  font-size: clamp(1.15rem, 1.7vw, 2rem);
+}
 /* FU-04: game.js sets --q-scale (1 for short questions, smaller for long ones) */
 .question-text {
   margin: 0 0 1.2rem;
@@ -656,6 +694,7 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 
 @media (max-width: 960px) {
   .question-layout { grid-template-columns: minmax(0, 1fr); }
+  .question-image { height: clamp(7rem, 40vh, 22rem); }
 }
 
 /* Results (US-15, US-16) */
@@ -717,6 +756,7 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
   /* Question: the timer buttons get their own line so the bar stays visible */
   .question-layout { gap: 0.9rem; }
   .question-main, .scoring { padding: 0.9rem 0.9rem 1rem; }
+  .question-image { height: clamp(6rem, 30vh, 14rem); margin-bottom: 0.8rem; }
   .timer { grid-template-columns: auto minmax(0, 1fr); }
   .timer-controls { grid-column: 1 / -1; }
   .timer-controls .btn { flex: 1; }
