@@ -9,12 +9,14 @@
   const LABEL_MAX = 60; // question text length used in confirms and button labels
   const BANNER_MAX = 150; // banner_text limit in api/settings.php
   const BANNER_DEFAULT = 'New questions added - try them now!'; // same as the seed in sql/schema.sql
+  // Picture questions: same rule as api/questions.php (a file under img/questions/).
+  const IMAGE_PATTERN = /^img\/questions\/[a-z0-9][a-z0-9-]*\.(svg|jpg|jpeg|png|webp)$/;
 
   const state = {
     settings: null,    // { categories_per_game, timer_seconds, banner_enabled, banner_text }
     points: [],        // [{ id, points, enabled, question_count }] ascending
     categories: [],    // [{ id, name, question_count }] sorted by name
-    questions: [],     // [{ id, category_id, category_name, points, question, answer }]
+    questions: [],     // [{ id, category_id, category_name, points, question, answer, question_ar, answer_ar, image }]
     renamingId: null,  // category currently being renamed inline
     renameDraft: '',
     editing: null,     // question being edited, or null when the form is in "add" mode
@@ -50,6 +52,8 @@
     qAnswer: byId('question-answer'),
     qTextAr: byId('question-text-ar'),
     qAnswerAr: byId('question-answer-ar'),
+    qImage: byId('question-image'),
+    qImagePreview: byId('question-image-preview'),
     qSave: byId('question-save'),
     qCancel: byId('question-cancel'),
     questionsMsg: byId('questions-msg'),
@@ -635,7 +639,7 @@
     clear(dom.questionsBody);
     if (!rows.length) {
       dom.questionsBody.appendChild(h('tr', {}, [
-        h('td', { className: 'empty-row', colSpan: 6, text: 'No questions yet.' }),
+        h('td', { className: 'empty-row', colSpan: 7, text: 'No questions yet.' }),
       ]));
       return;
     }
@@ -648,6 +652,7 @@
         h('td', { className: 'text-cell', text: q.question }),
         h('td', { className: 'text-cell', text: q.answer }),
         h('td', { className: 'text-cell', text: q.question_ar ? 'Yes' : '-' }),
+        h('td', { className: 'text-cell', text: q.image ? 'Yes' : '-' }),
         h('td', { className: 'row-actions' }, [
           h('button', {
             type: 'button',
@@ -685,7 +690,25 @@
     dom.qAnswer.value = '';
     dom.qTextAr.value = '';
     dom.qAnswerAr.value = '';
+    dom.qImage.value = '';
+    updateImagePreview();
     setFormMode();
+  }
+
+  /** Thumbnail of the image path; hidden while the path is empty or invalid (or fails to load). */
+  function updateImagePreview() {
+    const path = dom.qImage.value.trim();
+    if (path && IMAGE_PATTERN.test(path)) {
+      dom.qImagePreview.src = path;
+      dom.qImagePreview.hidden = false;
+    } else {
+      hideImagePreview();
+    }
+  }
+
+  function hideImagePreview() {
+    dom.qImagePreview.hidden = true;
+    dom.qImagePreview.removeAttribute('src');
   }
 
   function focusQuestionForm() {
@@ -702,6 +725,8 @@
     dom.qAnswer.value = q.answer;
     dom.qTextAr.value = q.question_ar || '';
     dom.qAnswerAr.value = q.answer_ar || '';
+    dom.qImage.value = q.image || '';
+    updateImagePreview();
     setFormMode();
     renderQuestions();
     focusQuestionForm();
@@ -724,6 +749,10 @@
     if (!dom.qTextAr.value.trim() !== !dom.qAnswerAr.value.trim()) {
       errors.push('Fill in both the Arabic question and the Arabic answer, or leave both empty.');
     }
+    const image = dom.qImage.value.trim();
+    if (image && (image.length > 255 || !IMAGE_PATTERN.test(image))) {
+      errors.push('Image path must look like img/questions/flag-japan.svg (lowercase letters, digits and hyphens; .svg, .jpg, .jpeg, .png or .webp), or be empty.');
+    }
     return {
       errors: errors,
       body: {
@@ -733,6 +762,7 @@
         answer: dom.qAnswer.value.trim(),
         question_ar: dom.qTextAr.value.trim(),
         answer_ar: dom.qAnswerAr.value.trim(),
+        image: image, // '' = no picture
       },
     };
   }
@@ -787,6 +817,8 @@
     dom.categoryForm.addEventListener('submit', onCategorySubmit);
     dom.qForm.addEventListener('submit', onQuestionSubmit);
     dom.qCancel.addEventListener('click', cancelEdit);
+    dom.qImage.addEventListener('input', updateImagePreview);
+    dom.qImagePreview.addEventListener('error', hideImagePreview);
     dom.qFilter.addEventListener('change', onFilterChange);
     dom.authRetry.addEventListener('click', onAuthRetry);
   }

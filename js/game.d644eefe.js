@@ -12,6 +12,8 @@
   const TIMER_TICK_MS = 100;
   const QUESTION_FULL_SIZE_CHARS = 150; // FU-04: longer questions get a smaller font
   const QUESTION_MIN_SCALE = 0.5;
+  // Picture questions: same rule as the API (a file under img/questions/, no URLs or "..").
+  const IMAGE_PATTERN = /^img\/questions\/[a-z0-9][a-z0-9-]*\.(svg|jpg|jpeg|png|webp)$/;
   const MINUS = String.fromCharCode(0x2212);   // typographic minus sign
   const TIMES = String.fromCharCode(0x00d7);   // multiplication sign
   const DOT = String.fromCharCode(0x00b7);     // middle dot
@@ -87,6 +89,7 @@
     endBtn: byId('end-btn'),
     scoreboard: byId('scoreboard'),
     qHeading: byId('question-title'),
+    qImage: byId('question-image'),
     qText: byId('question-text'),
     timerBox: byId('timer'),
     timerValue: byId('timer-value'),
@@ -327,11 +330,17 @@
         typeof c.name === 'string' && isPlainObject(c.questions) &&
         points.every((p) => {
           const q = hasOwn(c.questions, String(p)) ? c.questions[String(p)] : null;
-          return isPlainObject(q) && typeof q.question === 'string' && typeof q.answer === 'string';
+          return isPlainObject(q) && typeof q.question === 'string' && typeof q.answer === 'string' &&
+            isValidImage(q.image);
         });
       if (ok) ids[c.id] = true;
       return ok;
     });
+  }
+
+  /** Picture path is optional: missing/null (text question, also older saves) or a valid path. */
+  function isValidImage(image) {
+    return image === undefined || image === null || (typeof image === 'string' && IMAGE_PATTERN.test(image));
   }
 
   /** "<categoryId>:<points>" naming a real cell of this board, in canonical form. */
@@ -788,6 +797,7 @@
             answer: q.answer,
             question_ar: arabic ? q.question_ar : null,
             answer_ar: arabic ? q.answer_ar : null,
+            image: typeof q.image === 'string' ? q.image : null,
           };
         });
         return { id: c.id, name: c.name, questions: questions };
@@ -815,7 +825,9 @@
     updateStartButton();
     try {
       const data = await apiGet('questions.php?board=1&categories=' + ids.join(','));
-      beginGame(parseBoard(data, ids), timer);
+      const board = parseBoard(data, ids);
+      preloadImages(board.categories);
+      beginGame(board, timer);
     } catch (err) {
       // US-06: stay on setup with every input intact.
       showMessage(dom.startMsg, 'Could not start the game: ' + errorText(err), 'error');
@@ -824,6 +836,16 @@
       dom.startBtn.textContent = 'Start Game';
       updateStartButton();
     }
+  }
+
+  /** Fetch every picture of the board up front so a picture question opens without a delay. */
+  function preloadImages(categories) {
+    categories.forEach((c) => {
+      Object.keys(c.questions).forEach((p) => {
+        const image = c.questions[p].image;
+        if (image) new Image().src = image;
+      });
+    });
   }
 
   /** D-12: the board loaded now is used for the whole game (stored in the game state). */
@@ -1009,6 +1031,7 @@
     // Arabic first when the question has an Arabic version; a restored choice is kept.
     if (!hasArabic(q)) cur.lang = 'en';
     else if (cur.lang !== 'en' && cur.lang !== 'ar') cur.lang = 'ar';
+    renderQuestionImage(q);
     renderQuestionLang(q);
     renderAnswerState();
     renderScoringRows();
@@ -1020,6 +1043,18 @@
   function hasArabic(q) {
     return typeof q.question_ar === 'string' && q.question_ar !== '' &&
       typeof q.answer_ar === 'string' && q.answer_ar !== '';
+  }
+
+  /** Picture question: show its picture above the text (same in both languages); else hide it. */
+  function renderQuestionImage(q) {
+    const image = dom.qImage;
+    if (q.image) {
+      image.src = q.image;
+      image.hidden = false;
+    } else {
+      image.hidden = true;
+      image.removeAttribute('src');
+    }
   }
 
   /** Show the question and its answer in the open question's language (cur.lang). */
@@ -1318,6 +1353,7 @@
       return;
     }
     renderGame();
+    preloadImages(state.game.categories);
     if (saved.screen === 'question') showQuestion();
     else showScreen('board');
   }
