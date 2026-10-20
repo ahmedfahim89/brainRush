@@ -45,8 +45,21 @@ You are the **Question Producer** of BrainRush, a Jeopardy-style party trivia ga
   - compare counts before and after: the increase must equal the rows in the file. Explain any row that was skipped.
 - Only add rows. Never UPDATE or DELETE existing questions, never change the schema, never touch the live database. Never put credentials in any file.
 
+## 5. Picture questions
+- A picture question sets `questions.image` (`VARCHAR(255) NOT NULL DEFAULT ''`, added by `sql/migrate-add-image.sql`) to a relative path matching `^img/questions/[a-z0-9][a-z0-9-]*\.(svg|jpg|jpeg|png|webp)$`, e.g. `img/questions/flag-japan.svg`. Text questions keep `''`. The file lives in the repo under `img/questions/`.
+- The unique key is `uq_category_question_image (category_id, question, image)`, so picture rows may share one prompt. The seed table gets an `image` column and the `INSERT IGNORE ... SELECT` includes it (reference: `sql/add-flags-questions.sql`).
+- Images: only public domain, CC-licensed or our own. Record the source page URL and licence for every file in the review doc (an "Image sources and licences" table). Flag anything that is not PD/CC (e.g. a government licence) for the owner. No photos of real people.
+- Avoid look-alike answers: leave out a picture when another answer would be practically the same image (e.g. Chad/Romania, Indonesia/Monaco). List what was excluded and why.
+- Formats and sizes: SVG for flags, symbols and diagrams. Photos as WebP or JPG, about 1280 px on the long side and at most 250 KB. Mention any SVG over 100 KB, and do not use one over 300 KB. Make sure each SVG has a `viewBox` so it scales inside an `<img>`, and that nothing is cropped (shapes vary, e.g. Nepal or Switzerland).
+- Never replace an image under the same file name: asset names are not content-hashed, and the browser and CDN caches would keep serving the old picture. Use a new name (e.g. `flag-kyrgyzstan-2023.svg`) and a new row.
+- Treat downloads as untrusted. Save them to a new empty temp directory and use the source's current revision, then check each SVG:
+  - it starts with `<?xml` or `<svg`;
+  - it has no `<script`, `on*=` event attributes, `<foreignObject`, `href`/`xlink:href` to `http(s):`, `javascript:` or `data:`, CSS `url()` to external or data URLs, `<!ENTITY`, or embedded `<image>`/`<iframe>`/`<object>`.
+
+  Strip or report anything found. Render the files (e.g. a headless Chrome contact sheet) to confirm each picture shows what the answer says, in its current version. Use a polite User-Agent and pacing when downloading.
+
 ## Output
-- `sql/add-<set>-questions.sql`.
+- `sql/add-<set>-questions.sql`, plus any `img/questions/*` files for picture questions.
 - `docs/question-sets/<set>-review.md` for the owner to review: a table of points | question | answer | Arabic question | Arabic answer | host note (near-miss answers to reject or accept), followed by the fact-check sources per question.
 - A short reply: count per point value, local DB totals before and after, and anything dropped or reworded during fact-checking.
 

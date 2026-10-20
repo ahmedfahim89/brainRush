@@ -71,6 +71,7 @@ Upload only what the website needs. Keep the folder structure:
 | `.htaccess` (a hidden file; make sure your FTP client or File Manager shows hidden files) | `sql/` (import it through phpMyAdmin instead) |
 | `index.html`, `admin.html` | `docs/`, `.claude/`, `.git/`, `.gitignore`, `README.md` |
 | `css/` (whole folder) | **`api/config.php` from your computer** (it holds your *local* database settings; create a new one on the server in step 5) |
+| `img/` (whole folder, including `img/questions/` with the question pictures) | |
 | `js/` (whole folder) | **`password.txt`**, and any other local file with passwords or notes (never, under any name) |
 | `api/` (all `.php` files: `auth.php`, `categories.php`, `config.example.php`, `db.php`, `game-log.php`, `points.php`, `questions.php`, `settings.php`) | `logs/` (the server writes its own daily `logs/game-YYYY-MM-DD.log`) |
 
@@ -155,9 +156,15 @@ The database content and `api/config.php` belong to the live site. A redeploy on
 2. Back up the live content first (strongly recommended). In phpMyAdmin, select the database → **Export** → **Quick** → **Go**. Keep the `.sql` file somewhere private.
 3. Update the code:
    - **Git deployment:** hPanel → **Advanced → Git** → **Deploy**. You can also set up the auto-deploy webhook shown there. `api/config.php` is untouched because it is not in the repository.
-   - **File Manager/FTP:** upload the changed files from the list in step 4 and overwrite the old ones, including `.htaccess` whenever it changed. A changed JavaScript or CSS file has a new name (for example `js/game.dfec3b1c.js`), so upload it together with `index.html` and `admin.html`, then delete the old `js/`/`css/` file it replaces. **Never** upload or overwrite `api/config.php`, never upload `password.txt` or other local credential files, and never delete the whole `api/` folder.
+   - **File Manager/FTP:** upload the changed files from the list in step 4 and overwrite the old ones, including `.htaccess` whenever it changed. A changed JavaScript or CSS file has a new name (for example `js/game.dfec3b1c.js`), so upload it together with `index.html` and `admin.html`, then delete the old `js/`/`css/` file it replaces. Question pictures in `img/questions/` are **not** content-hashed: upload new ones as they are, and give a changed picture a **new file name** (and update its question in Admin), because browsers and the CDN may keep showing the old copy of an unchanged name for days. **Never** upload or overwrite `api/config.php`, never upload `password.txt` or other local credential files, and never delete the whole `api/` folder.
 4. Database changes: only if that sprint's dev note (`docs/sprints/sprint-N-dev.md`) says the schema changed.
    - **Do not** re-import `schema-hosted.sql` "just in case". It never overwrites existing rows, but it **re-adds any sample category or question you deleted**. It also cannot change existing tables. A schema change comes with its own instructions or migration script in the dev note.
+   - **Picture questions: import `sql/migrate-add-image.sql` once, BEFORE the code update in step 3.** It adds the `image` column to `questions` and replaces the duplicate key `uq_category_question` with `uq_category_question_image` (category + question text + picture), because flag questions all share the same prompt text. The new code reads the `image` column, so deploying it first breaks the game and admin until the migration runs; the old code keeps working with the migrated table.
+     1. Back up first (step 2).
+     2. In phpMyAdmin, select your database in the left sidebar, open **Import**, choose **`sql/migrate-add-image.sql`** and click **Import** (or **Go**).
+     3. Expected result: a green success message. Under **Structure**, `questions` has an `image` column (`varchar(255)`, default empty); under **Indexes**, `uq_category_question` is gone and `uq_category_question_image` exists. Existing questions get an empty image and play as before.
+     4. It is safe to import again by mistake: a second run only reports notes and changes nothing.
+     5. Upload `img/questions/` with the code (Git deployment includes it; with FTP, see the upload table in section 4).
    - **Sprint 6 (question bank): import `sql/migrate-question-bank.sql` once.** Questions keep their point value, but a category may now hold several questions per value, and each new game draws one at random for every board cell. Do this right after the code update in step 3. Until then the old one-per-slot key still blocks a second question at the same category and point value; the game keeps working.
      1. Back up first (step 2). The migration changes the `questions` table.
      2. In phpMyAdmin, click your database in the left sidebar so it is selected, open **Import**, choose **`sql/migrate-question-bank.sql`** and click **Import** (or **Go**). The file has no `CREATE DATABASE`/`USE`, so it runs on the selected database.

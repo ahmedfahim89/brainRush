@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BrainRush - Admin</title>
-  <link rel="stylesheet" href="css/style.87a7c741.css">
+  <link rel="stylesheet" href="css/style.cd9513fb.css">
 </head>
 <body class="admin">
   <header class="page-header">
@@ -106,6 +106,14 @@
         <textarea id="question-text-ar" rows="3" maxlength="5000" dir="rtl" lang="ar"></textarea>
         <label for="question-answer-ar">Arabic answer (optional, required if the Arabic question is filled)</label>
         <input id="question-answer-ar" type="text" maxlength="5000" dir="rtl" lang="ar">
+        <label for="question-image">Image path (optional, makes it a picture question)</label>
+        <div class="image-field">
+          <div class="image-field-input">
+            <input id="question-image" type="text" maxlength="255" placeholder="img/questions/flag-japan.svg" spellcheck="false" autocomplete="off" aria-describedby="question-image-hint">
+            <p id="question-image-hint" class="hint">A file in the project's <code>img/questions/</code> folder: lowercase letters, digits and hyphens, ending in .svg, .jpg, .jpeg, .png or .webp. The picture is shown above the question text.</p>
+          </div>
+          <img id="question-image-preview" class="image-preview" alt="Preview of the question picture" hidden>
+        </div>
         <div class="actions">
           <button type="submit" id="question-save" class="btn btn-primary">Add question</button>
           <button type="button" id="question-cancel" class="btn" hidden>Cancel edit</button>
@@ -120,7 +128,7 @@
       <div class="table-wrap">
         <table class="data-table">
           <thead>
-            <tr><th scope="col">Category</th><th scope="col">Points</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Arabic</th><th scope="col">Actions</th></tr>
+            <tr><th scope="col">Category</th><th scope="col">Points</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Arabic</th><th scope="col">Picture?</th><th scope="col">Actions</th></tr>
           </thead>
           <tbody id="questions-body"></tbody>
         </table>
@@ -128,6 +136,6 @@
     </section>
   </main>
 
-  <script src="js/admin.5295b56d.js"></script>
+  <script src="js/admin.d2e03373.js"></script>
 </body>
 </html>
