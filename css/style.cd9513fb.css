@@ -1,0 +1,769 @@
+/* BrainRush shared styles: dark board theme, gold accents, big readable text. */
+
+:root {
+  --bg: #0b1026;
+  --panel: #151c3d;
+  --panel-2: #1d2654;
+  --border: #2c3770;
+  --text: #eef1ff;
+  --muted: #a3acd3;
+  --gold: #f5c518;
+  --gold-dark: #c99d00;
+  --danger: #ff6b6b;
+  --danger-bg: rgba(255, 107, 107, 0.12);
+  --success: #4cd18a;
+  --success-bg: rgba(76, 209, 138, 0.12);
+  --radius: 8px;
+  --focus: 0 0 0 3px rgba(245, 197, 24, 0.45);
+}
+
+* { box-sizing: border-box; }
+
+/* text-size-adjust: iOS must not enlarge text on its own when the phone is turned sideways */
+html { font-size: 17px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+  line-height: 1.45;
+}
+
+h1, h2, h3 { margin: 0 0 0.6rem; line-height: 1.2; }
+h1 { font-size: 1.9rem; color: var(--gold); letter-spacing: 0.02em; }
+h2 { font-size: 1.3rem; color: var(--gold); }
+h3 { font-size: 1.05rem; }
+
+a { color: var(--gold); }
+/* Hover styles only for real pointers: on touch screens a tap would leave them stuck on (iOS). */
+@media (hover: hover) { a:hover { color: #ffe27a; } }
+
+.subtitle { color: var(--text); font-weight: 400; font-size: 1.2rem; }
+.hint { color: var(--muted); font-size: 0.9rem; font-weight: 400; }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---------- Header ---------- */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: #0e1433;
+}
+.page-header h1 { margin: 0; }
+.nav-link { font-weight: 600; text-decoration: none; }
+@media (hover: hover) { .nav-link:hover { text-decoration: underline; } }
+
+/* ---------- Maintenance overlay ---------- */
+.page-header { position: relative; z-index: 101; } /* keeps the Admin link usable above the overlay */
+.maintenance-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(5, 8, 22, 0.88);
+}
+.maintenance-overlay[hidden] { display: none; }
+.maintenance-card {
+  max-width: 36rem;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 1.25rem;
+  border: 2px solid var(--gold);
+  border-radius: var(--radius);
+  background: var(--panel);
+  text-align: center;
+  font-size: 1.2rem;
+  line-height: 1.5;
+}
+.maintenance-card p { margin: 0; }
+.maintenance-img { display: block; width: 100%; height: auto; margin-bottom: 1rem; border-radius: var(--radius); }
+
+/* ---------- Form controls ---------- */
+input, select, textarea, button { font: inherit; }
+/* No double-tap zoom when the host taps buttons quickly (e.g. + / - on the scoreboard) */
+a, button, label, input, select, textarea { touch-action: manipulation; }
+/* iOS zooms into any field with text under 16px; keep fields at 16px or more on touch screens */
+@media (pointer: coarse) {
+  input, select, textarea { font-size: max(16px, 1em); }
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  color: var(--text);
+  background: #0e1433;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+textarea { resize: vertical; min-height: 4.5rem; }
+input:focus, select:focus, textarea:focus, button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
+  border-color: var(--gold);
+}
+select:disabled, input:disabled { opacity: 0.6; }
+
+label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size: 0.9rem; }
+
+.btn {
+  display: inline-block;
+  padding: 0.45rem 0.9rem;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+@media (hover: hover) { .btn:hover:not(:disabled) { border-color: var(--gold); } }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn[hidden] { display: none; }
+.btn-primary { background: var(--gold); color: #1a1a1a; border-color: var(--gold); font-weight: 600; }
+@media (hover: hover) { .btn-primary:hover:not(:disabled) { background: #ffd84a; } }
+.btn-danger { color: var(--danger); border-color: rgba(255, 107, 107, 0.5); }
+@media (hover: hover) { .btn-danger:hover:not(:disabled) { border-color: var(--danger); background: var(--danger-bg); } }
+.btn-small { padding: 0.2rem 0.55rem; font-size: 0.85rem; }
+
+.actions { display: flex; gap: 0.5rem; margin-top: 0.8rem; flex-wrap: wrap; }
+
+/* ---------- Inline messages ---------- */
+.msg {
+  margin: 0.7rem 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border-left: 4px solid var(--muted);
+  white-space: pre-line;
+  overflow-wrap: anywhere; /* long unbroken names wrap instead of widening the page (D-19) */
+}
+.msg-error { color: #ffd0d0; background: var(--danger-bg); border-left-color: var(--danger); }
+.msg-success { color: #c9f5dc; background: var(--success-bg); border-left-color: var(--success); }
+#global-msg { margin: 1rem 1.5rem 0; }
+.msg-warning { color: #fff1c2; background: rgba(245, 197, 24, 0.12); border-left-color: var(--gold); }
+/* Admin login notice (US-29): text + "Log in" button on one line */
+.auth-banner { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin: 1rem 1.5rem 0; }
+.auth-banner[hidden] { display: none; }
+.auth-banner .auth-text { flex: 1 1 20rem; min-width: 0; overflow-wrap: anywhere; }
+
+/* ---------- Admin layout ---------- */
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.25rem;
+  padding: 1.25rem 1.5rem 2rem;
+}
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.2rem 1.2rem;
+  min-width: 0;
+}
+.panel-wide { grid-column: 1 / -1; }
+
+.stack input { max-width: 12rem; }
+.stack input.wide-input { max-width: none; }
+.stack .hint { margin: 0.2rem 0 0; }
+/* Checkbox and its text on one line (banner on/off in Game settings) */
+.check-label { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.8rem; color: var(--text); cursor: pointer; }
+.check-label input { flex: none; width: 1.1rem; height: 1.1rem; margin: 0; accent-color: var(--gold); }
+
+.inline-form { display: flex; gap: 0.5rem; align-items: center; }
+.inline-form input { flex: 1; min-width: 0; }
+
+.filter-row { display: flex; align-items: center; gap: 0.6rem; margin: 1rem 0 0.5rem; flex-wrap: wrap; }
+.filter-row label { margin: 0; }
+.filter-row select { width: auto; min-width: 14rem; }
+
+.question-form {
+  padding: 0.8rem 1rem 1rem;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.question-form.editing { border-color: var(--gold); }
+.form-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+.form-row .field { flex: 1 1 12rem; }
+/* Image path + thumbnail of the picture question */
+.image-field { display: flex; gap: 1rem; align-items: flex-start; }
+.image-field-input { flex: 1; min-width: 0; }
+.image-field-input .hint { margin: 0.3rem 0 0; }
+.image-preview {
+  flex: none;
+  display: block;
+  width: 7rem;
+  height: 4.5rem;
+  object-fit: contain;
+  background: #0e1433;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 4px;
+}
+.image-preview[hidden] { display: none; }
+
+/* Point value list */
+.item-list { list-style: none; margin: 0.6rem 0 0; padding: 0; }
+.item-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.4rem 0.2rem;
+  border-bottom: 1px solid var(--border);
+}
+.item-list li:last-child { border-bottom: none; }
+.point-label { font-weight: 700; font-size: 1.1rem; color: var(--gold); font-variant-numeric: tabular-nums; }
+.item-meta { flex: 1; color: var(--muted); font-size: 0.85rem; }
+
+/* Tables */
+.table-wrap { overflow-x: auto; }
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th, .data-table td {
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+.data-table th { color: var(--muted); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.data-table td.text-cell { max-width: 28rem; overflow-wrap: anywhere; white-space: pre-wrap; }
+.data-table td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.data-table td.row-actions { white-space: nowrap; }
+.data-table td.row-actions .btn + .btn { margin-left: 0.35rem; }
+.data-table td.empty-row { color: var(--muted); font-style: italic; }
+.data-table tr.is-editing td { background: rgba(245, 197, 24, 0.08); }
+/* min-width keeps normal names on one line; "anywhere" still breaks very long unbroken names */
+.data-table td.name-cell { min-width: 9rem; overflow-wrap: anywhere; }
+.rename-input { max-width: 22rem; }
+
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge-ok { background: var(--success-bg); color: var(--success); }
+.badge-missing { background: var(--danger-bg); color: #ffb3b3; }
+
+/* ---------- Game page ---------- */
+.game-main { padding: 1.25rem 1.5rem 1rem; }
+.screen[hidden] { display: none; }
+.field-error { margin: 0.25rem 0 0; color: #ffb3b3; font-size: 0.9rem; }
+.field-error[hidden] { display: none; }
+.game input[aria-invalid="true"] { border-color: var(--danger); }
+.btn-large { padding: 0.7rem 2rem; font-size: 1.2rem; }
+.msg a { font-weight: 600; }
+.msg .btn { margin-left: 0.6rem; }
+
+/* Setup */
+.setup { max-width: 54rem; margin: 0 auto; }
+.setup-block {
+  min-width: 0;
+  margin: 0 0 1.25rem;
+  padding: 0.9rem 1.2rem 1.2rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.setup-block legend { padding: 0 0.4rem; color: var(--gold); font-weight: 700; font-size: 1.15rem; }
+
+.mode-toggle { display: inline-flex; margin: 0.3rem 0 0.2rem; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+.mode-option { position: relative; margin: 0; font-size: 1rem; color: var(--text); }
+.mode-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.mode-option span { display: block; padding: 0.45rem 1.2rem; cursor: pointer; }
+.mode-option + .mode-option span { border-left: 1px solid var(--border); }
+.mode-option input:checked + span { background: var(--gold); color: #1a1a1a; font-weight: 700; }
+.mode-option input:focus-visible + span { box-shadow: inset var(--focus); }
+.mode-limit { font-size: 0.8rem; font-weight: 400; }
+
+.entry-list { list-style: none; margin: 0.4rem 0 0.8rem; padding: 0; }
+.entry-row {
+  display: grid;
+  grid-template-columns: 5rem 2.4rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.25rem 0.6rem;
+  padding: 0.3rem 0;
+}
+.entry-row .entry-label { margin: 0; font-size: 0.95rem; }
+.entry-row .field-error { grid-column: 3 / -1; margin: 0; }
+.swatch {
+  width: 2.2rem;
+  height: 2.2rem;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  cursor: pointer;
+}
+@media (hover: hover) { .swatch:hover { transform: scale(1.08); } }
+
+.cat-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: 0.5rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.cat-label {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  color: var(--text);
+  font-size: 1rem;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.cat-label.is-selected { border-color: var(--gold); }
+.cat-label.is-locked { color: var(--muted); cursor: not-allowed; }
+.cat-label input { flex: none; width: 1.1rem; height: 1.1rem; margin: 0; accent-color: var(--gold); }
+.cat-name-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.cat-order { min-width: 1.5rem; border-radius: 999px; background: var(--gold); color: #1a1a1a; font-size: 0.8rem; font-weight: 700; text-align: center; }
+.cat-order:empty { display: none; }
+
+.timer-input { max-width: 8rem; }
+.start-row { justify-content: center; margin: 0.5rem 0; }
+
+/* "New questions" banner on the setup screen (text and on/off come from Admin settings):
+   gold strip with a pulsing NEW pill and a light shine sweeping across it */
+.new-banner {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  margin: 0 0 1rem;
+  padding: 0.65rem 1rem;
+  color: #1a1a1a;
+  font-family: "Comic Sans MS", "Comic Sans", "Comic Neue", cursive;
+  font-size: 1.15rem;
+  font-weight: 800;
+  text-align: center;
+  overflow-wrap: anywhere;
+  background: linear-gradient(90deg, var(--gold-dark), var(--gold) 30%, #ffe27a 70%, var(--gold));
+  border-radius: var(--radius);
+  box-shadow: 0 0 18px rgba(245, 197, 24, 0.35);
+}
+.new-banner[hidden] { display: none; }
+.new-banner::before {
+  content: "\2728  NEW";
+  flex: none;
+  padding: 0.1rem 0.6rem;
+  color: var(--gold);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  white-space: pre;
+  background: var(--bg);
+  border-radius: 999px;
+  animation: banner-pulse 1.6s ease-in-out infinite;
+}
+.new-banner::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -40%;
+  width: 30%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+  animation: banner-shine 3.5s ease-in-out infinite;
+}
+@keyframes banner-pulse { 50% { transform: scale(1.1); } }
+@keyframes banner-shine { 0% { left: -40%; } 60%, 100% { left: 120%; } }
+@media (prefers-reduced-motion: reduce) {
+  .new-banner::before { animation: none; }
+  .new-banner::after { display: none; }
+}
+
+/* Board: columns = categories, rows = point values (both from data; JS sets --cols and --digits) */
+.board-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem 1rem; max-width: 90rem; margin: 0 auto 0.8rem; }
+.board-info { margin: 0; }
+.btn-end { color: var(--gold); border-color: var(--gold-dark); font-weight: 600; }
+@media (hover: hover) { .btn-end:hover:not(:disabled) { background: rgba(245, 197, 24, 0.12); } }
+.board-done {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.2rem;
+  max-width: 90rem;
+  margin: 0 auto 0.9rem;
+  padding: 0.8rem 1rem;
+  background: rgba(245, 197, 24, 0.12);
+  border: 2px solid var(--gold);
+  border-radius: var(--radius);
+}
+.board-done[hidden] { display: none; }
+.board-done-text { margin: 0; font-size: 1.25rem; font-weight: 700; color: #fff1c2; }
+/* FU-03 (D-30): on the board screen the page is one viewport tall and the board gets the height
+   that header, bar, offer and scoreboard leave over. The page only scrolls once rows hit --row-min.
+   game.js sets body[data-screen]; the flex chain below is only active while the board is shown. */
+body[data-screen="board"] { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+body[data-screen="board"] .game-main { display: flex; flex-direction: column; flex: 1 0 auto; }
+body[data-screen="board"] #screen-board { display: flex; flex-direction: column; flex: 1 0 auto; }
+/* auto side margins would shrink-wrap flex items, so give them the full width (max-width still applies) */
+body[data-screen="board"] #screen-board > * { width: 100%; }
+
+/* --cols, --rows and --digits are always set inline by game.js from the board data */
+.board {
+  --gap: 0.5rem;
+  --cat-h: 3.6rem;
+  --row-min: 2.75rem;
+  --row-max: 6.5rem;
+  --board-w: min(100vw - 3rem, 90rem);
+  --cell-w: calc((var(--board-w) - (var(--cols) - 1) * var(--gap)) / var(--cols));
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  /* rows share the board height equally; "1fr" never goes below a cell's min-height */
+  grid-template-rows: auto repeat(var(--rows), 1fr);
+  gap: var(--gap);
+  flex: 1 0 0;
+  /* few rows: stop growing at --row-max so the scoreboard stays right under the board */
+  max-height: calc(var(--cat-h) + var(--rows) * (var(--row-max) + var(--gap)));
+  max-width: 90rem;
+  margin: 0 auto;
+}
+.board-cat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: var(--cat-h);
+  padding: 0.4rem 0.3rem;
+  color: var(--text);
+  font-size: clamp(0.62rem, calc(var(--cell-w) / 10.5), 1.1rem);
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  -webkit-hyphens: auto;
+  hyphens: auto;
+  background: var(--panel-2);
+  border-bottom: 3px solid var(--gold);
+  border-radius: 6px;
+}
+.board-cat-name { min-width: 0; overflow-wrap: anywhere; }
+.board-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  min-width: 0;
+  min-height: var(--row-min);
+  padding: 0.3rem;
+  overflow: hidden;
+  /* size container: the label and owner name scale with the cell's real height (cqh), so content
+     never makes a row taller than its share of the board */
+  container-type: size;
+  color: var(--gold);
+  background: linear-gradient(#1f2a6b, #161f57);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+@media (hover: hover) { .board-cell:hover:not(:disabled) { border-color: var(--gold); filter: brightness(1.2); } }
+/* Used cells (US-08): owner color is set inline by JS; no correct answer = grey */
+.board-cell.is-used { cursor: default; background-image: none; border-color: rgba(0, 0, 0, 0.35); }
+.board-cell.is-owned { box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.25); }
+.board-cell.is-unanswered { color: #c3c7d4; background: #4b5163; }
+.board-cell.is-used .cell-points { opacity: 0.85; }
+/* FU-05: owned and grey cells share one smaller label size (room for the owner name, US-08).
+   55cqh + 28cqh * 1.2 line height + the 0.2rem gap always fit the cell's content height. */
+.board-cell.is-used .cell-points { font-size: min(calc(var(--label-size) * 0.7), 55cqh); }
+.cell-owner {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: min(clamp(0.62rem, calc(var(--cell-w) / 11), 0.95rem), 28cqh);
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Label shrinks with column width and digit count so e.g. 10000 never wraps or overflows,
+   and with the cell height (cqh of the cell) on short rows. */
+.cell-points {
+  --label-size: min(2.6rem, calc(var(--cell-w) / (var(--digits) * 0.62 + 1)), 90cqh);
+  font-size: var(--label-size);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Scoreboard strip */
+.scoreboard-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  max-width: 90rem;
+  margin: 1.2rem auto 0;
+  padding: 0;
+  list-style: none;
+}
+.score-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "name name name" "minus score plus";
+  align-items: center;
+  gap: 0.2rem 0.5rem;
+  flex: 1 1 11rem;
+  min-width: 0;
+  max-width: 18rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--radius);
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.25);
+}
+.score-name { grid-area: name; font-weight: 700; text-align: center; overflow-wrap: anywhere; }
+.score-value { grid-area: score; font-size: 1.8rem; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+.score-btn {
+  width: 2.2rem;
+  height: 2.2rem;
+  padding: 0;
+  color: inherit;
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  border-radius: 50%;
+  cursor: pointer;
+}
+@media (hover: hover) { .score-btn:hover { background: rgba(0, 0, 0, 0.38); } }
+.score-minus { grid-area: minus; }
+.score-plus { grid-area: plus; }
+
+/* Question screen (US-11..US-14): question left, scoring right; stacks on narrow screens */
+.question { max-width: 90rem; margin: 0 auto; }
+.question-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+.question-main, .scoring {
+  min-width: 0;
+  padding: 1.1rem 1.4rem 1.3rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.question-heading {
+  margin: 0 0 0.6rem;
+  font-size: clamp(1.15rem, 1.9vw, 1.7rem);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+.question-heading:focus { outline: none; }
+/* Picture questions: a fixed height so every picture (also SVGs without a size) shows at the
+   same size; contain keeps its aspect ratio. The height leaves room for the text, timer and
+   answer with no page scroll at 1366x768 (D-30) and grows to 50vh on taller screens.
+   The outline is a drop-shadow, not a border: it follows the painted picture, so a wide
+   picture narrowed by max-width gets no empty framed bars. The thin light edge keeps white
+   (Japan) and dark flags distinct from the panel. */
+.question-image {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: clamp(7rem, calc(100vh - 32.5rem), 50vh);
+  margin: 0 auto 1rem;
+  object-fit: contain;
+  border-radius: 4px;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.75)) drop-shadow(0 3px 10px rgba(0, 0, 0, 0.5));
+}
+.question-image[hidden] { display: none; }
+/* The picture is the question, so its short prompt gets a smaller font: one line at
+   1366x768, which keeps a long answer on screen without a page scroll. */
+.question-image:not([hidden]) + .question-text {
+  margin-bottom: 0.9rem;
+  font-size: clamp(1.15rem, 1.7vw, 2rem);
+}
+/* FU-04: game.js sets --q-scale (1 for short questions, smaller for long ones) */
+.question-text {
+  margin: 0 0 1.2rem;
+  font-size: max(1.15rem, calc(clamp(1.6rem, 3vw, 3rem) * var(--q-scale, 1)));
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.lang-btn { margin: 0 0 1.2rem; }
+.lang-btn[hidden] { display: none; }
+
+.timer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.3rem 1rem;
+}
+.timer-value {
+  min-width: 3ch;
+  color: var(--gold);
+  font-size: 2.6rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.timer-track { height: 1rem; overflow: hidden; background: #0e1433; border: 1px solid var(--border); border-radius: 999px; }
+.timer-bar {
+  height: 100%;
+  background: var(--gold);
+  transform-origin: left center;
+  transition: transform 0.1s linear, background-color 0.2s;
+}
+.timer.is-low .timer-value { color: var(--danger); }
+.timer.is-low .timer-bar { background: var(--danger); }
+.timer-controls { display: flex; gap: 0.5rem; }
+.timer-controls .btn { min-width: 5.5rem; }
+.timer-status { grid-column: 1 / -1; min-height: 1.45em; margin: 0; color: var(--danger); font-weight: 700; }
+
+.answer-block { margin-top: 0.8rem; }
+.answer-text {
+  margin: 0;
+  padding: 0.7rem 1rem;
+  color: #c9f5dc;
+  font-size: clamp(1.3rem, 2.3vw, 2.2rem);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  background: var(--success-bg);
+  border-left: 4px solid var(--success);
+  border-radius: 6px;
+}
+.answer-text.is-rtl { text-align: right; border-left: 0; border-right: 4px solid var(--success); }
+.answer-text:focus { outline: none; }
+#answer-value { white-space: pre-wrap; }
+.answer-text[hidden] { display: none; }
+.answer-label { display: block; color: var(--muted); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+
+.scoring h3 { color: var(--gold); margin-bottom: 0.2rem; }
+.scoring .hint { margin: 0 0 0.7rem; }
+.score-rows { display: grid; gap: 0.5rem; margin: 0 0 1rem; padding: 0; list-style: none; }
+.srow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.5rem;
+  padding: 0.35rem 0.5rem;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-left: 8px solid var(--border);
+  border-radius: 6px;
+}
+.srow-name {
+  flex: 1 1 6rem;
+  min-width: 0;
+  padding: 0.2rem 0.55rem;
+  font-weight: 700;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+.srow .btn { padding: 0.35rem 0.7rem; }
+.srow-score { min-width: 4ch; font-size: 1.2rem; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
+.btn-correct { color: var(--success); border-color: rgba(76, 209, 138, 0.55); }
+@media (hover: hover) { .btn-correct:hover:not(:disabled) { border-color: var(--success); background: var(--success-bg); } }
+.btn-wrong { color: var(--danger); border-color: rgba(255, 107, 107, 0.5); }
+@media (hover: hover) { .btn-wrong:hover:not(:disabled) { border-color: var(--danger); background: var(--danger-bg); } }
+/* The mark that was given stays clearly visible while its buttons are disabled */
+.btn-correct.is-chosen { opacity: 1; color: #0b1026; background: var(--success); border-color: var(--success); }
+.btn-wrong.is-chosen { opacity: 1; color: #0b1026; background: var(--danger); border-color: var(--danger); }
+.btn-block { display: block; width: 100%; }
+
+@media (max-width: 960px) {
+  .question-layout { grid-template-columns: minmax(0, 1fr); }
+  .question-image { height: clamp(7rem, 40vh, 22rem); }
+}
+
+/* Results (US-15, US-16) */
+.results { max-width: 46rem; margin: 0 auto; text-align: center; }
+.results-winner {
+  margin: 0.4rem 0 1.2rem;
+  color: var(--gold);
+  font-size: clamp(1.6rem, 3vw, 2.6rem);
+  font-weight: 800;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.results-list { display: grid; gap: 0.6rem; margin: 0 0 1rem; padding: 0; list-style: none; text-align: left; }
+.result-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.7rem 1rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 10px solid var(--border);
+  border-radius: var(--radius);
+}
+.result-row.is-winner {
+  background: rgba(245, 197, 24, 0.1);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold), 0 0 22px rgba(245, 197, 24, 0.3);
+}
+.result-rank { min-width: 2.2rem; color: var(--muted); font-size: 1.3rem; font-weight: 800; }
+.result-swatch { flex: none; width: 1.3rem; height: 1.3rem; border: 2px solid rgba(255, 255, 255, 0.85); border-radius: 50%; }
+.result-name { flex: 1; min-width: 0; font-size: 1.3rem; font-weight: 700; overflow-wrap: anywhere; }
+.result-badge { padding: 0.15rem 0.6rem; color: #1a1a1a; font-size: 0.85rem; font-weight: 800; background: var(--gold); border-radius: 999px; }
+/* FU-08: tight line height; the big score no longer sets a taller row than the name needs,
+   so 6 rows + headline + New Game fit 1366x768 */
+.result-score { min-width: 4ch; font-size: 1.8rem; font-weight: 800; line-height: 1.15; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---------- Phones (portrait, up to 600px wide) ----------
+   The game targets laptops and projectors (D-30). On a phone: less padding, the setup label above
+   its field, two score cards per row, and timer and scoring rows rearranged so nothing is squeezed. */
+@media (max-width: 600px) {
+  .page-header { padding: 0.6rem 0.9rem; }
+  h1 { font-size: 1.5rem; }
+  .game-main { padding: 0.9rem 0.75rem 0.75rem; }
+  .setup-block { padding: 0.7rem 0.8rem 0.9rem; }
+  .new-banner { gap: 0.5rem; padding: 0.5rem 0.7rem; font-size: 0.95rem; }
+  .entry-row { grid-template-columns: 2.4rem minmax(0, 1fr) auto; }
+  .entry-row .entry-label { grid-column: 1 / -1; }
+  .entry-row .field-error { grid-column: 2 / -1; }
+
+  /* Board: tighter gaps; names in normal case are narrower than in capitals */
+  .board { --gap: 0.3rem; --cat-h: 3rem; --board-w: calc(100vw - 1.5rem); }
+  .board-cat { padding: 0.3rem 0.15rem; text-transform: none; letter-spacing: 0; }
+  .board-cell { padding: 0.15rem; }
+  .scoreboard-list { gap: 0.5rem; margin-top: 0.8rem; }
+  .score-card { flex-basis: 8.5rem; padding: 0.4rem 0.5rem; }
+  .score-value { font-size: 1.35rem; }
+  .score-btn { width: 2.4rem; height: 2.4rem; }
+
+  /* Question: the timer buttons get their own line so the bar stays visible */
+  .question-layout { gap: 0.9rem; }
+  .question-main, .scoring { padding: 0.9rem 0.9rem 1rem; }
+  .question-image { height: clamp(6rem, 30vh, 14rem); margin-bottom: 0.8rem; }
+  .timer { grid-template-columns: auto minmax(0, 1fr); }
+  .timer-controls { grid-column: 1 / -1; }
+  .timer-controls .btn { flex: 1; }
+  /* Scoring row: name and score on top, Correct and Wrong side by side below */
+  .srow-name { flex-basis: calc(100% - 5rem); }
+  .srow .btn { flex: 1 1 0; align-self: stretch; padding: 0.4rem 0.3rem; font-size: 0.9rem; white-space: normal; }
+
+  .result-row { gap: 0.5rem; padding: 0.5rem 0.7rem; }
+  .result-name { font-size: 1.1rem; }
+  .result-score { font-size: 1.4rem; }
+}

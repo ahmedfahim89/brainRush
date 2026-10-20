@@ -53,7 +53,7 @@ The host caches JavaScript and CSS for 7 days. To make sure browsers always get 
 2. **Board.** Columns are the chosen categories; rows are the point values, smallest first. Click a cell to open its question.
    - **Question bank.** A category can hold several questions for each point value. When a new game starts, the server picks one of them at random for every cell (category × point value), so the same group can play again with mostly new questions. The draw is purely random: a question from an earlier game can come back. Each question keeps its own point value, so a 500 question is still meant to be harder than a 100 one.
    - The scoreboard below the board shows every player or team. Use **+ / −** to correct a score; each click is one step of the smallest point value. Corrections never change cell colors.
-3. **Question.** The question appears in large type, and a countdown starts automatically.
+3. **Question.** The question appears in large type (a picture question shows its picture above the text), and a countdown starts automatically.
    - The number and the bar turn red in the last third. At 0 the timer stops and shows "Time's up!" (no sound); nothing is scored automatically.
    - Use **Pause/Resume** and **Reset** as needed. **Show Answer** reveals the answer.
    - Mark each player or team **✓ Correct (+points)** or **✗ Wrong (−points)**. Each can be scored once per question, and only one can be correct. Wrong answers can still be marked after someone was correct. Marks cannot be undone inside a question; use the scoreboard **+ / −** instead.
@@ -87,7 +87,7 @@ The host caches JavaScript and CSS for 7 days. To make sure browsers always get 
 Other rules:
 - **Reading is open.** The game page and every `GET` endpoint work without a login, because the game needs them. Questions *and answers* can be read through the API by anyone who knows the URL. That is accepted for a party game (D-20), so don't put secrets in questions.
 - **Credentials live only in `api/config.php`.** That file is git-ignored; `api/config.example.php` holds placeholders only. Never commit, e-mail or paste real database or admin credentials. Keep any personal notes with passwords (for example a local `password.txt`) **outside** the project folder. It is git-ignored and blocked by `.htaccess`, but it must never be uploaded or served.
-- `.htaccess` (Apache/LiteSpeed) disables directory listings, passes the login header to PHP, and blocks web access to `sql/`, `docs/`, `.claude/`, `README.md`, `password.txt`, `api/config*.php` and `api/db.php`.
+- `.htaccess` (Apache/LiteSpeed) disables directory listings, passes the login header to PHP, and blocks web access to `sql/`, `docs/`, `.claude/`, `README.md`, `password.txt`, `api/config*.php` and `api/db.php`. SVG files (question pictures) are served with a strict `Content-Security-Policy` and `nosniff`, so a script inside an SVG cannot run when the file is opened directly.
 - **The PHP built-in server (`php -S`) ignores `.htaccess`.** It serves every file in the project folder, including the private ones listed above. Use it only on your own computer, bound to `localhost`, and never as a public server.
 - The game renders all names, categories, questions and answers as plain text (`textContent`), so HTML or script typed into them is shown literally. The API uses prepared statements only.
 

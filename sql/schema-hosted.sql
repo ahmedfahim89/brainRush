@@ -43,10 +43,14 @@ CREATE TABLE IF NOT EXISTS categories (
 -- Question bank (D-31, amended 2026-10-11): every question has a point value, and a
 -- category may have any number of questions per point value (no one-per-slot key).
 -- Each new game draws, per board cell (category x point value), one random question
--- from that cell's questions. uq_category_question blocks the same question text
--- twice in one category (case-insensitive via _ci; compares the first 191
--- characters) and keeps the seed INSERT IGNORE idempotent. idx_questions_slot
--- serves the per-cell lookups and fk_questions_category.
+-- from that cell's questions. uq_category_question_image blocks the same question
+-- text with the same picture twice in one category (case-insensitive via _ci;
+-- compares the first 191 characters of each) and keeps the seed INSERT IGNORE
+-- idempotent. Flag questions share one prompt text, so the key includes image.
+-- image is NOT NULL DEFAULT '' (not NULL, which never collides in a unique key) so
+-- text questions are still de-duplicated. A non-empty image (img/questions/...)
+-- makes it a picture question, shown above the text. idx_questions_slot serves
+-- the per-cell lookups and fk_questions_category.
 CREATE TABLE IF NOT EXISTS questions (
   id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
   category_id INT UNSIGNED NOT NULL,
@@ -55,8 +59,9 @@ CREATE TABLE IF NOT EXISTS questions (
   answer      TEXT         NOT NULL,
   question_ar TEXT         NULL,
   answer_ar   TEXT         NULL,
+  image       VARCHAR(255) NOT NULL DEFAULT '',
   PRIMARY KEY (id),
-  UNIQUE KEY uq_category_question (category_id, question(191)),
+  UNIQUE KEY uq_category_question_image (category_id, question(191), image(191)),
   KEY idx_questions_slot (category_id, points),
   KEY idx_questions_points (points),
   CONSTRAINT fk_questions_category
