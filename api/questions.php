@@ -2,20 +2,28 @@
 // GET    /api/questions.php                          -> all questions
 // GET    /api/questions.php?category_id=<id>         -> one category's questions
 // GET    /api/questions.php?board=1&categories=3,1,2 -> board payload (requested order)
+// POST   /api/questions.php?board=1                  body { categories: "3,1,2", seen?: [id, ...] }
+//                                                          -> board payload that avoids seen questions
+// POST   /api/questions.php?played=1                 body { categories: "3,1,2", seen?: [id, ...] }
+//                                                          -> { played, total } for the setup progress bar
 // POST   /api/questions.php                          body { category_id, points, question, answer,
 //                                                          question_ar?, answer_ar?, image? } -> 201
 // PUT    /api/questions.php?id=<id>                  body: any of the POST fields -> 200
 // DELETE /api/questions.php?id=<id>                  -> 200
 // The full list (first two GETs) and all writes need admin access (require_admin: 401/403
-// otherwise); only the board payload is public, it is what the game plays from.
+// otherwise); only the board payload (GET or POST) and the played count are public, they are
+// what the game plays from.
 //
 // Question bank (D-31 amended): every question has a category and a point value, and a
 // category may have any number of questions per point value. The board draws one
-// random question per cell (category x point value) (US-30).
+// random question per cell (category x point value) (US-30). The game sends the ids this
+// browser already played (`seen`, oldest first): a cell draws from its unseen questions,
+// and once all of them were played it takes the one played longest ago.
 require_once __DIR__ . '/db.php';
 
 const QUESTION_TEXT_MAX = 5000;
 const BOARD_MAX_CATEGORIES = 50;
+const BOARD_MAX_SEEN = 5000; // SEEN_MAX in js/game.js
 const IMAGE_PATH_MAX = 255;
 // Picture questions: a file in the repo under img/questions/. Only this shape is
 // accepted, which blocks path traversal, other folders and external URLs.
@@ -98,13 +106,54 @@ function parse_board_ids($raw): array
     return $ids;
 }
 
-/**
- * Board payload: { points: [...asc], categories: [{id, name, questions: {<points>: {question, answer, question_ar, answer_ar, image}}}] }
- * Every cell (category x point value) gets one random question from that cell's
- * questions (US-30). Cells hold different questions, so a board never repeats one.
- */
-function board(PDO $pdo, array $ids): array
+/** Parse the seen list: question ids, oldest first, at most BOARD_MAX_SEEN; 400 otherwise. */
+function parse_seen_ids($raw): array
 {
+    if ($raw === null) {
+        return [];
+    }
+    if (!is_array($raw) || array_values($raw) !== $raw || count($raw) > BOARD_MAX_SEEN) {
+        bad_request('seen must be a list of at most ' . BOARD_MAX_SEEN . ' question ids');
+    }
+    foreach ($raw as $id) {
+        if (!is_int($id) || $id < 1) {
+            bad_request('seen must be a list of positive integer question ids');
+        }
+    }
+    return $raw;
+}
+
+/**
+ * { played, total }: total = questions a board can draw from these categories (enabled point
+ * values only); played = how many of those are in $seen. Questions that were deleted, or whose
+ * point value or category is no longer on the board, do not count.
+ */
+function played_count(PDO $pdo, array $ids, array $seen): array
+{
+    $placeholders = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = $pdo->prepare(
+        "SELECT q.id FROM questions q
+           JOIN point_values pv ON pv.points = q.points AND pv.enabled = 1
+          WHERE q.category_id IN ($placeholders)"
+    );
+    $stmt->execute($ids);
+    $drawable = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    $seenRank = array_flip($seen);
+    $played = count(array_filter($drawable, fn(int $id): bool => isset($seenRank[$id])));
+    return ['played' => $played, 'total' => count($drawable)];
+}
+
+/**
+ * Board payload: { points: [...asc], categories: [{id, name, questions: {<points>: {id, question, answer, question_ar, answer_ar, image}}}] }
+ * Every cell (category x point value) gets one random question from that cell's unseen
+ * questions (US-30); when all of them are in $seen (oldest first), the one seen longest
+ * ago. Cells hold different questions, so a board never repeats one.
+ */
+function board(PDO $pdo, array $ids, array $seen = []): array
+{
+    // Position in the seen list: a lower rank was played longer ago.
+    $seenRank = array_flip($seen);
+
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
 
     $stmt = $pdo->prepare("SELECT id, name FROM categories WHERE id IN ($placeholders)");
@@ -119,12 +168,13 @@ function board(PDO $pdo, array $ids): array
     $points = array_map('intval', $pdo->query('SELECT points FROM point_values WHERE enabled = 1 ORDER BY points ASC')->fetchAll(PDO::FETCH_COLUMN));
 
     $stmt = $pdo->prepare(
-        "SELECT category_id, points, question, answer, question_ar, answer_ar, image FROM questions WHERE category_id IN ($placeholders) ORDER BY id ASC"
+        "SELECT id, category_id, points, question, answer, question_ar, answer_ar, image FROM questions WHERE category_id IN ($placeholders) ORDER BY id ASC"
     );
     $stmt->execute($ids);
     $pools = [];
     foreach ($stmt->fetchAll() as $r) {
         $pools[(int) $r['category_id']][(int) $r['points']][] = [
+            'id'          => (int) $r['id'],
             'question'    => $r['question'],
             'answer'      => $r['answer'],
             'question_ar' => $r['question_ar'],
@@ -143,7 +193,13 @@ function board(PDO $pdo, array $ids): array
                 $missing[] = $p;
                 continue;
             }
-            $questions[$p] = $pool[random_int(0, count($pool) - 1)];
+            $fresh = array_values(array_filter($pool, fn(array $q): bool => !isset($seenRank[$q['id']])));
+            if ($fresh) {
+                $questions[$p] = $fresh[random_int(0, count($fresh) - 1)];
+            } else {
+                usort($pool, fn(array $a, array $b): int => $seenRank[$a['id']] <=> $seenRank[$b['id']]);
+                $questions[$p] = $pool[0];
+            }
         }
         if ($missing) {
             bad_request("Category \"{$names[$id]}\" is missing questions for: " . implode(', ', $missing));
@@ -312,6 +368,17 @@ switch ($_SERVER['REQUEST_METHOD']) {
         break;
 
     case 'POST':
+        if (($_GET['board'] ?? '') === '1') {
+            // POST so a long seen list never hits URL length limits.
+            $body = read_json_body();
+            $ids = parse_board_ids($body['categories'] ?? null);
+            json_response(board(db(), $ids, parse_seen_ids($body['seen'] ?? null)));
+        }
+        if (($_GET['played'] ?? '') === '1') {
+            $body = read_json_body();
+            $ids = parse_board_ids($body['categories'] ?? null);
+            json_response(played_count(db(), $ids, parse_seen_ids($body['seen'] ?? null)));
+        }
         require_admin();
         $body = read_json_body();
         create_question(db(), $body);

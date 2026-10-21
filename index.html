@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BrainRush</title>
-  <link rel="stylesheet" href="css/style.f9053e1f.css">
+  <link rel="stylesheet" href="css/style.ec75d753.css">
 </head>
 <body class="game">
   <header class="page-header">
@@ -55,12 +55,22 @@
           <p id="cat-error" class="msg msg-error" role="alert" hidden></p>
         </fieldset>
 
-        <fieldset class="setup-block">
-          <legend>Timer</legend>
-          <label for="timer-input">Seconds per question (this game only)</label>
-          <input id="timer-input" class="timer-input" type="number" min="5" max="600" step="1" aria-describedby="timer-error">
-          <p id="timer-error" class="field-error" hidden></p>
-        </fieldset>
+        <div class="setup-pair">
+          <fieldset class="setup-block">
+            <legend>Timer</legend>
+            <label for="timer-input">Seconds per question (this game only)</label>
+            <input id="timer-input" class="timer-input" type="number" min="5" max="600" step="1" aria-describedby="timer-error">
+            <p id="timer-error" class="field-error" hidden></p>
+          </fieldset>
+
+          <fieldset class="setup-block">
+            <legend>Played questions</legend>
+            <div id="played-track" class="played-track" role="progressbar" aria-label="Questions played"
+                 aria-valuemin="0" aria-valuemax="100"><div id="played-bar" class="played-bar"></div></div>
+            <p id="played-count" class="hint" aria-live="polite"></p>
+            <button type="button" id="played-reset" class="btn" hidden>Forget played questions</button>
+          </fieldset>
+        </div>
 
         <div class="actions start-row">
           <button type="submit" id="start-btn" class="btn btn-primary btn-large" disabled>Start Game</button>
@@ -138,6 +148,6 @@
     </section>
   </main>
 
-  <script src="js/game.d644eefe.js"></script>
+  <script src="js/game.af625efd.js"></script>
 </body>
 </html>

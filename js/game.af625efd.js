@@ -1,6 +1,7 @@
 // BrainRush game page: setup, dynamic board, question + timer, scoring, results
 // and localStorage persistence (survives a page refresh).
-// The page only uses GET endpoints, so it works on the hosted site without the admin login.
+// The page only uses public endpoints (GETs, the board POST and the game log), so it works
+// on the hosted site without the admin login.
 // All API/user text is rendered with textContent / DOM APIs (never innerHTML).
 'use strict';
 
@@ -8,6 +9,9 @@
   const API_BASE = 'api/';
   const STORAGE_KEY = 'brainrush.game';
   const STORAGE_VERSION = 2; // v2 adds used cells + open question; v1 (Sprint 3) saves are migrated
+  // Ids of the questions opened in this browser, oldest first; new boards avoid them.
+  const SEEN_KEY = 'brainrush.seenQuestions';
+  const SEEN_MAX = 5000; // BOARD_MAX_SEEN in api/questions.php
   const NAME_MAX = 30;
   const TIMER_TICK_MS = 100;
   const QUESTION_FULL_SIZE_CHARS = 150; // FU-04: longer questions get a smaller font
@@ -78,6 +82,10 @@
     catError: byId('cat-error'),
     timerInput: byId('timer-input'),
     timerError: byId('timer-error'),
+    playedTrack: byId('played-track'),
+    playedBar: byId('played-bar'),
+    playedCount: byId('played-count'),
+    playedReset: byId('played-reset'),
     startBtn: byId('start-btn'),
     maintenanceOverlay: byId('maintenance-overlay'),
     startMsg: byId('start-msg'),
@@ -161,10 +169,24 @@
   }
 
   /** Read-only JSON API call (GET). Rejects with the API's `error` text, never raw output. */
-  async function apiGet(path) {
+  function apiGet(path) {
+    return apiCall(path, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+  }
+
+  /** JSON POST to a public endpoint (the board with the seen list); same errors as apiGet. */
+  function apiPost(path, body) {
+    return apiCall(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify(body),
+    });
+  }
+
+  async function apiCall(path, options) {
     let response;
     try {
-      response = await fetch(API_BASE + path, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+      response = await fetch(API_BASE + path, options);
     } catch (err) {
       throw new Error('Could not reach the server. Check that it is running.');
     }
@@ -294,6 +316,39 @@
     }
   }
 
+  // ---------- Played questions (no repeats across games) ----------
+
+  /** Seen question ids, oldest first; [] when nothing (valid) is stored. */
+  function loadSeen() {
+    try {
+      const seen = JSON.parse(window.localStorage.getItem(SEEN_KEY));
+      if (Array.isArray(seen)) return seen.filter((id) => Number.isInteger(id) && id > 0).slice(-SEEN_MAX);
+    } catch (err) {
+      // storage disabled or corrupt: start from an empty list
+    }
+    return [];
+  }
+
+  /** Remember an opened question; opening it again moves it to the end (most recent). */
+  function markSeen(id) {
+    if (!Number.isInteger(id) || id < 1) return; // games saved before ids were sent
+    const seen = loadSeen().filter((s) => s !== id);
+    seen.push(id);
+    try {
+      window.localStorage.setItem(SEEN_KEY, JSON.stringify(seen.slice(-SEEN_MAX)));
+    } catch (err) {
+      // storage full or disabled: questions may repeat, the game still works
+    }
+  }
+
+  function clearSeen() {
+    try {
+      window.localStorage.removeItem(SEEN_KEY);
+    } catch (err) {
+      // nothing to clear
+    }
+  }
+
   function isPlainObject(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
   }
@@ -417,6 +472,7 @@
       perGame: null,      // categories_per_game from settings
       timerDefault: null, // timer_seconds from settings
       playable: [],       // [{id, name}] from categories.php?playable=1
+      played: null,       // { played, total } from questions.php?played=1, null until loaded
       selected: [],       // category ids in the order they were ticked
       loading: true,
       loadError: '',
@@ -696,6 +752,59 @@
     s.loading = false;
     renderCategories();
     updateStartButton();
+    loadPlayed();
+  }
+
+  /**
+   * Ask the server how many of the seen questions a board can still draw, and out of how many.
+   * Only the server knows which questions were deleted or sit at a disabled point value.
+   */
+  async function loadPlayed() {
+    const s = state.setup;
+    s.played = null;
+    renderPlayed();
+    if (!s.playable.length) return;
+    try {
+      const data = await apiPost('questions.php?played=1', {
+        categories: s.playable.map((c) => c.id).join(','),
+        seen: loadSeen(),
+      });
+      if (state.setup !== s) return; // setup was restarted meanwhile
+      if (isPlainObject(data) && Number.isInteger(data.played) && Number.isInteger(data.total)) {
+        s.played = { played: data.played, total: data.total };
+      }
+    } catch (err) {
+      // the bar is only a hint: fall back to the plain count
+    }
+    renderPlayed();
+  }
+
+  /** Progress bar + "26% of the questions played" + the Forget button (hidden while nothing is played). */
+  function renderPlayed() {
+    const s = state.setup;
+    const seen = loadSeen().length;
+    const counts = s && s.played && s.played.total > 0 ? s.played : null;
+    dom.playedReset.hidden = seen === 0;
+    dom.playedTrack.hidden = counts === null;
+    if (counts === null) { // not loaded (yet): no total to compare with
+      dom.playedCount.textContent = 'Played ' + plural(seen, 'question', 'questions') + ' on this device.';
+      return;
+    }
+    const fraction = Math.min(counts.played, counts.total) / counts.total;
+    // Rounded down, so 100% only shows once every question was played; "less than 1%" beats a misleading 0%.
+    const percent = Math.floor(fraction * 100);
+    const label = counts.played > 0 && percent === 0 ? 'Less than 1%' : percent + '%';
+    dom.playedBar.style.transform = 'scaleX(' + fraction + ')';
+    dom.playedTrack.setAttribute('aria-valuenow', String(percent));
+    dom.playedCount.textContent = label + ' of the questions played on this device.';
+  }
+
+  /** Forget the played questions so every question can come up again. */
+  function forgetPlayed() {
+    if (!window.confirm('Forget the played questions? Questions you have already seen can come up again.')) return;
+    clearSeen();
+    if (state.setup.played) state.setup.played.played = 0;
+    renderPlayed();
   }
 
   // ---------- Setup: validation and Start Game (US-02, US-04, US-05, US-06) ----------
@@ -793,6 +902,7 @@
           const arabic = typeof q.question_ar === 'string' && q.question_ar.trim() &&
             typeof q.answer_ar === 'string' && q.answer_ar.trim();
           questions[String(p)] = {
+            id: Number.isInteger(q.id) ? q.id : null,
             question: q.question,
             answer: q.answer,
             question_ar: arabic ? q.question_ar : null,
@@ -824,7 +934,7 @@
     dom.startBtn.textContent = 'Starting...';
     updateStartButton();
     try {
-      const data = await apiGet('questions.php?board=1&categories=' + ids.join(','));
+      const data = await apiPost('questions.php?board=1', { categories: ids.join(','), seen: loadSeen() });
       const board = parseBoard(data, ids);
       preloadImages(board.categories);
       beginGame(board, timer);
@@ -1018,6 +1128,8 @@
     const g = state.game;
     if (!g || state.screen !== 'board' || g.current || hasOwn(g.used, cellKey(categoryId, points))) return;
     g.current = { catId: categoryId, points: points, marks: {}, answerShown: false };
+    // Opened = played: later boards in this browser avoid it.
+    markSeen(findCategory(g, categoryId).questions[String(points)].id);
     showQuestion();
   }
 
@@ -1334,6 +1446,7 @@
     dom.entryAdd.addEventListener('click', addEntry);
     dom.modeInputs.forEach((input) => input.addEventListener('change', onModeChange));
     dom.timerInput.addEventListener('input', () => setTimerError(''));
+    dom.playedReset.addEventListener('click', forgetPlayed);
     dom.endBtn.addEventListener('click', endGame);
     dom.boardDoneBtn.addEventListener('click', endGame);
     dom.answerBtn.addEventListener('click', showAnswer);
