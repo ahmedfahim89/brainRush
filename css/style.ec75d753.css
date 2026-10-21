@@ -340,6 +340,14 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 .cat-order:empty { display: none; }
 
 .timer-input { max-width: 8rem; }
+/* Timer and Played questions side by side, equal width (stacked on phones) */
+.setup-pair { display: flex; gap: 1.25rem; }
+.setup-pair > .setup-block { flex: 1; }
+/* Same look as the question timer bar */
+.played-track { height: 0.8rem; margin-top: 0.5rem; overflow: hidden; background: #0e1433; border: 1px solid var(--border); border-radius: 999px; }
+.played-track[hidden] { display: none; }
+.played-bar { height: 100%; background: var(--gold); transform: scaleX(0); transform-origin: left center; transition: transform 0.3s ease-out; }
+#played-count { margin: 0.4rem 0 0.6rem; }
 .start-row { justify-content: center; margin: 0.5rem 0; }
 
 /* "New questions" banner on the setup screen (text and on/off come from Admin settings):
@@ -739,6 +747,7 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
   h1 { font-size: 1.5rem; }
   .game-main { padding: 0.9rem 0.75rem 0.75rem; }
   .setup-block { padding: 0.7rem 0.8rem 0.9rem; }
+  .setup-pair { flex-direction: column; gap: 0; }
   .new-banner { gap: 0.5rem; padding: 0.5rem 0.7rem; font-size: 0.95rem; }
   .entry-row { grid-template-columns: 2.4rem minmax(0, 1fr) auto; }
   .entry-row .entry-label { grid-column: 1 / -1; }
