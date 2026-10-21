@@ -13,6 +13,8 @@
   const SEEN_KEY = 'brainrush.seenQuestions';
   const SEEN_MAX = 5000; // BOARD_MAX_SEEN in api/questions.php
   const NAME_MAX = 30;
+  const SURPRISE = 0;       // "Surprise me!" tile in the selected list (real category ids are positive)
+  const SURPRISE_ALONE = 3; // random categories when "Surprise me!" is the only tick
   const TIMER_TICK_MS = 100;
   const QUESTION_FULL_SIZE_CHARS = 150; // FU-04: longer questions get a smaller font
   const QUESTION_MIN_SCALE = 0.5;
@@ -45,7 +47,8 @@
 
   // Central state. `setup` is the form being filled in (memory only);
   // `game` is the running game and is saved to localStorage on every change:
-  //   { mode, contestants: [{id, name, color, score}], timerSeconds, points, categories,
+  //   { mode, contestants: [{id, name, color, score}], timerSeconds, points,
+  //     categories: [{id, name, questions, hidden}] (hidden = unopened "Surprise me!" pick, shown as "?"),
   //     used: { "<categoryId>:<points>": { owner: contestantId | null } },
   //     current: null | { catId, points, marks: { "<contestantId>": "correct" | "wrong" }, answerShown } }
   const state = {
@@ -383,6 +386,7 @@
     return categories.every((c) => {
       const ok = isPlainObject(c) && Number.isInteger(c.id) && !ids[c.id] &&
         typeof c.name === 'string' && isPlainObject(c.questions) &&
+        (c.hidden === undefined || typeof c.hidden === 'boolean') &&
         points.every((p) => {
           const q = hasOwn(c.questions, String(p)) ? c.questions[String(p)] : null;
           return isPlainObject(q) && typeof q.question === 'string' && typeof q.answer === 'string' &&
@@ -625,6 +629,7 @@
       dom.catCount.textContent = s.loading ? 'Loading categories...' : '';
       return;
     }
+    if (s.playable.length) renderSurpriseTile();
     s.playable.forEach((c) => {
       const box = h('input', { type: 'checkbox', id: 'cat-' + c.id, checked: s.selected.indexOf(c.id) !== -1 });
       box.addEventListener('change', () => toggleCategory(c.id, box.checked));
@@ -641,6 +646,26 @@
     }
     if (s.perGame !== null && !s.playable.length) renderNotEnough();
     renderCategorySelection();
+  }
+
+  /** "Surprise me!": alone = SURPRISE_ALONE random categories, with picks = 1 random category in its slot. */
+  function renderSurpriseTile() {
+    const s = state.setup;
+    const box = h('input', { type: 'checkbox', id: 'cat-surprise', checked: s.selected.indexOf(SURPRISE) !== -1 });
+    box.addEventListener('change', () => toggleCategory(SURPRISE, box.checked));
+    dom.catList.appendChild(h('li', { className: 'cat-surprise-item' }, [
+      h('label', { className: 'cat-label cat-surprise', htmlFor: 'cat-surprise', 'data-cat': String(SURPRISE) }, [
+        box,
+        h('span', { className: 'cat-name-text' }, [
+          document.createTextNode('Surprise me!'),
+          h('span', {
+            className: 'cat-surprise-hint',
+            text: 'Tick alone for ' + SURPRISE_ALONE + ' random categories, or add it to your picks for 1 mystery category.',
+          }),
+        ]),
+        h('span', { className: 'cat-order', 'aria-hidden': 'true' }),
+      ]),
+    ]));
   }
 
   /** D-11 (amended by D-32): no playable category at all -> message with Admin link, Start disabled. */
@@ -738,7 +763,7 @@
       s.maintenance = settings.start_game_hidden === 1;
       s.playable = results[1].filter((c) => isPlainObject(c) && Number.isInteger(c.id) && typeof c.name === 'string')
         .map((c) => ({ id: c.id, name: c.name }));
-      s.selected = s.selected.filter((id) => s.playable.some((c) => c.id === id));
+      s.selected = s.selected.filter((id) => id === SURPRISE || s.playable.some((c) => c.id === id));
       if (dom.timerInput.value === '' && s.timerDefault !== null) dom.timerInput.value = String(s.timerDefault);
       if (s.perGame === null) {
         s.loadError = 'settings';
@@ -915,6 +940,36 @@
     };
   }
 
+  /** Copy of the list in random order (Fisher-Yates). */
+  function shuffled(list) {
+    const copy = list.slice();
+    for (let i = copy.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = copy[i];
+      copy[i] = copy[j];
+      copy[j] = tmp;
+    }
+    return copy;
+  }
+
+  /** Turn the ticked list into board category ids. "Surprise me!" alone picks SURPRISE_ALONE random
+   *  categories; with other picks it becomes 1 random category not already picked, in its own slot.
+   *  Returns { ids, hidden } where hidden holds the randomly picked ids (shown as "?" on the board). */
+  function resolveSelection(s) {
+    const picked = s.selected.filter((id) => id !== SURPRISE);
+    if (picked.length === s.selected.length) return { ids: picked, hidden: [] };
+    const free = shuffled(s.playable.map((c) => c.id).filter((id) => picked.indexOf(id) === -1));
+    if (!picked.length) {
+      const ids = free.slice(0, Math.min(SURPRISE_ALONE, s.perGame));
+      return { ids: ids, hidden: ids };
+    }
+    if (!free.length) {
+      throw new Error('Every playable category is already picked ' + String.fromCharCode(0x2014) +
+        ' untick one, or untick Surprise me!');
+    }
+    return { ids: s.selected.map((id) => (id === SURPRISE ? free[0] : id)), hidden: [free[0]] };
+  }
+
   async function onStart(event) {
     event.preventDefault();
     if (startBlockReason()) return;
@@ -929,13 +984,15 @@
     }
 
     const s = state.setup;
-    const ids = s.selected.slice();
     s.starting = true;
     dom.startBtn.textContent = 'Starting...';
     updateStartButton();
     try {
+      const selection = resolveSelection(s);
+      const ids = selection.ids;
       const data = await apiPost('questions.php?board=1', { categories: ids.join(','), seen: loadSeen() });
       const board = parseBoard(data, ids);
+      board.categories.forEach((c) => { c.hidden = selection.hidden.indexOf(c.id) !== -1; });
       preloadImages(board.categories);
       beginGame(board, timer);
     } catch (err) {
@@ -1023,13 +1080,18 @@
     dom.board.style.setProperty('--rows', String(g.points.length));
     dom.board.style.setProperty('--digits', String(digits));
     g.categories.forEach((c) => {
-      dom.board.appendChild(h('div', { className: 'board-cat', title: c.name }, [
-        h('span', { className: 'board-cat-name', text: c.name }),
+      dom.board.appendChild(h('div', { className: 'board-cat' + (c.hidden ? ' is-mystery' : ''), title: categoryLabel(c) }, [
+        h('span', { className: 'board-cat-name', text: c.hidden ? '?' : c.name }),
       ]));
     });
     g.points.forEach((p) => {
       g.categories.forEach((c) => dom.board.appendChild(renderCell(c, p)));
     });
+  }
+
+  /** Board name of a category: a "Surprise me!" pick stays a mystery until one of its questions is opened. */
+  function categoryLabel(category) {
+    return category.hidden ? 'Surprise category' : category.name;
   }
 
   /** One board cell: open (clickable) or used (disabled; owner color + name, or grey, US-08). */
@@ -1041,7 +1103,7 @@
       return h('button', {
         type: 'button',
         className: 'board-cell',
-        'aria-label': category.name + ', ' + points + ' points',
+        'aria-label': categoryLabel(category) + ', ' + points + ' points',
         onclick: () => openQuestion(category.id, points),
       }, [label]);
     }
@@ -1050,7 +1112,7 @@
       type: 'button',
       className: 'board-cell is-used ' + (owner ? 'is-owned' : 'is-unanswered'),
       disabled: true, // disabled buttons ignore clicks
-      'aria-label': category.name + ', ' + points + ' points, ' +
+      'aria-label': categoryLabel(category) + ', ' + points + ' points, ' +
         (owner ? 'won by ' + owner.name : 'no correct answer'),
     }, [label, owner ? h('span', { className: 'cell-owner', text: owner.name }) : null]);
     if (owner) {
@@ -1128,8 +1190,10 @@
     const g = state.game;
     if (!g || state.screen !== 'board' || g.current || hasOwn(g.used, cellKey(categoryId, points))) return;
     g.current = { catId: categoryId, points: points, marks: {}, answerShown: false };
+    const category = findCategory(g, categoryId);
+    category.hidden = false; // a "Surprise me!" column shows its name from its first question on
     // Opened = played: later boards in this browser avoid it.
-    markSeen(findCategory(g, categoryId).questions[String(points)].id);
+    markSeen(category.questions[String(points)].id);
     showQuestion();
   }
 
