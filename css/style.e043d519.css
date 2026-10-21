@@ -338,6 +338,12 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 .cat-name-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .cat-order { min-width: 1.5rem; border-radius: 999px; background: var(--gold); color: #1a1a1a; font-size: 0.8rem; font-weight: 700; text-align: center; }
 .cat-order:empty { display: none; }
+/* "Surprise me!" tile: one full row above the categories. */
+.cat-surprise-item { grid-column: 1 / -1; }
+.cat-label.cat-surprise { font-weight: 700; color: var(--gold); background: rgba(245, 197, 24, 0.08); border: 1px dashed var(--gold); }
+.cat-label.cat-surprise.is-selected { border-style: solid; }
+.cat-label.cat-surprise.is-locked { color: var(--muted); border-color: var(--border); }
+.cat-surprise-hint { margin-left: 0.6rem; color: var(--muted); font-size: 0.85rem; font-weight: 400; }
 
 .timer-input { max-width: 8rem; }
 /* Timer and Played questions side by side, equal width (stacked on phones) */
@@ -471,6 +477,7 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
   border-radius: 6px;
 }
 .board-cat-name { min-width: 0; overflow-wrap: anywhere; }
+.board-cat.is-mystery { color: var(--gold); font-size: clamp(1rem, calc(var(--cell-w) / 5), 1.8rem); }
 .board-cell {
   display: flex;
   flex-direction: column;

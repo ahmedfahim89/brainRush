@@ -92,6 +92,7 @@ Screens toggled by JS (single page, state held in a JS object, also saved to `lo
    - Dynamic name inputs with "Add"/"Remove" (min 1 … max per mode); reject empty/duplicate names.
    - Each player/team auto-assigned a distinct color from a 6-color palette (shown as a swatch, clickable to change).
    - Category picker: checklist of playable categories, select at least 1 and up to `categories_per_game` (loaded from settings). Changed 2026-10-11 (D-32): was "exactly `categories_per_game`".
+   - "Surprise me!" tile first in the picker (D-33): alone it picks 3 random playable categories; with other picks it adds 1 random category in its slot. Random columns show "?" on the board until one of their questions is opened.
    - Timer seconds field pre-filled from settings (`timer_seconds`), host can override for this game.
    - "Start Game" → fetch board questions.
 2. **Board**

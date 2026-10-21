@@ -47,6 +47,14 @@ As a host, I want "Start Game" to load the board questions, so that play can beg
 - **Given** valid setup, **when** the host clicks "Start Game", **then** the app calls `questions.php?board=1&categories=<ids>` and shows the Board screen with all contestants at score 0.
 - **Given** the API call fails, **when** the host clicks "Start Game", **then** an error message is shown and the host stays on setup with inputs intact.
 
+### US-31 Surprise me! (Should)
+As a host, I want a "Surprise me!" choice in the category list, so that the game can pick random categories for us, alone or as a mystery column next to our picks. *(Added 2026-10-22, D-33.)*
+- **Given** at least one playable category, **when** setup loads, **then** a "Surprise me!" tile is shown first in the category list. It counts as one of the N selections, gets a tick-order badge and is locked at N like the other boxes.
+- **Given** only "Surprise me!" is ticked, **when** the host starts, **then** the board has 3 random playable categories (fewer when N or the number of playable categories is smaller).
+- **Given** "Surprise me!" is ticked with other categories, **when** the host starts, **then** it becomes 1 random playable category that is not already picked, in the column of its tick order.
+- **Given** every playable category is already picked as well as "Surprise me!", **when** the host clicks Start, **then** an error says so and the host stays on setup with inputs intact.
+- **Given** a randomly picked column, **then** its board header shows "?" until a question in that column is opened; from then on (also after a refresh) it shows the real name. The question screen always shows the real name.
+
 ---
 
 ## Epic E2 — Board
@@ -337,6 +345,7 @@ Where the spec is silent or ambiguous, the PO chose the simplest party-game beha
 - The local DB, already converted by the first Sprint 6 migration (no `points`), is not a supported source. Restore it from the pre-Sprint 6 backup, then run the new migration (FU-13).
 
 Details: US-30 (rewritten), with US-19, US-20, US-21, US-24, US-25 and D-18 re-amended. |
+| D-33 | "Surprise me!" | Owner decision 2026-10-22. One tile in the category list with two behaviours: ticked alone it picks **3** random playable categories (capped by N and by the number of playable categories); ticked with other picks it takes one slot and becomes **1** random playable category not already picked. The draw happens in the browser at Start; the board API and the game log are unchanged and see real category ids. Randomly picked columns show "?" on the board until one of their questions is opened (saved with the game, so a refresh keeps it). US-31. |
 
 ---
 
