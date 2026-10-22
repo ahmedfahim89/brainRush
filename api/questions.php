@@ -7,7 +7,8 @@
 // POST   /api/questions.php?played=1                 body { categories: "3,1,2", seen?: [id, ...] }
 //                                                          -> { played, total } for the setup progress bar
 // POST   /api/questions.php                          body { category_id, points, question, answer,
-//                                                          question_ar?, answer_ar?, image? } -> 201
+//                                                          question_ar?, answer_ar?, image?,
+//                                                          image_credit? } -> 201
 // PUT    /api/questions.php?id=<id>                  body: any of the POST fields -> 200
 // DELETE /api/questions.php?id=<id>                  -> 200
 // The full list (first two GETs) and all writes need admin access (require_admin: 401/403
@@ -29,7 +30,10 @@ const IMAGE_PATH_MAX = 255;
 // accepted, which blocks path traversal, other folders and external URLs.
 const IMAGE_PATH_PATTERN = '/^img\/questions\/[a-z0-9][a-z0-9-]*\.(svg|jpg|jpeg|png|webp)$/D';
 
-/** Stored '' means "no picture"; the JSON uses null for that. */
+// Photo credit shown as a one-line caption under the picture, e.g. "Jane Doe / CC BY-SA 4.0".
+const IMAGE_CREDIT_MAX = 255;
+
+/** Stored '' means "no picture" (or "no credit"); the JSON uses null for that. */
 function image_or_null(string $image): ?string
 {
     return $image === '' ? null : $image;
@@ -37,7 +41,7 @@ function image_or_null(string $image): ?string
 
 const QUESTION_SELECT =
     'SELECT q.id, q.category_id, c.name AS category_name, q.points, q.question, q.answer,
-           q.question_ar, q.answer_ar, q.image
+           q.question_ar, q.answer_ar, q.image, q.image_credit
        FROM questions q
        JOIN categories c ON c.id = q.category_id';
 
@@ -53,6 +57,7 @@ function question_row(array $r): array
         'question_ar'   => $r['question_ar'],
         'answer_ar'     => $r['answer_ar'],
         'image'         => image_or_null($r['image']),
+        'image_credit'  => image_or_null($r['image_credit']),
     ];
 }
 
@@ -144,7 +149,7 @@ function played_count(PDO $pdo, array $ids, array $seen): array
 }
 
 /**
- * Board payload: { points: [...asc], categories: [{id, name, questions: {<points>: {id, question, answer, question_ar, answer_ar, image}}}] }
+ * Board payload: { points: [...asc], categories: [{id, name, questions: {<points>: {id, question, answer, question_ar, answer_ar, image, image_credit}}}] }
  * Every cell (category x point value) gets one random question from that cell's unseen
  * questions (US-30); when all of them are in $seen (oldest first), the one seen longest
  * ago. Cells hold different questions, so a board never repeats one.
@@ -168,18 +173,19 @@ function board(PDO $pdo, array $ids, array $seen = []): array
     $points = array_map('intval', $pdo->query('SELECT points FROM point_values WHERE enabled = 1 ORDER BY points ASC')->fetchAll(PDO::FETCH_COLUMN));
 
     $stmt = $pdo->prepare(
-        "SELECT id, category_id, points, question, answer, question_ar, answer_ar, image FROM questions WHERE category_id IN ($placeholders) ORDER BY id ASC"
+        "SELECT id, category_id, points, question, answer, question_ar, answer_ar, image, image_credit FROM questions WHERE category_id IN ($placeholders) ORDER BY id ASC"
     );
     $stmt->execute($ids);
     $pools = [];
     foreach ($stmt->fetchAll() as $r) {
         $pools[(int) $r['category_id']][(int) $r['points']][] = [
-            'id'          => (int) $r['id'],
-            'question'    => $r['question'],
-            'answer'      => $r['answer'],
-            'question_ar' => $r['question_ar'],
-            'answer_ar'   => $r['answer_ar'],
-            'image'       => image_or_null($r['image']),
+            'id'           => (int) $r['id'],
+            'question'     => $r['question'],
+            'answer'       => $r['answer'],
+            'question_ar'  => $r['question_ar'],
+            'answer_ar'    => $r['answer_ar'],
+            'image'        => image_or_null($r['image']),
+            'image_credit' => image_or_null($r['image_credit']),
         ];
     }
 
@@ -245,7 +251,21 @@ function optional_image($value): string
     return $path;
 }
 
-/** Validate question fields; returns [category_id, points, question, answer, question_ar, answer_ar, image] or sends 400. */
+/** Optional photo credit: null/empty -> '' (no caption); otherwise one line of plain text. */
+function optional_image_credit($value): string
+{
+    $credit = optional_text($value, 'Image credit', IMAGE_CREDIT_MAX);
+    if ($credit === null) {
+        return '';
+    }
+    // A caption is a single line: no line breaks, tabs or other control characters.
+    if (preg_match('/[\x00-\x1F\x7F]/', $credit)) {
+        bad_request('Image credit must be a single line of text');
+    }
+    return $credit;
+}
+
+/** Validate question fields; returns [category_id, points, question, answer, question_ar, answer_ar, image, image_credit] or sends 400. */
 function validate_question(PDO $pdo, array $data): array
 {
     $categoryId = parse_int($data['category_id'] ?? null);
@@ -265,6 +285,7 @@ function validate_question(PDO $pdo, array $data): array
         bad_request('Provide both the Arabic question and the Arabic answer, or neither');
     }
     $image = optional_image($data['image'] ?? null);
+    $imageCredit = optional_image_credit($data['image_credit'] ?? null);
 
     $stmt = $pdo->prepare('SELECT 1 FROM categories WHERE id = :id');
     $stmt->execute([':id' => $categoryId]);
@@ -276,7 +297,7 @@ function validate_question(PDO $pdo, array $data): array
     if (!$stmt->fetchColumn()) {
         bad_request("Point value $points does not exist");
     }
-    return [$categoryId, $points, $question, $answer, $questionAr, $answerAr, $image];
+    return [$categoryId, $points, $question, $answer, $questionAr, $answerAr, $image, $imageCredit];
 }
 
 /** Execute an INSERT/UPDATE of a question, mapping constraint errors to 409/400. */
@@ -298,19 +319,20 @@ function save_question(PDOStatement $stmt, array $params): void
 
 function create_question(PDO $pdo, array $body): void
 {
-    [$categoryId, $points, $question, $answer, $questionAr, $answerAr, $image] = validate_question($pdo, $body);
+    [$categoryId, $points, $question, $answer, $questionAr, $answerAr, $image, $imageCredit] = validate_question($pdo, $body);
     $stmt = $pdo->prepare(
-        'INSERT INTO questions (category_id, points, question, answer, question_ar, answer_ar, image)
-         VALUES (:category_id, :points, :question, :answer, :question_ar, :answer_ar, :image)'
+        'INSERT INTO questions (category_id, points, question, answer, question_ar, answer_ar, image, image_credit)
+         VALUES (:category_id, :points, :question, :answer, :question_ar, :answer_ar, :image, :image_credit)'
     );
     save_question($stmt, [
-        ':category_id' => $categoryId,
-        ':points'      => $points,
-        ':question'    => $question,
-        ':answer'      => $answer,
-        ':question_ar' => $questionAr,
-        ':answer_ar'   => $answerAr,
-        ':image'       => $image,
+        ':category_id'  => $categoryId,
+        ':points'       => $points,
+        ':question'     => $question,
+        ':answer'       => $answer,
+        ':question_ar'  => $questionAr,
+        ':answer_ar'    => $answerAr,
+        ':image'        => $image,
+        ':image_credit' => $imageCredit,
     ]);
     json_response(find_question($pdo, (int) $pdo->lastInsertId()), 201);
 }
@@ -323,25 +345,27 @@ function update_question(PDO $pdo, int $id, array $body): void
     }
     // Fields not sent keep their current value.
     $merged = [];
-    foreach (['category_id', 'points', 'question', 'answer', 'question_ar', 'answer_ar', 'image'] as $field) {
+    foreach (['category_id', 'points', 'question', 'answer', 'question_ar', 'answer_ar', 'image', 'image_credit'] as $field) {
         $merged[$field] = array_key_exists($field, $body) ? $body[$field] : $existing[$field];
     }
-    [$categoryId, $points, $question, $answer, $questionAr, $answerAr, $image] = validate_question($pdo, $merged);
+    [$categoryId, $points, $question, $answer, $questionAr, $answerAr, $image, $imageCredit] = validate_question($pdo, $merged);
     $stmt = $pdo->prepare(
         'UPDATE questions
             SET category_id = :category_id, points = :points, question = :question, answer = :answer,
-                question_ar = :question_ar, answer_ar = :answer_ar, image = :image
+                question_ar = :question_ar, answer_ar = :answer_ar, image = :image,
+                image_credit = :image_credit
           WHERE id = :id'
     );
     save_question($stmt, [
-        ':category_id' => $categoryId,
-        ':points'      => $points,
-        ':question'    => $question,
-        ':answer'      => $answer,
-        ':question_ar' => $questionAr,
-        ':answer_ar'   => $answerAr,
-        ':image'       => $image,
-        ':id'          => $id,
+        ':category_id'  => $categoryId,
+        ':points'       => $points,
+        ':question'     => $question,
+        ':answer'       => $answer,
+        ':question_ar'  => $questionAr,
+        ':answer_ar'    => $answerAr,
+        ':image'        => $image,
+        ':image_credit' => $imageCredit,
+        ':id'           => $id,
     ]);
     json_response(find_question($pdo, $id));
 }

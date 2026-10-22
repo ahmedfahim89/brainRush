@@ -52,7 +52,8 @@ CREATE TABLE IF NOT EXISTS categories (
 -- image is NOT NULL DEFAULT '' (not NULL, which never collides in a unique key) so
 -- text questions are still de-duplicated. A non-empty image (img/questions/...)
 -- makes it a picture question, shown above the text. idx_questions_slot serves
--- the per-cell lookups and fk_questions_category.
+-- the per-cell lookups and fk_questions_category. image_credit ('' = none) is the
+-- photo credit shown as a caption under the picture, e.g. "Jane Doe / CC BY-SA 4.0".
 CREATE TABLE IF NOT EXISTS questions (
   id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
   category_id INT UNSIGNED NOT NULL,
@@ -62,6 +63,7 @@ CREATE TABLE IF NOT EXISTS questions (
   question_ar TEXT         NULL,
   answer_ar   TEXT         NULL,
   image       VARCHAR(255) NOT NULL DEFAULT '',
+  image_credit VARCHAR(255) NOT NULL DEFAULT '',
   PRIMARY KEY (id),
   UNIQUE KEY uq_category_question_image (category_id, question(191), image(191)),
   KEY idx_questions_slot (category_id, points),
