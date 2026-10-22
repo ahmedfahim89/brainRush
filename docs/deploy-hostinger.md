@@ -69,7 +69,7 @@ Upload only what the website needs. Keep the folder structure:
 | Upload | Do **not** upload |
 |---|---|
 | `.htaccess` (a hidden file; make sure your FTP client or File Manager shows hidden files) | `sql/` (import it through phpMyAdmin instead) |
-| `index.html`, `admin.html`, `how-to-play.html` | `docs/`, `.claude/`, `.git/`, `.gitignore`, `README.md` |
+| `index.html`, `admin.html`, `how-to-play.html`, `llms.txt` | `docs/`, `.claude/`, `.git/`, `.gitignore`, `README.md` |
 | `css/` (whole folder) | **`api/config.php` from your computer** (it holds your *local* database settings; create a new one on the server in step 5) |
 | `img/` (whole folder, including `img/questions/` with the question pictures) | |
 | `js/` (whole folder) | **`password.txt`**, and any other local file with passwords or notes (never, under any name) |

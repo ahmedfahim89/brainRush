@@ -47,6 +47,8 @@ The host caches JavaScript and CSS for 7 days. To make sure browsers always get 
 
 Players read the guide at `how-to-play.html`, linked as "How to play" in the game's header. Keep it in step with the rules below.
 
+`llms.txt` is a short summary of the site for AI tools (the [llms.txt](https://llmstxt.org/) convention). Keep it in step with the guide, and never put questions or answers in it.
+
 1. **Setup.** Choose **Players** (up to 6) or **Teams** (up to 4), then enter the names. Names must be unique and at most 30 characters.
    - Each entry gets its own color. Click the color circle to switch to the next free color.
    - Tick between 1 and the configured maximum number of categories (admin setting "Max categories per game"). The board columns follow the order you tick them.
