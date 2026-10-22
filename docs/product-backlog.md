@@ -282,6 +282,13 @@ As a player, I want a guide that explains how to play, so that new players and h
 - **Given** the guide, **then** it names no category and no admin-set limit or default (max categories, default timer), so it stays correct when the admin changes them.
 - **Given** the guide, **then** it has a contents list that jumps to each section, a "Back to the game" link, and it reads well at 1366x768 and on a phone.
 
+### US-36 Terms of Service (Should)
+As the site owner, I want a Terms of Service page, so that players know the rules for using the site and what data it keeps. *(Added 2026-10-23, D-39.)*
+- **Given** the game page, **then** the header shows "How to play · Terms · Admin"; Terms opens `terms.html` in a new tab, so a running game is not interrupted. The guide's header links to it too.
+- **Given** the Terms page, **then** it shows a "Last updated" date and covers, in English: what the terms are, who runs the site (Ahmed Fahim, with a contact email), using the game, fair use, questions and content (possible mistakes, translations, photo licences, trademarks), the data it keeps, no warranty, changes to the terms, and contact.
+- **Given** the "Your data" section, **then** it matches what the game stores: the game start log on the server (date and time, player or team names, categories); the running game and the played-questions list in the browser, with only question ids sent to the server; no accounts, ads or tracking cookies; and the host's own technical logs.
+- **Given** the Terms page, **then** players never have to accept anything to play. It has a contents list and a "Back to the game" link, and it reads well at 1366x768 and on a phone.
+
 ---
 
 ## Story status
@@ -295,7 +302,7 @@ As a player, I want a guide that explains how to play, so that new players and h
 | 5 (polish) | No stories; follow-ups FU-03, FU-04, FU-05, FU-08 | Accepted 2026-10-05 |
 | 6 | US-30 (with amendments to US-19, US-20, US-21, US-24, US-25; US-22 retired) | Accepted 2026-10-11 after rework. The first version was accepted, then re-opened when D-31 was amended (points per question again); the rework was re-tested with 36 PASS. Hosted migration done (FU-11, owner confirmed 2026-10-12). |
 
-US-01 to US-21 and US-23 to US-30 accepted. US-22 retired 2026-10-11 by D-31. US-35 (player guide) added 2026-10-23. Open items are listed under "Follow-ups after Sprint 4" and "Follow-ups after Sprint 6".
+US-01 to US-21 and US-23 to US-30 accepted. US-22 retired 2026-10-11 by D-31. US-35 (player guide) and US-36 (Terms of Service) added 2026-10-23. Open items are listed under "Follow-ups after Sprint 4" and "Follow-ups after Sprint 6".
 
 ---
 
@@ -358,6 +365,7 @@ Details: US-30 (rewritten), with US-19, US-20, US-21, US-24, US-25 and D-18 re-a
 | D-34 | Photo credit under picture questions | Owner decision 2026-10-22, for the CC BY / CC BY-SA photos of the Landmarks set. New column `questions.image_credit` (`VARCHAR(255) NOT NULL DEFAULT ''`, `''` = no caption; migration `sql/migrate-add-image-credit.sql`, before the code). The API returns it as `image_credit` (null when empty) in the admin list and the board payload and accepts it on create/update (optional, trimmed, max 255, one line of plain text, else 400). The question screen shows it as a small muted one-line caption "Photo: <credit>" right under the picture, as text, left-to-right in both languages; it takes the picture's bottom margin, so the picture size and the 1366x768 layout are unchanged. No caption for text questions or an empty credit (Flags). Admin: optional "Image credit" field under the image path; the list is unchanged. Format: `<author> / <licence>`, e.g. `Jane Doe / CC BY-SA 4.0`. |
 | D-35 | Bigger photos in picture questions | Owner decision 2026-10-22, for the Landmarks photos. A photo (a picture that is not an `.svg`; flags stay as they are) gets a compact question layout: the language button sits on the prompt's line, the timer digits (2rem) and the answer text are smaller, the spacing is tighter, and the "Time's up!" line only takes room once time is up. The room goes to the photo: `clamp(7rem, calc(100vh - 25.2rem), 58.5vh)` on screens wider than 960px, about 340px tall at 1366x768 (flags 215px) and 632px at 1920x1080 (flags 528px); the owner first asked for bigger photos (280px), then for 20% more. A one- or two-line answer still fits with no page scroll; the two three-line answers (Big Ben, Muhammad Ali Mosque) scroll a little, as does a two-line answer once "Time's up!" shows, as D-30 accepts. The photo credit caption (D-34) is 0.6875rem (owner: one size smaller). |
 | D-38 | Player guide | Owner decision 2026-10-23. A separate static page `how-to-play.html` (no JS), in English only, with its own `css/guide.css` on top of the shared stylesheet. The game header links to it in a new tab, so a running game and an open question's timer are not touched. It names no category and no admin-set limit or default. It describes the game without helpers; a helpers section follows once that feature lands. US-35. |
+| D-39 | Terms of Service | Owner decision 2026-10-23. A separate static page `terms.html`, in English only, with no JS and no CSS of its own (it reuses the guide styles). It is linked as "Terms" in the game header (new tab) and in the guide's header. Players don't accept anything: there is no checkbox, and Start is not affected. It names the owner, Ahmed Fahim, with the contact ahmedfahim89@gmail.com. A short "Your data" section replaces a separate privacy page. There is no governing-law clause. US-36. |
 
 ---
 
