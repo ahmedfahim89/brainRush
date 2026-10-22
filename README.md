@@ -45,7 +45,7 @@ The host caches JavaScript and CSS for 7 days. To make sure browsers always get 
 
 ## How to play
 
-Players read the guide at `how-to-play.html`, linked as "How to play" in the game's header. Keep it in step with the rules below.
+Players read the guide at `how-to-play.html`, linked as "How to play" in the game's header. Keep it in step with the rules below. The Terms of Service are at `terms.html`, linked as "Terms" in the header. Keep its "Your data" section in step whenever the game starts storing something new (game log, browser storage).
 
 1. **Setup.** Choose **Players** (up to 6) or **Teams** (up to 4), then enter the names. Names must be unique and at most 30 characters.
    - Each entry gets its own color. Click the color circle to switch to the next free color.
