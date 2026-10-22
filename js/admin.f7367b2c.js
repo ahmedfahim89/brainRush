@@ -16,7 +16,7 @@
     settings: null,    // { categories_per_game, timer_seconds, banner_enabled, banner_text }
     points: [],        // [{ id, points, enabled, question_count }] ascending
     categories: [],    // [{ id, name, question_count }] sorted by name
-    questions: [],     // [{ id, category_id, category_name, points, question, answer, question_ar, answer_ar, image }]
+    questions: [],     // [{ id, category_id, category_name, points, question, answer, question_ar, answer_ar, image, image_credit }]
     renamingId: null,  // category currently being renamed inline
     renameDraft: '',
     editing: null,     // question being edited, or null when the form is in "add" mode
@@ -54,6 +54,7 @@
     qAnswerAr: byId('question-answer-ar'),
     qImage: byId('question-image'),
     qImagePreview: byId('question-image-preview'),
+    qImageCredit: byId('question-image-credit'),
     qSave: byId('question-save'),
     qCancel: byId('question-cancel'),
     questionsMsg: byId('questions-msg'),
@@ -691,6 +692,7 @@
     dom.qTextAr.value = '';
     dom.qAnswerAr.value = '';
     dom.qImage.value = '';
+    dom.qImageCredit.value = '';
     updateImagePreview();
     setFormMode();
   }
@@ -726,6 +728,7 @@
     dom.qTextAr.value = q.question_ar || '';
     dom.qAnswerAr.value = q.answer_ar || '';
     dom.qImage.value = q.image || '';
+    dom.qImageCredit.value = q.image_credit || '';
     updateImagePreview();
     setFormMode();
     renderQuestions();
@@ -753,6 +756,8 @@
     if (image && (image.length > 255 || !IMAGE_PATTERN.test(image))) {
       errors.push('Image path must look like img/questions/flag-japan.svg (lowercase letters, digits and hyphens; .svg, .jpg, .jpeg, .png or .webp), or be empty.');
     }
+    const imageCredit = dom.qImageCredit.value.trim();
+    if (imageCredit.length > 255) errors.push('Image credit must be at most 255 characters.');
     return {
       errors: errors,
       body: {
@@ -763,6 +768,7 @@
         question_ar: dom.qTextAr.value.trim(),
         answer_ar: dom.qAnswerAr.value.trim(),
         image: image, // '' = no picture
+        image_credit: imageCredit, // '' = no caption
       },
     };
   }

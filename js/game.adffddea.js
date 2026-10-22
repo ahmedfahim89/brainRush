@@ -101,6 +101,7 @@
     scoreboard: byId('scoreboard'),
     qHeading: byId('question-title'),
     qImage: byId('question-image'),
+    qCredit: byId('question-credit'),
     qText: byId('question-text'),
     timerBox: byId('timer'),
     timerValue: byId('timer-value'),
@@ -390,7 +391,7 @@
         points.every((p) => {
           const q = hasOwn(c.questions, String(p)) ? c.questions[String(p)] : null;
           return isPlainObject(q) && typeof q.question === 'string' && typeof q.answer === 'string' &&
-            isValidImage(q.image);
+            isValidImage(q.image) && isOptionalText(q.image_credit);
         });
       if (ok) ids[c.id] = true;
       return ok;
@@ -400,6 +401,11 @@
   /** Picture path is optional: missing/null (text question, also older saves) or a valid path. */
   function isValidImage(image) {
     return image === undefined || image === null || (typeof image === 'string' && IMAGE_PATTERN.test(image));
+  }
+
+  /** Optional text such as the photo credit: missing/null (also older saves) or a string. */
+  function isOptionalText(value) {
+    return value === undefined || value === null || typeof value === 'string';
   }
 
   /** "<categoryId>:<points>" naming a real cell of this board, in canonical form. */
@@ -933,6 +939,7 @@
             question_ar: arabic ? q.question_ar : null,
             answer_ar: arabic ? q.answer_ar : null,
             image: typeof q.image === 'string' ? q.image : null,
+            image_credit: typeof q.image_credit === 'string' ? q.image_credit : null,
           };
         });
         return { id: c.id, name: c.name, questions: questions };
@@ -1231,6 +1238,20 @@
       image.hidden = true;
       image.removeAttribute('src');
     }
+    // A photo (not an SVG flag) gets the compact question layout and a bigger picture (D-35).
+    image.parentElement.classList.toggle('has-photo', Boolean(q.image) && !/\.svg$/i.test(q.image));
+    renderImageCredit(q);
+  }
+
+  /** Photo credit caption under the picture; only for a picture with a non-empty credit. */
+  function renderImageCredit(q) {
+    const credit = q.image && typeof q.image_credit === 'string' ? q.image_credit.trim() : '';
+    const caption = dom.qCredit;
+    caption.textContent = credit ? 'Photo: ' + credit : '';
+    caption.title = caption.textContent; // full text when the one-line caption is cut off
+    caption.hidden = !credit;
+    // The caption takes the picture's bottom margin, so the page height stays the same.
+    dom.qImage.classList.toggle('has-credit', Boolean(credit));
   }
 
   /** Show the question and its answer in the open question's language (cur.lang). */
