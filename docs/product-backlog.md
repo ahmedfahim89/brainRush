@@ -273,6 +273,15 @@ Terms: a "cell pool" = all questions of one category with one point value.
 - **Given** the migration has already run, **when** it is run again, **then** it completes without errors and the question count does not change.
 - **Given** `docs/question-bank.md`, **then** it lists exactly 120 questions, 20 per seed category and 4 per point value 100–500 in each category, with no question or answer duplicating the seed questions, the 6 questions in `docs/questions-600.md` or each other.
 
+## Epic E11 — Player help
+
+### US-35 How to play guide (Should)
+As a player, I want a guide that explains how to play, so that new players and hosts can learn the rules without asking. *(Added 2026-10-23, D-38.)*
+- **Given** the game page, **then** the header shows a "How to play" link next to Admin; it opens `how-to-play.html` in a new tab, so a running game is not interrupted.
+- **Given** the guide, **then** it explains in English: the host's role, a quick start, setup (players/teams, colors, categories, Surprise me!, timer, played questions), the board, answering (timer, pictures, Arabic/English, "(accept …)"), scoring with an example, ending the game and ties, and a short FAQ.
+- **Given** the guide, **then** it names no category and no admin-set limit or default (max categories, default timer), so it stays correct when the admin changes them.
+- **Given** the guide, **then** it has a contents list that jumps to each section, a "Back to the game" link, and it reads well at 1366x768 and on a phone.
+
 ---
 
 ## Story status
@@ -286,7 +295,7 @@ Terms: a "cell pool" = all questions of one category with one point value.
 | 5 (polish) | No stories; follow-ups FU-03, FU-04, FU-05, FU-08 | Accepted 2026-10-05 |
 | 6 | US-30 (with amendments to US-19, US-20, US-21, US-24, US-25; US-22 retired) | Accepted 2026-10-11 after rework. The first version was accepted, then re-opened when D-31 was amended (points per question again); the rework was re-tested with 36 PASS. Hosted migration done (FU-11, owner confirmed 2026-10-12). |
 
-US-01 to US-21 and US-23 to US-30 accepted. US-22 retired 2026-10-11 by D-31. Open items are listed under "Follow-ups after Sprint 4" and "Follow-ups after Sprint 6".
+US-01 to US-21 and US-23 to US-30 accepted. US-22 retired 2026-10-11 by D-31. US-35 (player guide) added 2026-10-23. Open items are listed under "Follow-ups after Sprint 4" and "Follow-ups after Sprint 6".
 
 ---
 
@@ -348,6 +357,7 @@ Details: US-30 (rewritten), with US-19, US-20, US-21, US-24, US-25 and D-18 re-a
 | D-33 | "Surprise me!" | Owner decision 2026-10-22. One tile in the category list with two behaviours: ticked alone it picks **3** random playable categories (capped by N and by the number of playable categories); ticked with other picks it takes one slot and becomes **1** random playable category not already picked. The draw happens in the browser at Start; the board API and the game log are unchanged and see real category ids. Randomly picked columns show "?" on the board until one of their questions is opened (saved with the game, so a refresh keeps it). US-31. |
 | D-34 | Photo credit under picture questions | Owner decision 2026-10-22, for the CC BY / CC BY-SA photos of the Landmarks set. New column `questions.image_credit` (`VARCHAR(255) NOT NULL DEFAULT ''`, `''` = no caption; migration `sql/migrate-add-image-credit.sql`, before the code). The API returns it as `image_credit` (null when empty) in the admin list and the board payload and accepts it on create/update (optional, trimmed, max 255, one line of plain text, else 400). The question screen shows it as a small muted one-line caption "Photo: <credit>" right under the picture, as text, left-to-right in both languages; it takes the picture's bottom margin, so the picture size and the 1366x768 layout are unchanged. No caption for text questions or an empty credit (Flags). Admin: optional "Image credit" field under the image path; the list is unchanged. Format: `<author> / <licence>`, e.g. `Jane Doe / CC BY-SA 4.0`. |
 | D-35 | Bigger photos in picture questions | Owner decision 2026-10-22, for the Landmarks photos. A photo (a picture that is not an `.svg`; flags stay as they are) gets a compact question layout: the language button sits on the prompt's line, the timer digits (2rem) and the answer text are smaller, the spacing is tighter, and the "Time's up!" line only takes room once time is up. The room goes to the photo: `clamp(7rem, calc(100vh - 25.2rem), 58.5vh)` on screens wider than 960px, about 340px tall at 1366x768 (flags 215px) and 632px at 1920x1080 (flags 528px); the owner first asked for bigger photos (280px), then for 20% more. A one- or two-line answer still fits with no page scroll; the two three-line answers (Big Ben, Muhammad Ali Mosque) scroll a little, as does a two-line answer once "Time's up!" shows, as D-30 accepts. The photo credit caption (D-34) is 0.6875rem (owner: one size smaller). |
+| D-38 | Player guide | Owner decision 2026-10-23. A separate static page `how-to-play.html` (no JS), in English only, with its own `css/guide.css` on top of the shared stylesheet. The game header links to it in a new tab, so a running game and an open question's timer are not touched. It names no category and no admin-set limit or default. It describes the game without helpers; a helpers section follows once that feature lands. US-35. |
 
 ---
 
