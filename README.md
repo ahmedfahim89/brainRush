@@ -45,13 +45,15 @@ The host caches JavaScript and CSS for 7 days. To make sure browsers always get 
 
 ## How to play
 
+Players read the guide at `how-to-play.html`, linked as "How to play" in the game's header. Keep it in step with the rules below.
+
 1. **Setup.** Choose **Players** (up to 6) or **Teams** (up to 4), then enter the names. Names must be unique and at most 30 characters.
    - Each entry gets its own color. Click the color circle to switch to the next free color.
    - Tick between 1 and the configured maximum number of categories (admin setting "Max categories per game"). The board columns follow the order you tick them.
    - Optionally change the timer for this game only (5–600 seconds). The admin setting is not changed.
    - Click **Start Game**.
 2. **Board.** Columns are the chosen categories; rows are the point values, smallest first. Click a cell to open its question.
-   - **Question bank.** A category can hold several questions for each point value. When a new game starts, the server picks one of them at random for every cell (category × point value), so the same group can play again with mostly new questions. The draw is purely random: a question from an earlier game can come back. Each question keeps its own point value, so a 500 question is still meant to be harder than a 100 one.
+   - **Question bank.** A category can hold several questions for each point value. When a new game starts, the server picks one of them for every cell (category × point value), so the same group can play again with new questions. Each browser remembers the questions it has opened: the draw takes unseen questions first, and only when a cell has none left does the one seen longest ago come back. "Forget played questions" on the setup screen clears that list. Each question keeps its own point value, so a 500 question is still meant to be harder than a 100 one.
    - The scoreboard below the board shows every player or team. Use **+ / −** to correct a score; each click is one step of the smallest point value. Corrections never change cell colors.
 3. **Question.** The question appears in large type (a picture question shows its picture above the text), and a countdown starts automatically.
    - The number and the bar turn red in the last third. At 0 the timer stops and shows "Time's up!" (no sound); nothing is scored automatically.
