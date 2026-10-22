@@ -1,0 +1,21 @@
+# BrainRush
+
+> BrainRush is a free trivia game for a group around one shared screen, played in the browser. One person hosts: they read each question out, listen to the spoken answers and mark them right or wrong. Players or teams pick questions from a board of categories and point values, and harder questions are worth more points.
+
+- Up to 6 players or 4 teams, each with their own color.
+- A correct answer adds the question's points, a wrong one takes them away.
+- Every question has a countdown timer.
+- Many questions are in Arabic and English, and some show a picture, such as a flag or a famous place.
+- Each device remembers which questions it has played, so new games pick unseen questions first.
+- No sign-up or install. It works best on a TV or big screen with the host at the keyboard.
+
+This file lists no questions or answers, on purpose.
+
+## Play
+
+- [Play BrainRush](https://brainrush.integration.ninja/index.html): set up players or teams, pick categories and start a game
+- [How to play](https://brainrush.integration.ninja/how-to-play.html): player guide covering setup, the board, answering, scoring and ending the game
+
+## Optional
+
+- [Categories](https://brainrush.integration.ninja/api/categories.php): JSON list of the current categories and how many questions each has
