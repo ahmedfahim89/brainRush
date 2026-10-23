@@ -25,6 +25,7 @@
     renamingId: null,  // category currently being renamed inline
     renameDraft: '',
     editing: null,     // question being edited, or null when the form is in "add" mode
+    filtersDefaulted: false, // question filters start on the first category and lowest points, once
   };
 
   const byId = (id) => document.getElementById(id);
@@ -69,6 +70,8 @@
     qCancel: byId('question-cancel'),
     questionsMsg: byId('questions-msg'),
     qFilter: byId('question-filter'),
+    qPointsFilter: byId('question-points-filter'),
+    qCount: byId('question-count'),
     questionsBody: byId('questions-body'),
     streaksReload: byId('streaks-reload'),
     streaksMsg: byId('streaks-msg'),
@@ -644,19 +647,43 @@
     dom.qPoints.value = state.points.some((p) => String(p.points) === previous) ? previous : '';
   }
 
+  /** Points filter of the question list: "All points" plus every point value. */
+  function fillPointFilterOptions() {
+    const previous = dom.qPointsFilter.value;
+    clear(dom.qPointsFilter);
+    dom.qPointsFilter.appendChild(h('option', { value: '', text: 'All points' }));
+    state.points.forEach((p) => {
+      dom.qPointsFilter.appendChild(h('option', { value: String(p.points), text: String(p.points) }));
+    });
+    dom.qPointsFilter.value = state.points.some((p) => String(p.points) === previous) ? previous : '';
+  }
+
   function renderQuestionSelects() {
     fillCategoryOptions(dom.qFilter, 'All categories');
+    fillPointFilterOptions();
     fillCategoryOptions(dom.qCategory, 'Choose a category');
     fillPointOptions();
+    // On the first load show one category at one point value (e.g. "AI - 100"), not the whole bank.
+    // Later reloads (after a save or delete) keep whatever the admin picked.
+    if (!state.filtersDefaulted && state.categories.length && state.points.length) {
+      state.filtersDefaulted = true;
+      dom.qFilter.value = String(state.categories[0].id);
+      dom.qPointsFilter.value = String(state.points[0].points);
+      preselectFormFromFilters();
+    }
   }
 
   function renderQuestions() {
     const filterId = Number(dom.qFilter.value);
-    const rows = filterId ? state.questions.filter((q) => q.category_id === filterId) : state.questions;
+    const filterPoints = Number(dom.qPointsFilter.value);
+    const rows = state.questions.filter((q) =>
+      (!filterId || q.category_id === filterId) && (!filterPoints || q.points === filterPoints));
+    dom.qCount.textContent = 'Showing ' + rows.length + ' of ' + state.questions.length;
     clear(dom.questionsBody);
     if (!rows.length) {
+      const text = filterId || filterPoints ? 'No questions match this filter.' : 'No questions yet.';
       dom.questionsBody.appendChild(h('tr', {}, [
-        h('td', { className: 'empty-row', colSpan: 8, text: 'No questions yet.' }),
+        h('td', { className: 'empty-row', colSpan: 8, text: text }),
       ]));
       return;
     }
@@ -873,10 +900,14 @@
 
   function onFilterChange() {
     renderQuestions();
-    // In add mode, preselect the filtered category in the form for faster entry.
-    if (!state.editing && dom.qFilter.value) {
-      dom.qCategory.value = dom.qFilter.value;
-    }
+    preselectFormFromFilters();
+  }
+
+  /** In add mode, preselect the filtered category and points in the form for faster entry. */
+  function preselectFormFromFilters() {
+    if (state.editing) return;
+    if (dom.qFilter.value) dom.qCategory.value = dom.qFilter.value;
+    if (dom.qPointsFilter.value) dom.qPoints.value = dom.qPointsFilter.value;
   }
 
   // ---------- Streak leaderboard (US-34) ----------
@@ -952,6 +983,7 @@
     dom.qImage.addEventListener('input', updateImagePreview);
     dom.qImagePreview.addEventListener('error', hideImagePreview);
     dom.qFilter.addEventListener('change', onFilterChange);
+    dom.qPointsFilter.addEventListener('change', onFilterChange);
     dom.authRetry.addEventListener('click', onAuthRetry);
     dom.streaksReload.addEventListener('click', onStreaksReload);
   }
