@@ -291,6 +291,51 @@ As the site owner, I want a Terms of Service page, so that players know the rule
 
 ---
 
+## Epic E11 — Helpers
+
+### US-32 Helpers: 3 choices, Swap, Skip (Should)
+As a contestant, I want three helpers I can each use once per game, so that I can get out of a hard question: see 3 possible answers, swap the question for another one, or skip it for half the points. *(Added 2026-10-23, D-36.)*
+
+Terms: the "helper user" = the contestant who used a helper on the open question. The "chips" = the 3 small helper buttons on each scoring row (ABC = 3 choices, ⇄ = Swap, ½ = Skip).
+
+*Availability (all helpers)*
+- **Given** a new game, **then** every contestant has all 3 helpers, each usable once in that game. The board's ± buttons never give a helper back.
+- **Given** an open question that nobody has been scored on and whose answer is not shown, **when** a contestant clicks one of their unused chips, **then** a confirm asks e.g. "Use Swap for Team Red? …". Cancel changes nothing; OK uses the helper (no undo, D-06).
+- **Given** a contestant used a helper on the open question, **then** only that contestant can still be scored (the other rows' Correct and Wrong are disabled) and only that contestant can use more helpers on it (they may stack, e.g. Swap and then 3 choices).
+- **Given** someone was scored on the open question, or the answer was shown, **then** every chip is disabled for that question. A disabled chip has a tooltip saying why (already used, not after scoring, not after the answer, only X can use helpers, no choices yet).
+- **Given** the board, **then** each scoreboard card shows the 3 helper symbols; a used helper is dimmed and struck through.
+- **Given** a helper was used, **when** the page is refreshed, **then** the used helpers, the helper user, the choice order and a swapped question are restored; the timer restarts at full length (D-04).
+
+*3 choices*
+- **Given** a question with wrong options, **when** the host uses 3 choices, **then** 3 options labelled A/B/C are shown under the question in random order: the answer and the 2 wrong options, each cut at its first bracket (English at " (", Arabic at "(" with or without a space before it), so "Three (triplets)" shows as "Three" and no option gives itself away by an explanation, an "(accept …)" note or an English gloss. The full answer still shows under Show Answer. The order is saved, so a refresh shows the same A/B/C.
+- **Given** the 3 choices are shown on a text question, **then** the question screen switches to a compact layout (smaller question font, tight choice rows, short choices side by side, smaller timer and answer), so at 1366x768 with 6 contestants it fits with no page scroll, also after Show Answer, except for a few unusually long questions (D-30).
+- **Given** the choices are shown, **when** the host switches the language, **then** the options switch to that language (same order).
+- **Given** the answer is shown, **then** the right option is highlighted green.
+- **Given** a question without wrong options, **then** the 3 choices chip is disabled with the tooltip "this question has no choices yet".
+
+*Swap*
+- **When** the host uses Swap, **then** a random question is drawn from the whole bank: a random playable category (same rule as `categories.php?playable=1`), a random enabled point value, never a question on this board, unseen questions first, otherwise the one seen longest ago. It replaces the open question: the heading is "Category – points" with a small "Swapped from History – 300" note, the picture (if any) and its credit are shown, the timer restarts, and Correct/Wrong use the new points. The new question is marked as seen.
+- **Given** a swapped question, **when** the host returns to the board, **then** the original cell closes with the swapped question's result (the Correct contestant's color, or grey).
+- **Given** the swap request fails (network error, or 409 when no question is left), **then** an error is shown on the question screen and the helper stays available.
+- **Given** 3 choices were used before a Swap, **then** the choices apply to the new question too (a fresh order), if it has wrong options.
+
+*Skip*
+- **When** the host uses Skip on a question worth P points (the swapped value after a Swap), **then** the helper user loses `Math.round(P / 2)` points, the cell closes grey for everyone and the board is shown.
+
+*Data and API*
+- **Given** `sql/migrate-add-wrong-options.sql`, **when** it runs (also twice), **then** `questions` has `wrong_1`, `wrong_2`, `wrong_1_ar`, `wrong_2_ar` (`VARCHAR(255) NULL`) after `image_credit`; both schema files have them too.
+- **Given** the admin list and the board payload, **then** each question has the 4 fields (null when empty).
+- **Given** a create or update, **then** wrong options are optional, trimmed, one line, at most 255 characters; each language's pair is both-or-nothing, the two differ (case-insensitive) and neither equals the answer, both as typed and as shown in the game (cut at the first bracket); Arabic wrong options need the Arabic question and the English wrong options; a question with an Arabic version and English wrong options needs the Arabic ones. Anything else → 400 with a readable message.
+- **Given** `POST questions.php?random=1` with `{ exclude, seen }` (lists of question ids, as the board's `seen`), **then** it returns `{ category: {id, name}, points, question }` (question as a board cell), never an excluded id; with nothing left to draw → 409. Malformed lists → 400. Public, like the board.
+
+*Admin*
+- **Given** the question form, **then** it has optional "Wrong option 1/2" and "Arabic wrong option 1/2" fields, filled on edit and checked like the API before sending; the questions table has a "Choices" column (✓ / -; "✓ (no Arabic)" when an Arabic question lacks Arabic options).
+
+*Player guide*
+- **Given** `how-to-play.html` (US-35), **then** it has a "Helpers" section (in the contents too): 3 helpers per game, each once, what 3 choices, Swap and Skip do, when they can be used (before anyone is marked and before the answer is shown), that the question is then the helper user's alone, that ABC is greyed out without choices, and that helpers are not given back; the Quick start and Scoring parts point to it. `llms.txt` mentions the helpers. *(Added 2026-10-23.)*
+
+---
+
 ## Story status
 
 | Sprint | Stories | Status |
@@ -301,8 +346,9 @@ As the site owner, I want a Terms of Service page, so that players know the rule
 | 4 | US-08, US-10, US-11, US-12, US-13, US-14, US-15, US-16, US-17, US-27 | Accepted 2026-10-05 |
 | 5 (polish) | No stories; follow-ups FU-03, FU-04, FU-05, FU-08 | Accepted 2026-10-05 |
 | 6 | US-30 (with amendments to US-19, US-20, US-21, US-24, US-25; US-22 retired) | Accepted 2026-10-11 after rework. The first version was accepted, then re-opened when D-31 was amended (points per question again); the rework was re-tested with 36 PASS. Hosted migration done (FU-11, owner confirmed 2026-10-12). |
+| Helpers (outside the sprint cycle, branch `helpers`) | US-32 | Implemented 2026-10-23 (`docs/sprints/helpers-dev.md`); in test. The wrong-option content (`sql/add-wrong-options.sql`) is produced separately and reviewed by the owner. |
 
-US-01 to US-21 and US-23 to US-30 accepted. US-22 retired 2026-10-11 by D-31. US-35 (player guide) and US-36 (Terms of Service) added 2026-10-23. Open items are listed under "Follow-ups after Sprint 4" and "Follow-ups after Sprint 6".
+US-01 to US-21 and US-23 to US-30 accepted. US-22 retired 2026-10-11 by D-31. US-31 shipped (PR #46). US-32 in test. US-35 (player guide) and US-36 (Terms of Service) added 2026-10-23. Open items are listed under "Follow-ups after Sprint 4" and "Follow-ups after Sprint 6".
 
 ---
 
@@ -364,6 +410,13 @@ Details: US-30 (rewritten), with US-19, US-20, US-21, US-24, US-25 and D-18 re-a
 | D-33 | "Surprise me!" | Owner decision 2026-10-22. One tile in the category list with two behaviours: ticked alone it picks **3** random playable categories (capped by N and by the number of playable categories); ticked with other picks it takes one slot and becomes **1** random playable category not already picked. The draw happens in the browser at Start; the board API and the game log are unchanged and see real category ids. Randomly picked columns show "?" on the board until one of their questions is opened (saved with the game, so a refresh keeps it). US-31. |
 | D-34 | Photo credit under picture questions | Owner decision 2026-10-22, for the CC BY / CC BY-SA photos of the Landmarks set. New column `questions.image_credit` (`VARCHAR(255) NOT NULL DEFAULT ''`, `''` = no caption; migration `sql/migrate-add-image-credit.sql`, before the code). The API returns it as `image_credit` (null when empty) in the admin list and the board payload and accepts it on create/update (optional, trimmed, max 255, one line of plain text, else 400). The question screen shows it as a small muted one-line caption "Photo: <credit>" right under the picture, as text, left-to-right in both languages; it takes the picture's bottom margin, so the picture size and the 1366x768 layout are unchanged. No caption for text questions or an empty credit (Flags). Admin: optional "Image credit" field under the image path; the list is unchanged. Format: `<author> / <licence>`, e.g. `Jane Doe / CC BY-SA 4.0`. |
 | D-35 | Bigger photos in picture questions | Owner decision 2026-10-22, for the Landmarks photos. A photo (a picture that is not an `.svg`; flags stay as they are) gets a compact question layout: the language button sits on the prompt's line, the timer digits (2rem) and the answer text are smaller, the spacing is tighter, and the "Time's up!" line only takes room once time is up. The room goes to the photo: `clamp(7rem, calc(100vh - 25.2rem), 58.5vh)` on screens wider than 960px, about 340px tall at 1366x768 (flags 215px) and 632px at 1920x1080 (flags 528px); the owner first asked for bigger photos (280px), then for 20% more. A one- or two-line answer still fits with no page scroll; the two three-line answers (Big Ben, Muhammad Ali Mosque) scroll a little, as does a two-line answer once "Time's up!" shows, as D-30 accepts. The photo credit caption (D-34) is 0.6875rem (owner: one size smaller). |
+| D-36 | Helpers (3 choices, Swap, Skip) | Owner decisions 2026-10-23. Every contestant gets 3 helpers per game, each usable once: **3 choices** (the answer plus 2 wrong options, A/B/C in random order), **Swap** (replace the open question) and **Skip** (lose half its value instead of risking all of it). (a) Wrong options are **stored per question** in English and Arabic (`questions.wrong_1`, `wrong_2`, `wrong_1_ar`, `wrong_2_ar`, `VARCHAR(255) NULL`; migration `sql/migrate-add-wrong-options.sql`, before the code) and written by the question-producer (`sql/add-wrong-options.sql`, reviewed by the owner per set). The 3 choices chip is greyed out on a question without them. (b) Using a helper makes the question **that contestant's only**: the other scoring rows are disabled, and only that contestant can use more helpers on it. (c) Helpers are allowed only before anyone is scored on the question and before the answer is shown; each use is confirmed first (no undo, D-06); the ± buttons do not restore them. (d) **Swap** draws from the **whole bank**: a random playable category, a random enabled point value, never a question on the current board, unseen first, otherwise the one seen longest ago (`POST questions.php?random=1`). It is scored at the new question's value, and the original cell closes with the new question's result. (e) **Skip** subtracts `Math.round(points / 2)` (at the swapped value after a Swap) and **closes the question for everyone**: the cell turns grey. (f) **Amended 2026-10-23 (fix loop 1):** every choice is shown cut at its first bracket: English at " (", Arabic at "(" with or without a space. This covers the correct answer ("Three (triplets)" → "Three"; "(accept …)" notes go too) and also the wrong options, because some Arabic wrong options carry an English gloss like their answers. So no option stands out by its brackets. The full answer still shows under Show Answer. The API rejects an option that equals the answer, typed or cut. The saved game goes to version 3; version 2 saves are upgraded with all helpers available (D-28). (g) Layout (**amended 2026-10-23, fix loop 1**):
+- **Chips:** icon-sized chips (ABC, ⇄, ½) on the scoring rows and 3 small symbols on each scoreboard card.
+- **Scoring rows:** the columns stay 1 : 1 as before. A row fits on one line at 1366x768 with 6 contestants (D-30) through compact rows: 0.92rem Correct/Wrong buttons, 1.5rem chips, tighter gaps.
+- **Text question with 3 choices:** a compact layout like D-35's photo one. The question font is smaller, the choice rows are tight, choices of up to 24 characters sit side by side, the timer digits are 2rem, "Time's up!" takes room only once time is up, and the answer is smaller. In the 761-question sweep at 1366x768, 4 English views with the answer shown scroll: 1 long Egyptians question by 2 px, and 3 Landmarks photos with long answers, which D-35 already lists. No Arabic view scrolls.
+- **Picture question with 3 choices:** the choices sit side by side, and the picture gives up their height.
+
+US-32. |
 | D-38 | Player guide | Owner decision 2026-10-23. A separate static page `how-to-play.html` (no JS), in English only, with its own `css/guide.css` on top of the shared stylesheet. The game header links to it in a new tab, so a running game and an open question's timer are not touched. It names no category and no admin-set limit or default. It describes the game without helpers; a helpers section follows once that feature lands. US-35. |
 | D-39 | Terms of Service | Owner decision 2026-10-23. A separate static page `terms.html`, in English only, with no JS and no CSS of its own (it reuses the guide styles). It is linked as "Terms" in the game header (new tab) and in the guide's header. Players don't accept anything: there is no checkbox, and Start is not affected. It names the owner, Ahmed Fahim, with the contact ahmedfahim89@gmail.com. A short "Your data" section replaces a separate privacy page. There is no governing-law clause. US-36. |
 

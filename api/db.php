@@ -170,6 +170,20 @@ function require_text($value, string $label, int $maxChars): string
     return $text;
 }
 
+/**
+ * Playable categories (D-31 amended): the HAVING clause of a query over
+ * "categories c LEFT JOIN questions q ON q.category_id = c.id LEFT JOIN point_values pv
+ * ON pv.points = q.points GROUP BY c.id, ...". The FK guarantees every question uses an
+ * existing point value, so "distinct enabled values used == number of enabled point values"
+ * means every board cell has a question to draw from. Disabled values are not on the board,
+ * so they are not required. "> 0" excludes the no-enabled-values case.
+ * Used by categories.php?playable=1 and the Swap draw in questions.php?random=1.
+ */
+const PLAYABLE_HAVING =
+    'HAVING COUNT(DISTINCT CASE WHEN pv.enabled = 1 THEN q.points END) > 0
+        AND COUNT(DISTINCT CASE WHEN pv.enabled = 1 THEN q.points END) =
+            (SELECT COUNT(*) FROM point_values WHERE enabled = 1)';
+
 /** MySQL error 1062: duplicate entry for a unique key. */
 function is_duplicate_key(PDOException $e): bool
 {

@@ -11,12 +11,16 @@
   const BANNER_DEFAULT = 'New questions added - try them now!'; // same as the seed in sql/schema.sql
   // Picture questions: same rule as api/questions.php (a file under img/questions/).
   const IMAGE_PATTERN = /^img\/questions\/[a-z0-9][a-z0-9-]*\.(svg|jpg|jpeg|png|webp)$/;
+  // "3 choices" helper (US-32): wrong-option fields, as in api/questions.php.
+  const WRONG_FIELDS = ['wrong_1', 'wrong_2', 'wrong_1_ar', 'wrong_2_ar'];
+  const CHECK = String.fromCharCode(0x2713); // check mark
 
   const state = {
     settings: null,    // { categories_per_game, timer_seconds, banner_enabled, banner_text }
     points: [],        // [{ id, points, enabled, question_count }] ascending
     categories: [],    // [{ id, name, question_count }] sorted by name
-    questions: [],     // [{ id, category_id, category_name, points, question, answer, question_ar, answer_ar, image, image_credit }]
+    questions: [],     // [{ id, category_id, category_name, points, question, answer, question_ar, answer_ar, image, image_credit,
+                       //    wrong_1, wrong_2, wrong_1_ar, wrong_2_ar }]
     renamingId: null,  // category currently being renamed inline
     renameDraft: '',
     editing: null,     // question being edited, or null when the form is in "add" mode
@@ -52,6 +56,10 @@
     qAnswer: byId('question-answer'),
     qTextAr: byId('question-text-ar'),
     qAnswerAr: byId('question-answer-ar'),
+    qWrong1: byId('question-wrong-1'),
+    qWrong2: byId('question-wrong-2'),
+    qWrong1Ar: byId('question-wrong-1-ar'),
+    qWrong2Ar: byId('question-wrong-2-ar'),
     qImage: byId('question-image'),
     qImagePreview: byId('question-image-preview'),
     qImageCredit: byId('question-image-credit'),
@@ -640,7 +648,7 @@
     clear(dom.questionsBody);
     if (!rows.length) {
       dom.questionsBody.appendChild(h('tr', {}, [
-        h('td', { className: 'empty-row', colSpan: 7, text: 'No questions yet.' }),
+        h('td', { className: 'empty-row', colSpan: 8, text: 'No questions yet.' }),
       ]));
       return;
     }
@@ -654,6 +662,7 @@
         h('td', { className: 'text-cell', text: q.answer }),
         h('td', { className: 'text-cell', text: q.question_ar ? 'Yes' : '-' }),
         h('td', { className: 'text-cell', text: q.image ? 'Yes' : '-' }),
+        h('td', { className: 'text-cell', text: choicesLabel(q) }),
         h('td', { className: 'row-actions' }, [
           h('button', {
             type: 'button',
@@ -672,6 +681,12 @@
         ]),
       ]));
     });
+  }
+
+  /** "Choices" column: whether the "3 choices" helper has its wrong options (US-32), to track the backfill. */
+  function choicesLabel(q) {
+    if (!q.wrong_1) return '-';
+    return q.question_ar && !q.wrong_1_ar ? CHECK + ' (no Arabic)' : CHECK;
   }
 
   function setFormMode() {
@@ -693,8 +708,14 @@
     dom.qAnswerAr.value = '';
     dom.qImage.value = '';
     dom.qImageCredit.value = '';
+    wrongInputs().forEach((input) => { input.value = ''; });
     updateImagePreview();
     setFormMode();
+  }
+
+  /** The 4 wrong-option inputs, in the API's field order (WRONG_FIELDS). */
+  function wrongInputs() {
+    return [dom.qWrong1, dom.qWrong2, dom.qWrong1Ar, dom.qWrong2Ar];
   }
 
   /** Thumbnail of the image path; hidden while the path is empty or invalid (or fails to load). */
@@ -729,6 +750,7 @@
     dom.qAnswerAr.value = q.answer_ar || '';
     dom.qImage.value = q.image || '';
     dom.qImageCredit.value = q.image_credit || '';
+    wrongInputs().forEach((input, i) => { input.value = q[WRONG_FIELDS[i]] || ''; });
     updateImagePreview();
     setFormMode();
     renderQuestions();
@@ -758,19 +780,53 @@
     }
     const imageCredit = dom.qImageCredit.value.trim();
     if (imageCredit.length > 255) errors.push('Image credit must be at most 255 characters.');
-    return {
-      errors: errors,
-      body: {
-        category_id: categoryId,
-        points: points,
-        question: dom.qText.value.trim(),
-        answer: dom.qAnswer.value.trim(),
-        question_ar: dom.qTextAr.value.trim(),
-        answer_ar: dom.qAnswerAr.value.trim(),
-        image: image, // '' = no picture
-        image_credit: imageCredit, // '' = no caption
-      },
+    const wrong = wrongInputs().map((input) => input.value.trim());
+    const hasArabic = dom.qTextAr.value.trim() !== '';
+    checkWrongOptions(errors, wrong.slice(0, 2), dom.qAnswer.value, 'wrong options', false);
+    checkWrongOptions(errors, wrong.slice(2), dom.qAnswerAr.value, 'Arabic wrong options', true);
+    if (wrong[2] && !hasArabic) errors.push('Arabic wrong options need the Arabic question and answer.');
+    if (wrong[2] && !wrong[0]) errors.push('Fill in the English wrong options too.');
+    if (wrong[0] && hasArabic && !wrong[2]) errors.push('This question has an Arabic version: fill in the Arabic wrong options too.');
+    const body = {
+      category_id: categoryId,
+      points: points,
+      question: dom.qText.value.trim(),
+      answer: dom.qAnswer.value.trim(),
+      question_ar: dom.qTextAr.value.trim(),
+      answer_ar: dom.qAnswerAr.value.trim(),
+      image: image, // '' = no picture
+      image_credit: imageCredit, // '' = no caption
     };
+    WRONG_FIELDS.forEach((field, i) => { body[field] = wrong[i]; }); // '' = no choices
+    return { errors: errors, body: body };
+  }
+
+  /** A text as the game shows it as a choice: cut at its first bracket (choice_text() in api/questions.php). */
+  function choiceText(text, arabic) {
+    const at = text.indexOf(arabic ? '(' : ' (');
+    return (at === -1 ? text : text.slice(0, at)).trim() || text.trim();
+  }
+
+  /**
+   * Same rules as api/questions.php: both or neither, at most 255, different from each other
+   * and from the answer, both as typed and as the game shows them.
+   */
+  function checkWrongOptions(errors, pair, answer, label, arabic) {
+    if (!pair[0] && !pair[1]) return;
+    if (!pair[0] || !pair[1]) {
+      errors.push('Fill in both ' + label + ', or leave both empty.');
+      return;
+    }
+    if (pair.some((text) => text.length > 255)) errors.push('Each of the ' + label + ' must be at most 255 characters.');
+    const fold = (text) => text.trim().toLowerCase();
+    const shown = (text) => fold(choiceText(text, arabic));
+    if (fold(pair[0]) === fold(pair[1]) || shown(pair[0]) === shown(pair[1])) {
+      errors.push('The two ' + label + ' must be different.');
+    }
+    const correct = [fold(answer), shown(answer)];
+    if (pair.some((text) => correct.indexOf(fold(text)) !== -1 || correct.indexOf(shown(text)) !== -1)) {
+      errors.push('The ' + label + ' must not be the answer itself.');
+    }
   }
 
   function onQuestionSubmit(event) {

@@ -21,15 +21,8 @@ function category_row(array $r): array
 
 function list_categories(PDO $pdo, bool $playableOnly): array
 {
-    // The FK guarantees every question uses an existing point value, so "distinct
-    // enabled values used == number of enabled point values" means every board cell
-    // has a question to draw from (D-31 amended). Disabled values are not on the board,
-    // so they are not required. "> 0" excludes the no-enabled-values case.
-    $having = $playableOnly
-        ? 'HAVING COUNT(DISTINCT CASE WHEN pv.enabled = 1 THEN q.points END) > 0
-              AND COUNT(DISTINCT CASE WHEN pv.enabled = 1 THEN q.points END) =
-                  (SELECT COUNT(*) FROM point_values WHERE enabled = 1)'
-        : '';
+    // Playable = a question for every enabled point value (PLAYABLE_HAVING in db.php).
+    $having = $playableOnly ? PLAYABLE_HAVING : '';
     $rows = $pdo->query(
         "SELECT c.id, c.name, COUNT(q.id) AS question_count
            FROM categories c

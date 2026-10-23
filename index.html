@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BrainRush</title>
-  <link rel="stylesheet" href="css/style.19c4f0ef.css">
+  <link rel="stylesheet" href="css/style.6240296b.css">
 </head>
 <body class="game">
   <header class="page-header">
@@ -109,6 +109,8 @@
           <p id="question-credit" class="question-credit" dir="ltr" lang="en" hidden></p>
           <p id="question-text" class="question-text"></p>
           <button type="button" id="lang-btn" class="btn lang-btn" hidden></button>
+          <!-- "3 choices" helper (US-32): the answer and two wrong options, A/B/C, in the question's language -->
+          <ol id="question-choices" class="question-choices" aria-label="Choices" hidden></ol>
 
           <div id="timer" class="timer" role="timer" aria-labelledby="timer-label">
             <span id="timer-label" class="visually-hidden">Seconds left</span>
@@ -132,7 +134,9 @@
 
         <section class="scoring" aria-labelledby="scoring-title">
           <h3 id="scoring-title">Scoring</h3>
-          <p class="hint">Each player or team can be scored once. Only one can be correct.</p>
+          <p class="hint">Each player or team can be scored once. Only one can be correct.
+            Helpers, once per game before anyone is scored: ABC 3 choices, &#8644; swap, &frac12; skip for half the points.</p>
+          <p id="helper-msg" class="msg msg-error" role="alert" hidden></p>
           <ul id="score-rows" class="score-rows"></ul>
           <button type="button" id="back-btn" class="btn btn-primary btn-large btn-block">Back to Board</button>
         </section>
@@ -150,6 +154,6 @@
     </section>
   </main>
 
-  <script src="js/game.adffddea.js"></script>
+  <script src="js/game.6819355e.js"></script>
 </body>
 </html>

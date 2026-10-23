@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS categories (
 -- makes it a picture question, shown above the text. idx_questions_slot serves
 -- the per-cell lookups and fk_questions_category. image_credit ('' = none) is the
 -- photo credit shown as a caption under the picture, e.g. "Jane Doe / CC BY-SA 4.0".
+-- wrong_1/wrong_2 (and the _ar pair) are the two wrong options of the "3 choices"
+-- helper (US-32); NULL = none yet, so the helper is greyed out on that question.
 CREATE TABLE IF NOT EXISTS questions (
   id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
   category_id INT UNSIGNED NOT NULL,
@@ -62,6 +64,10 @@ CREATE TABLE IF NOT EXISTS questions (
   answer_ar   TEXT         NULL,
   image       VARCHAR(255) NOT NULL DEFAULT '',
   image_credit VARCHAR(255) NOT NULL DEFAULT '',
+  wrong_1     VARCHAR(255) NULL,
+  wrong_2     VARCHAR(255) NULL,
+  wrong_1_ar  VARCHAR(255) NULL,
+  wrong_2_ar  VARCHAR(255) NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_category_question_image (category_id, question(191), image(191)),
   KEY idx_questions_slot (category_id, points),

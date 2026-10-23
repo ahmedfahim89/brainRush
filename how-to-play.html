@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BrainRush - How to play</title>
-  <link rel="stylesheet" href="css/style.19c4f0ef.css">
+  <link rel="stylesheet" href="css/style.6240296b.css">
   <link rel="stylesheet" href="css/guide.12d2b532.css">
 </head>
 <body class="guide">
@@ -26,6 +26,7 @@
         <li><a href="#board">The board</a></li>
         <li><a href="#question">Answering a question</a></li>
         <li><a href="#scoring">Scoring</a></li>
+        <li><a href="#helpers">Helpers</a></li>
         <li><a href="#ending">Ending the game</a></li>
         <li><a href="#tips">Tips and questions</a></li>
       </ol>
@@ -43,7 +44,7 @@
         <li><strong>Who is playing?</strong> Choose Players or Teams and enter the names.</li>
         <li><strong>Pick categories</strong> and click <strong>Start Game</strong>.</li>
         <li><strong>Pick a cell</strong> on the board: a category and a point value.</li>
-        <li><strong>Answer before the timer runs out.</strong> The host clicks <strong>Show Answer</strong> and marks each answer <strong>Correct</strong> or <strong>Wrong</strong>.</li>
+        <li><strong>Answer before the timer runs out.</strong> Stuck? Use one of your 3 <a href="#helpers">helpers</a>. The host clicks <strong>Show Answer</strong> and marks each answer <strong>Correct</strong> or <strong>Wrong</strong>.</li>
         <li>Go <strong>Back to Board</strong> and keep playing. Click <strong>End Game</strong> to see who won.</li>
       </ol>
     </section>
@@ -100,7 +101,7 @@
       <ul>
         <li><strong>&check; Correct</strong> adds the question's points to the score.</li>
         <li><strong>&cross; Wrong</strong> takes the same number of points away. Scores can go below zero, so think before you guess!</li>
-        <li>Only <strong>one</strong> player or team can be correct on each question, but anyone may try.</li>
+        <li>Only <strong>one</strong> player or team can be correct on each question, but anyone may try, unless someone has used a <a href="#helpers">helper</a> on it.</li>
         <li>Each player or team can be marked only once per question, and a mark can't be undone. To fix a mistake, use <strong>&minus;</strong> / <strong>+</strong> on the scoreboard.</li>
         <li><strong>Back to Board</strong> closes the question for good, whether or not anyone answered.</li>
       </ul>
@@ -117,6 +118,29 @@
         </tbody>
       </table>
       <p>The cell then takes Sara's color and name.</p>
+    </section>
+
+    <section id="helpers" class="guide-section">
+      <h2>Helpers</h2>
+      <p>Every player or team starts the game with <strong>3 helpers</strong>, and each one can be used <strong>once per game</strong>. The host clicks the small helper buttons next to that player's name on the question screen, then confirms. The scoreboard shows which helpers each player has left.</p>
+      <table class="guide-table">
+        <thead>
+          <tr><th scope="col">Helper</th><th scope="col">What it does</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>ABC</strong> 3 choices</td><td>Shows 3 possible answers, A, B and C. One of them is right.</td></tr>
+          <tr><td><strong>&#8644;</strong> Swap</td><td>Replaces the question with a random one from any category, at a random point value. It could be worth more or less! The timer starts again, and the new question's points count.</td></tr>
+          <tr><td><strong>&frac12;</strong> Skip</td><td>Gives up on the question and loses only <strong>half</strong> its points instead of risking all of them. The question closes and its cell turns grey.</td></tr>
+        </tbody>
+      </table>
+      <ul>
+        <li>A helper can be used only <strong>before anyone has been marked</strong> on the question and before the answer is shown.</li>
+        <li>Once you use a helper, the question is <strong>yours alone</strong>: nobody else can answer it. You can still add another of your helpers, for example Swap and then 3 choices.</li>
+        <li>Some questions don't have 3 choices yet. On those, the ABC button is greyed out.</li>
+        <li>A helper can't be taken back, and the scoreboard's <strong>&minus;</strong> / <strong>+</strong> buttons don't give it back.</li>
+      </ul>
+      <h3>Example</h3>
+      <p>Omar opens a 400 question and has no idea. He uses <strong>Skip</strong> and loses 200 instead of risking 400. Later, Lina uses <strong>3 choices</strong> on a 300 question, picks B and gets it right: +300.</p>
     </section>
 
     <section id="ending" class="guide-section">
