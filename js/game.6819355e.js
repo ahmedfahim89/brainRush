@@ -8,7 +8,8 @@
 (function () {
   const API_BASE = 'api/';
   const STORAGE_KEY = 'brainrush.game';
-  const STORAGE_VERSION = 2; // v2 adds used cells + open question; v1 (Sprint 3) saves are migrated
+  // v3 adds the helpers (US-32); v2 (used cells + open question) and v1 (Sprint 3) saves are migrated
+  const STORAGE_VERSION = 3;
   // Ids of the questions opened in this browser, oldest first; new boards avoid them.
   const SEEN_KEY = 'brainrush.seenQuestions';
   const SEEN_MAX = 5000; // BOARD_MAX_SEEN in api/questions.php
@@ -26,6 +27,19 @@
   const EN_DASH = String.fromCharCode(0x2013); // "Category – 300"
   const CHECK = String.fromCharCode(0x2713);   // check mark
   const CROSS = String.fromCharCode(0x2717);   // ballot x
+  const ELLIPSIS = String.fromCharCode(0x2026);
+
+  // Helpers (US-32, D-36): each contestant may use each one once per game. `chip` is the
+  // icon-sized text on the scoring row and the scoreboard; `name` is used in confirms and tooltips.
+  const HELPER_KEYS = ['choices', 'swap', 'skip'];
+  const HELPERS = {
+    choices: { chip: 'ABC', name: '3 choices' },
+    swap: { chip: String.fromCharCode(0x21c4), name: 'Swap' },          // left-right arrows
+    skip: { chip: String.fromCharCode(0x00bd), name: 'Skip' },          // one half
+  };
+  const CHOICE_LETTERS = ['A', 'B', 'C'];
+  const CHOICES_SHORT_CHARS = 24; // text question: 3 choices this short sit side by side
+  const WRONG_FIELDS = ['wrong_1', 'wrong_2', 'wrong_1_ar', 'wrong_2_ar'];
 
   const MODES = {
     players: { limit: 6, title: 'Players', label: 'Player', one: 'player', many: 'players' },
@@ -47,10 +61,15 @@
 
   // Central state. `setup` is the form being filled in (memory only);
   // `game` is the running game and is saved to localStorage on every change:
-  //   { mode, contestants: [{id, name, color, score}], timerSeconds, points,
+  //   { mode, contestants: [{id, name, color, score, helpers: {choices, swap, skip}}], timerSeconds, points,
   //     categories: [{id, name, questions, hidden}] (hidden = unopened "Surprise me!" pick, shown as "?"),
   //     used: { "<categoryId>:<points>": { owner: contestantId | null } },
-  //     current: null | { catId, points, marks: { "<contestantId>": "correct" | "wrong" }, answerShown } }
+  //     current: null | { catId, points, marks: { "<contestantId>": "correct" | "wrong" }, answerShown,
+  //                       lang, by?, choiceOrder?, swap? } }
+  // helpers: true = still available (US-32). On the open question: by = id of the contestant who
+  // used a helper on it (only they can be scored then); choiceOrder = order of the 3 choices on
+  // screen, a permutation of [0, 1, 2] where 0 is the answer; swap = { catId, catName, points,
+  // question }, the question that replaced the cell's one. The cell still closes on Back to Board.
   const state = {
     screen: 'setup',
     setup: null,
@@ -60,6 +79,7 @@
   // Countdown of the open question (memory only; restarts at full length after a refresh, D-04).
   const timer = { totalMs: 0, remainingMs: 0, endAt: 0, running: false, handle: null };
   let scoringRows = []; // DOM references of the question screen's scoring rows
+  let swapping = null; // id of the contestant whose Swap request is running (memory only)
 
   let nextEntryKey = 1;
 
@@ -103,6 +123,7 @@
     qImage: byId('question-image'),
     qCredit: byId('question-credit'),
     qText: byId('question-text'),
+    qChoices: byId('question-choices'),
     timerBox: byId('timer'),
     timerValue: byId('timer-value'),
     timerBar: byId('timer-bar'),
@@ -113,6 +134,7 @@
     answerBtn: byId('answer-btn'),
     answerText: byId('answer-text'),
     answerValue: byId('answer-value'),
+    helperMsg: byId('helper-msg'),
     scoreRows: byId('score-rows'),
     backBtn: byId('back-btn'),
     resultsWinner: byId('results-winner'),
@@ -255,6 +277,22 @@
     return key === undefined ? null : Number(key);
   }
 
+  /** Every helper still available (a new game, or a save from before the helpers). */
+  function allHelpers() {
+    return { choices: true, swap: true, skip: true };
+  }
+
+  /**
+   * The question being played: the Swap question if there is one (US-32), otherwise the cell's.
+   * Returns { question, points, catName }; Correct / Wrong / Skip use these points.
+   */
+  function activeQuestion(g) {
+    const cur = g.current;
+    if (cur.swap) return { question: cur.swap.question, points: cur.swap.points, catName: cur.swap.catName };
+    const category = findCategory(g, cur.catId);
+    return { question: category.questions[String(cur.points)], points: cur.points, catName: category.name };
+  }
+
   // ---------- Persistence (saveState / loadState, US-17) ----------
   // Only a started game is stored (D-24), together with the screen it is on.
 
@@ -296,20 +334,30 @@
     return null;
   }
 
-  /** Bring an older saved shape up to the current version; null when unknown. */
+  /** Bring an older saved shape up to the current version, one step at a time; null when unknown. */
   function migrateSaved(saved) {
     if (!isPlainObject(saved)) return null;
-    if (saved.version === STORAGE_VERSION) return saved;
+    let upgraded = saved;
     // Sprint 3 (v1) only saved games on the board, without used cells.
-    if (saved.version === 1 && saved.screen === 'board' && isPlainObject(saved.game) &&
-        !hasOwn(saved.game, 'used') && !hasOwn(saved.game, 'current')) {
-      return {
-        version: STORAGE_VERSION,
+    if (upgraded.version === 1 && upgraded.screen === 'board' && isPlainObject(upgraded.game) &&
+        !hasOwn(upgraded.game, 'used') && !hasOwn(upgraded.game, 'current')) {
+      upgraded = {
+        version: 2,
         screen: 'board',
-        game: Object.assign({}, saved.game, { used: {}, current: null }),
+        game: Object.assign({}, upgraded.game, { used: {}, current: null }),
       };
     }
-    return null;
+    // v2 had no helpers (US-32): every contestant gets all of them.
+    if (upgraded.version === 2 && isPlainObject(upgraded.game) && Array.isArray(upgraded.game.contestants)) {
+      const contestants = upgraded.game.contestants.map((c) =>
+        (isPlainObject(c) ? Object.assign({}, c, { helpers: allHelpers() }) : c));
+      upgraded = {
+        version: 3,
+        screen: upgraded.screen,
+        game: Object.assign({}, upgraded.game, { contestants: contestants }),
+      };
+    }
+    return upgraded.version === STORAGE_VERSION ? upgraded : null;
   }
 
   function clearSavedState() {
@@ -357,7 +405,7 @@
     return value !== null && typeof value === 'object' && !Array.isArray(value);
   }
 
-  /** Contestants: 1..limit, unique ids/colors/names, names 1-30 chars after trimming (D-22), integer scores. */
+  /** Contestants: 1..limit, unique ids/colors/names, names 1-30 chars after trimming (D-22), integer scores, helpers. */
   function isValidContestants(list, mode) {
     if (!Array.isArray(list) || list.length < 1 || list.length > mode.limit) return false;
     const ids = {};
@@ -369,7 +417,7 @@
       const ok = name !== '' && name.length <= NAME_MAX && !names[nameKey] &&
         Number.isInteger(c.id) && !ids[c.id] &&
         PALETTE.some((p) => p.value === c.color) && !colors[c.color] &&
-        Number.isInteger(c.score);
+        Number.isInteger(c.score) && isValidHelpers(c.helpers);
       if (ok) {
         ids[c.id] = true;
         colors[c.color] = true;
@@ -377,6 +425,12 @@
       }
       return ok;
     });
+  }
+
+  /** Helpers left: exactly { choices, swap, skip }, each true (available) or false (used). */
+  function isValidHelpers(helpers) {
+    return isPlainObject(helpers) && Object.keys(helpers).length === HELPER_KEYS.length &&
+      HELPER_KEYS.every((key) => typeof helpers[key] === 'boolean');
   }
 
   function isValidBoard(points, categories) {
@@ -388,14 +442,17 @@
       const ok = isPlainObject(c) && Number.isInteger(c.id) && !ids[c.id] &&
         typeof c.name === 'string' && isPlainObject(c.questions) &&
         (c.hidden === undefined || typeof c.hidden === 'boolean') &&
-        points.every((p) => {
-          const q = hasOwn(c.questions, String(p)) ? c.questions[String(p)] : null;
-          return isPlainObject(q) && typeof q.question === 'string' && typeof q.answer === 'string' &&
-            isValidImage(q.image) && isOptionalText(q.image_credit);
-        });
+        points.every((p) => isValidQuestion(hasOwn(c.questions, String(p)) ? c.questions[String(p)] : null));
       if (ok) ids[c.id] = true;
       return ok;
     });
+  }
+
+  /** One question (board cell or Swap question); the picture, credit and wrong options are optional. */
+  function isValidQuestion(q) {
+    return isPlainObject(q) && typeof q.question === 'string' && typeof q.answer === 'string' &&
+      isValidImage(q.image) && isOptionalText(q.image_credit) &&
+      WRONG_FIELDS.every((field) => isOptionalText(q[field]));
   }
 
   /** Picture path is optional: missing/null (text question, also older saves) or a valid path. */
@@ -426,7 +483,7 @@
     });
   }
 
-  /** Open question: an unused cell, marks only for real contestants, at most one Correct (US-14). */
+  /** Open question: an unused cell, marks only for real contestants, at most one Correct (US-14), valid helper use. */
   function isValidCurrent(current, g) {
     if (current === null) return true;
     if (!isPlainObject(current) || !Number.isInteger(current.catId) || !Number.isInteger(current.points) ||
@@ -440,7 +497,36 @@
       return /^\d+$/.test(id) && findContestant(g, Number(id)) !== null && String(Number(id)) === id &&
         (value === 'correct' || value === 'wrong');
     });
-    return marksOk && correct <= 1;
+    return marksOk && correct <= 1 && isValidHelperUse(current, g);
+  }
+
+  /**
+   * Helper fields of the open question (US-32): `by` is a real contestant, and a shown choice
+   * order or Swap question was paid for with that contestant's helper. With a helper used, only
+   * `by` can have been scored.
+   */
+  function isValidHelperUse(current, g) {
+    const hasChoices = current.choiceOrder !== undefined;
+    const hasSwap = current.swap !== undefined;
+    if (current.by === undefined) return !hasChoices && !hasSwap;
+    if (!hasChoices && !hasSwap) return false; // Skip closes the question, so it is never saved open
+    const user = Number.isInteger(current.by) ? findContestant(g, current.by) : null;
+    if (user === null) return false;
+    if (Object.keys(current.marks).some((id) => Number(id) !== user.id)) return false;
+    if (hasChoices && (user.helpers.choices || !isValidChoiceOrder(current.choiceOrder))) return false;
+    if (hasSwap && (user.helpers.swap || !isValidSwap(current.swap))) return false;
+    return true;
+  }
+
+  /** A permutation of [0, 1, 2]. */
+  function isValidChoiceOrder(order) {
+    return Array.isArray(order) && order.length === CHOICE_LETTERS.length &&
+      order.slice().sort().every((value, i) => value === i);
+  }
+
+  function isValidSwap(swap) {
+    return isPlainObject(swap) && Number.isInteger(swap.catId) && typeof swap.catName === 'string' &&
+      Number.isInteger(swap.points) && swap.points > 0 && isValidQuestion(swap.question);
   }
 
   function isValidGame(g) {
@@ -927,23 +1013,35 @@
       points: points,
       categories: categories.map((c) => {
         const questions = {};
-        points.forEach((p) => {
-          const q = c.questions[String(p)];
-          // The Arabic version only counts when both halves are present.
-          const arabic = typeof q.question_ar === 'string' && q.question_ar.trim() &&
-            typeof q.answer_ar === 'string' && q.answer_ar.trim();
-          questions[String(p)] = {
-            id: Number.isInteger(q.id) ? q.id : null,
-            question: q.question,
-            answer: q.answer,
-            question_ar: arabic ? q.question_ar : null,
-            answer_ar: arabic ? q.answer_ar : null,
-            image: typeof q.image === 'string' ? q.image : null,
-            image_credit: typeof q.image_credit === 'string' ? q.image_credit : null,
-          };
-        });
+        points.forEach((p) => { questions[String(p)] = parseQuestion(c.questions[String(p)]); });
         return { id: c.id, name: c.name, questions: questions };
       }),
+    };
+  }
+
+  function isFilled(value) {
+    return typeof value === 'string' && value.trim() !== '';
+  }
+
+  /** The fields the game keeps of a question checked by isValidQuestion (board cell or Swap question). */
+  function parseQuestion(q) {
+    // The Arabic version only counts when both halves are present; so do the wrong options
+    // of each language (US-32), and the Arabic ones only with an Arabic question.
+    const arabic = isFilled(q.question_ar) && isFilled(q.answer_ar);
+    const wrong = isFilled(q.wrong_1) && isFilled(q.wrong_2);
+    const wrongAr = arabic && isFilled(q.wrong_1_ar) && isFilled(q.wrong_2_ar);
+    return {
+      id: Number.isInteger(q.id) ? q.id : null,
+      question: q.question,
+      answer: q.answer,
+      question_ar: arabic ? q.question_ar : null,
+      answer_ar: arabic ? q.answer_ar : null,
+      image: typeof q.image === 'string' ? q.image : null,
+      image_credit: typeof q.image_credit === 'string' ? q.image_credit : null,
+      wrong_1: wrong ? q.wrong_1 : null,
+      wrong_2: wrong ? q.wrong_2 : null,
+      wrong_1_ar: wrongAr ? q.wrong_1_ar : null,
+      wrong_2_ar: wrongAr ? q.wrong_2_ar : null,
     };
   }
 
@@ -1027,7 +1125,9 @@
     const s = state.setup;
     state.game = {
       mode: s.mode,
-      contestants: s.entries.map((e, i) => ({ id: i + 1, name: e.name.trim(), color: e.color, score: 0 })),
+      contestants: s.entries.map((e, i) => ({
+        id: i + 1, name: e.name.trim(), color: e.color, score: 0, helpers: allHelpers(),
+      })),
       timerSeconds: timerSeconds, // this game only; the admin setting is not changed
       points: board.points,
       categories: board.categories,
@@ -1183,11 +1283,25 @@
           'aria-label': 'Add ' + step + ' points to ' + c.name,
           onclick: () => adjust(step),
         }),
+        renderHelpersLeft(c),
       ]);
       card.style.backgroundColor = color.value;
       card.style.color = color.ink;
       dom.scoreboard.appendChild(card);
     });
+  }
+
+  /** Scoreboard card line with the helpers a contestant has left; used ones are dimmed (US-32). */
+  function renderHelpersLeft(contestant) {
+    const left = HELPER_KEYS.filter((key) => contestant.helpers[key]).map((key) => HELPERS[key].name);
+    const text = left.length ? 'Helpers left: ' + left.join(', ') : 'No helpers left';
+    return h('span', { className: 'score-helpers', title: text }, [
+      h('span', { className: 'visually-hidden', text: text }),
+    ].concat(HELPER_KEYS.map((key) => h('span', {
+      className: 'score-helper' + (contestant.helpers[key] ? '' : ' is-used'),
+      text: HELPERS[key].chip,
+      'aria-hidden': 'true',
+    }))));
   }
 
   // ---------- Question screen (US-11, US-13, US-14) ----------
@@ -1204,16 +1318,17 @@
     showQuestion();
   }
 
-  /** Render the open question and (re)start its timer at full length (also used on restore, D-04). */
+  /** Render the open question and (re)start its timer at full length (also used on restore, D-04, and after a Swap). */
   function showQuestion() {
     const g = state.game;
     const cur = g.current;
-    const category = findCategory(g, cur.catId);
-    const q = category.questions[String(cur.points)];
-    dom.qHeading.textContent = category.name + ' ' + EN_DASH + ' ' + cur.points;
+    const active = activeQuestion(g);
+    const q = active.question;
+    renderQuestionHeading(active);
     // Arabic first when the question has an Arabic version; a restored choice is kept.
     if (!hasArabic(q)) cur.lang = 'en';
     else if (cur.lang !== 'en' && cur.lang !== 'ar') cur.lang = 'ar';
+    clearMessage(dom.helperMsg);
     renderQuestionImage(q);
     renderQuestionLang(q);
     renderAnswerState();
@@ -1221,6 +1336,21 @@
     showScreen('question'); // also saves the state
     startTimer(g.timerSeconds);
     dom.qHeading.focus();
+  }
+
+  /** "Category – 300"; after a Swap the new question's, with a small "Swapped from History – 300" note. */
+  function renderQuestionHeading(active) {
+    const g = state.game;
+    const cur = g.current;
+    clear(dom.qHeading);
+    dom.qHeading.appendChild(document.createTextNode(active.catName + ' ' + EN_DASH + ' ' + active.points));
+    if (cur.swap) {
+      const original = findCategory(g, cur.catId);
+      dom.qHeading.appendChild(h('span', {
+        className: 'question-swap-note',
+        text: 'Swapped from ' + original.name + ' ' + EN_DASH + ' ' + cur.points,
+      }));
+    }
   }
 
   function hasArabic(q) {
@@ -1272,12 +1402,59 @@
     dom.langBtn.textContent = arabic ? 'English' : 'العربية';
     dom.langBtn.lang = arabic ? 'en' : 'ar';
     dom.langBtn.setAttribute('aria-label', arabic ? 'Show question in English' : 'Show question in Arabic');
+    renderChoices(q, arabic);
+  }
+
+  /** Wrong options are there for the "3 choices" helper (parseQuestion keeps only complete pairs). */
+  function hasChoices(q) {
+    return isFilled(q.wrong_1) && isFilled(q.wrong_2);
+  }
+
+  /**
+   * A text as a choice: cut at its first bracket, English at " (" and Arabic at "(" with or
+   * without a space (choice_text() in api/questions.php). Answers often end in an explanation
+   * or an "(accept X)" note for the host, e.g. "Three (triplets)"; the full answer still shows
+   * under Show Answer. The wrong options are cut the same way (some Arabic ones carry an English
+   * gloss, like their answers), so no option gives itself away by its brackets.
+   */
+  function choiceText(text, arabic) {
+    const at = text.indexOf(arabic ? '(' : ' (');
+    return (at === -1 ? text : text.slice(0, at)).trim() || text.trim();
+  }
+
+  /** The 3 options (index 0 = the answer) in the shown language; English when Arabic ones are missing. */
+  function choiceTexts(q, arabic) {
+    const ar = arabic && isFilled(q.wrong_1_ar) && isFilled(q.wrong_2_ar);
+    const texts = ar ? [q.answer_ar, q.wrong_1_ar, q.wrong_2_ar] : [q.answer, q.wrong_1, q.wrong_2];
+    return { arabic: ar, options: texts.map((text) => choiceText(text, ar)) };
+  }
+
+  /** "3 choices" list (US-32): shown once the helper was used, in the saved order, labelled A/B/C. */
+  function renderChoices(q, arabic) {
+    const cur = state.game.current;
+    const list = dom.qChoices;
+    const shown = cur.choiceOrder !== undefined && hasChoices(q);
+    clear(list);
+    list.hidden = !shown;
+    // With a picture, the picture gives up the room the choices take (CSS, D-30).
+    dom.qImage.parentElement.classList.toggle('has-choices', shown);
+    if (!shown) return;
+    const texts = choiceTexts(q, arabic);
+    list.dir = texts.arabic ? 'rtl' : 'ltr';
+    list.lang = texts.arabic ? 'ar' : 'en';
+    list.classList.toggle('is-short', texts.options.every((text) => text.length <= CHOICES_SHORT_CHARS));
+    cur.choiceOrder.forEach((index, position) => {
+      list.appendChild(h('li', { className: 'choice' + (index === 0 ? ' is-answer' : '') }, [
+        h('span', { className: 'choice-letter', text: CHOICE_LETTERS[position] }),
+        h('span', { className: 'choice-text', text: texts.options[index] }),
+      ]));
+    });
   }
 
   function toggleLang() {
     const cur = state.game && state.game.current;
     if (!cur) return;
-    const q = findCategory(state.game, cur.catId).questions[String(cur.points)];
+    const q = activeQuestion(state.game).question;
     if (!hasArabic(q)) return;
     cur.lang = cur.lang === 'ar' ? 'en' : 'ar';
     renderQuestionLang(q);
@@ -1298,6 +1475,7 @@
     const shown = state.game.current.answerShown;
     dom.answerBtn.hidden = shown;
     dom.answerText.hidden = !shown;
+    dom.qChoices.classList.toggle('is-revealed', shown); // the right choice turns green
   }
 
   function showAnswer() {
@@ -1305,22 +1483,33 @@
     if (!cur) return;
     cur.answerShown = true;
     renderAnswerState();
+    updateScoringRows(); // no helpers once the answer is shown
     saveState();
     dom.answerText.focus();
   }
 
-  /** One row per contestant in their color with Correct (+p) / Wrong (-p). */
+  /** One row per contestant in their color with the helper chips and Correct (+p) / Wrong (-p). */
   function renderScoringRows() {
     const g = state.game;
-    const p = g.current.points;
+    const p = activeQuestion(g).points;
     clear(dom.scoreRows);
     scoringRows = g.contestants.map((c) => {
       const color = paletteEntry(c.color);
       const name = h('span', { className: 'srow-name', text: c.name });
       name.style.backgroundColor = color.value;
       name.style.color = color.ink;
+      const helperBtns = {};
+      HELPER_KEYS.forEach((key) => {
+        helperBtns[key] = h('button', {
+          type: 'button',
+          className: 'helper-chip',
+          text: HELPERS[key].chip,
+          onclick: () => useHelper(c, key),
+        });
+      });
       const ref = {
         contestant: c,
+        helpers: helperBtns,
         score: h('span', { className: 'srow-score', text: formatScore(c.score) }),
         status: h('span', { className: 'visually-hidden', 'aria-live': 'polite' }),
         correct: h('button', {
@@ -1338,7 +1527,8 @@
           onclick: () => markContestant(c, 'wrong'),
         }),
       };
-      ref.row = h('li', { className: 'srow' }, [name, ref.score, ref.status, ref.correct, ref.wrong]);
+      const chips = h('span', { className: 'srow-helpers' }, HELPER_KEYS.map((key) => helperBtns[key]));
+      ref.row = h('li', { className: 'srow' }, [name, chips, ref.score, ref.status, ref.correct, ref.wrong]);
       ref.row.style.borderLeftColor = color.value;
       dom.scoreRows.appendChild(ref.row);
       return ref;
@@ -1346,36 +1536,189 @@
     updateScoringRows();
   }
 
-  /** US-14 / D-08: once per contestant; a single Correct; Wrong stays open for unscored contestants. */
+  /**
+   * US-14 / D-08: once per contestant; a single Correct; Wrong stays open for unscored contestants.
+   * US-32: after a helper only its user can be scored; nobody can be scored while a Swap loads.
+   */
   function updateScoringRows() {
     const cur = state.game.current;
     const someoneCorrect = correctContestantId(cur) !== null;
     scoringRows.forEach((ref) => {
       const key = String(ref.contestant.id);
       const mark = hasOwn(cur.marks, key) ? cur.marks[key] : null;
-      ref.correct.disabled = mark !== null || someoneCorrect;
-      ref.wrong.disabled = mark !== null;
+      const out = cur.by !== undefined && cur.by !== ref.contestant.id;
+      ref.correct.disabled = mark !== null || someoneCorrect || out || swapping !== null;
+      ref.wrong.disabled = mark !== null || out || swapping !== null;
       ref.correct.classList.toggle('is-chosen', mark === 'correct');
       ref.wrong.classList.toggle('is-chosen', mark === 'wrong');
       ref.row.classList.toggle('is-scored', mark !== null);
+      ref.row.classList.toggle('is-out', out);
       ref.score.textContent = formatScore(ref.contestant.score);
       ref.status.textContent = mark === 'correct' ? ref.contestant.name + ' marked correct'
         : mark === 'wrong' ? ref.contestant.name + ' marked wrong' : '';
+      HELPER_KEYS.forEach((helper) => updateHelperChip(ref, helper));
     });
+  }
+
+  /** Enable a helper chip only when its contestant may use it now; the tooltip says why not. */
+  function updateHelperChip(ref, key) {
+    const chip = ref.helpers[key];
+    const name = HELPERS[key].name;
+    const reason = helperBlockReason(ref.contestant, key);
+    const busy = swapping === ref.contestant.id && key === 'swap';
+    chip.disabled = reason !== '';
+    chip.classList.toggle('is-used', !ref.contestant.helpers[key] && !busy);
+    chip.classList.toggle('is-busy', busy);
+    chip.textContent = busy ? ELLIPSIS : HELPERS[key].chip;
+    chip.title = name + (reason ? ': ' + reason : '');
+    chip.setAttribute('aria-label', name + ' for ' + ref.contestant.name + (reason ? ' (' + reason + ')' : ''));
+  }
+
+  /** Why `contestant` cannot use helper `key` on the open question now, or '' when they can (D-36). */
+  function helperBlockReason(contestant, key) {
+    const g = state.game;
+    const cur = g.current;
+    if (swapping !== null) {
+      return swapping === contestant.id && key === 'swap' ? 'loading a new question' : 'wait for the swap';
+    }
+    if (!contestant.helpers[key]) return 'already used in this game';
+    if (cur.answerShown) return 'not after the answer is shown';
+    if (Object.keys(cur.marks).length) return 'not after someone was scored';
+    if (cur.by !== undefined && cur.by !== contestant.id) {
+      return 'only ' + findContestant(g, cur.by).name + ' can use helpers on this question';
+    }
+    if (key === 'choices' && !hasChoices(activeQuestion(g).question)) return 'this question has no choices yet';
+    return '';
   }
 
   /** Apply a Correct / Wrong mark. No undo inside a question (D-06): use the board's +/- buttons. */
   function markContestant(contestant, result) {
     const cur = state.game && state.game.current;
-    if (!cur) return;
+    if (!cur || swapping !== null) return;
     const key = String(contestant.id);
     if (hasOwn(cur.marks, key)) return;
     if (result === 'correct' && correctContestantId(cur) !== null) return;
+    if (cur.by !== undefined && cur.by !== contestant.id) return; // the helper made it their question
+    const points = activeQuestion(state.game).points;
     cur.marks[key] = result;
-    contestant.score += result === 'correct' ? cur.points : -cur.points;
+    contestant.score += result === 'correct' ? points : -points;
     updateScoringRows();
     saveState();
     focusNextScoringButton();
+  }
+
+  // ---------- Helpers: 3 choices, Swap, Skip (US-32, D-36) ----------
+
+  /** A helper click: check it is allowed, confirm it (no undo, D-06), then apply it. */
+  function useHelper(contestant, key) {
+    const g = state.game;
+    if (!g || !g.current || helperBlockReason(contestant, key)) return;
+    if (!window.confirm(helperConfirmText(contestant, key))) return;
+    clearMessage(dom.helperMsg);
+    if (key === 'choices') useChoices(contestant);
+    else if (key === 'swap') useSwap(contestant);
+    else useSkip(contestant);
+  }
+
+  function helperConfirmText(contestant, key) {
+    const who = contestant.name;
+    const points = activeQuestion(state.game).points;
+    const ask = 'Use ' + HELPERS[key].name + ' for ' + who + '? ';
+    if (key === 'skip') {
+      return ask + who + ' loses ' + Math.round(points / 2) + ' points (half of ' + points +
+        ') and the question closes for everyone.';
+    }
+    const what = key === 'swap'
+      ? 'A random question from any category replaces this one, with a new timer.'
+      : 'The answer is shown among 3 choices.';
+    return ask + what + ' Only ' + who + ' can answer this question then.';
+  }
+
+  /** 3 choices: shuffle once and save the order, so a refresh shows the same A/B/C. */
+  function useChoices(contestant) {
+    const g = state.game;
+    const cur = g.current;
+    contestant.helpers.choices = false;
+    cur.by = contestant.id;
+    cur.choiceOrder = shuffled([0, 1, 2]);
+    renderQuestionLang(activeQuestion(g).question);
+    updateScoringRows();
+    saveState();
+  }
+
+  /** Skip: lose half the points (of the Swap question after a Swap); the cell closes grey. */
+  function useSkip(contestant) {
+    const cur = state.game.current;
+    contestant.helpers.skip = false;
+    cur.by = contestant.id;
+    contestant.score -= Math.round(activeQuestion(state.game).points / 2);
+    backToBoard(); // nobody is marked Correct, so the cell turns grey
+  }
+
+  /**
+   * Swap: a random question from the whole bank, not on this board, unseen first. It replaces
+   * the open one (new heading, points and timer); the cell still closes with its result.
+   * On an error the helper is kept.
+   */
+  async function useSwap(contestant) {
+    const g = state.game;
+    const cur = g.current;
+    swapping = contestant.id; // busy chip; scoring and the other helpers wait
+    updateScoringRows();
+    let swap = null;
+    let failure = '';
+    try {
+      swap = parseSwap(await apiPost('questions.php?random=1', { exclude: boardQuestionIds(g), seen: loadSeen() }));
+    } catch (err) {
+      const reason = errorText(err).trim();
+      failure = 'Could not swap the question: ' + reason + (/[.!?]$/.test(reason) ? '' : '.') +
+        ' The helper was not used.';
+    }
+    swapping = null;
+    if (state.game !== g || g.current !== cur) { // the question was closed meanwhile: drop the result
+      if (state.game && state.game.current) updateScoringRows();
+      return;
+    }
+    if (!failure && cur.answerShown) failure = 'The answer was shown meanwhile, so the Swap was not used.';
+    if (failure) {
+      showMessage(dom.helperMsg, failure, 'error');
+      updateScoringRows();
+      return;
+    }
+    contestant.helpers.swap = false;
+    cur.by = contestant.id;
+    cur.swap = swap;
+    // 3 choices used before the Swap carry over: a fresh order for the new question.
+    if (cur.choiceOrder !== undefined) cur.choiceOrder = shuffled([0, 1, 2]);
+    delete cur.lang; // the new question starts in its default language
+    markSeen(swap.question.id);
+    showQuestion(); // new heading, picture and points, timer from the start; also saves
+  }
+
+  /** Ids of every question on this board, so the Swap never brings one of them. */
+  function boardQuestionIds(g) {
+    const ids = [];
+    g.categories.forEach((c) => {
+      Object.keys(c.questions).forEach((p) => {
+        const id = c.questions[p].id;
+        if (Number.isInteger(id) && id > 0) ids.push(id);
+      });
+    });
+    return ids;
+  }
+
+  /** Check the random-question payload; returns the saved `swap` shape or throws. */
+  function parseSwap(data) {
+    const ok = isPlainObject(data) && isPlainObject(data.category) && Number.isInteger(data.category.id) &&
+      typeof data.category.name === 'string' && Number.isInteger(data.points) && data.points > 0 &&
+      isValidQuestion(data.question) && Number.isInteger(data.question.id);
+    if (!ok) throw new Error('The server sent an unexpected question.');
+    return {
+      catId: data.category.id,
+      catName: data.category.name,
+      points: data.points,
+      question: parseQuestion(data.question),
+    };
   }
 
   /** Keep keyboard focus on the scoring panel after the clicked button disables. */

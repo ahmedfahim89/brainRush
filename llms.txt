@@ -5,6 +5,7 @@
 - Up to 6 players or 4 teams, each with their own color.
 - A correct answer adds the question's points, a wrong one takes them away.
 - Every question has a countdown timer.
+- Each player or team has 3 helpers per game: 3 choices, Swap (a random new question) and Skip (lose only half the points).
 - Many questions are in Arabic and English, and some show a picture, such as a flag or a famous place.
 - Each device remembers which questions it has played, so new games pick unseen questions first.
 - No sign-up or install. It works best on a TV or big screen with the host at the keyboard.
@@ -14,7 +15,7 @@ This file lists no questions or answers, on purpose.
 ## Play
 
 - [Play BrainRush](https://brainrush.integration.ninja/index.html): set up players or teams, pick categories and start a game
-- [How to play](https://brainrush.integration.ninja/how-to-play.html): player guide covering setup, the board, answering, scoring and ending the game
+- [How to play](https://brainrush.integration.ninja/how-to-play.html): player guide covering setup, the board, answering, scoring, helpers and ending the game
 
 ## Optional
 

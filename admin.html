@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BrainRush - Admin</title>
-  <link rel="stylesheet" href="css/style.19c4f0ef.css">
+  <link rel="stylesheet" href="css/style.6240296b.css">
 </head>
 <body class="admin">
   <header class="page-header">
@@ -103,10 +103,32 @@
         <textarea id="question-text" rows="3" maxlength="5000" required></textarea>
         <label for="question-answer">Answer</label>
         <input id="question-answer" type="text" maxlength="5000" required>
+        <!-- "3 choices" helper (US-32): optional, both or neither -->
+        <div class="form-row">
+          <div class="field">
+            <label for="question-wrong-1">Wrong option 1 (optional)</label>
+            <input id="question-wrong-1" type="text" maxlength="255" autocomplete="off" aria-describedby="question-wrong-hint">
+          </div>
+          <div class="field">
+            <label for="question-wrong-2">Wrong option 2 (optional)</label>
+            <input id="question-wrong-2" type="text" maxlength="255" autocomplete="off" aria-describedby="question-wrong-hint">
+          </div>
+        </div>
+        <p id="question-wrong-hint" class="hint">Shown with the answer by the "3 choices" helper. Fill in both or neither; they must differ from each other and from the answer. A question with an Arabic version needs the Arabic wrong options below too. Leave them empty and the helper is greyed out on this question.</p>
         <label for="question-text-ar">Arabic question (optional)</label>
         <textarea id="question-text-ar" rows="3" maxlength="5000" dir="rtl" lang="ar"></textarea>
         <label for="question-answer-ar">Arabic answer (optional, required if the Arabic question is filled)</label>
         <input id="question-answer-ar" type="text" maxlength="5000" dir="rtl" lang="ar">
+        <div class="form-row">
+          <div class="field">
+            <label for="question-wrong-1-ar">Arabic wrong option 1 (optional)</label>
+            <input id="question-wrong-1-ar" type="text" maxlength="255" dir="rtl" lang="ar" autocomplete="off" aria-describedby="question-wrong-hint">
+          </div>
+          <div class="field">
+            <label for="question-wrong-2-ar">Arabic wrong option 2 (optional)</label>
+            <input id="question-wrong-2-ar" type="text" maxlength="255" dir="rtl" lang="ar" autocomplete="off" aria-describedby="question-wrong-hint">
+          </div>
+        </div>
         <label for="question-image">Image path (optional, makes it a picture question)</label>
         <div class="image-field">
           <div class="image-field-input">
@@ -132,7 +154,7 @@
       <div class="table-wrap">
         <table class="data-table">
           <thead>
-            <tr><th scope="col">Category</th><th scope="col">Points</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Arabic</th><th scope="col">Picture?</th><th scope="col">Actions</th></tr>
+            <tr><th scope="col">Category</th><th scope="col">Points</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Arabic</th><th scope="col">Picture?</th><th scope="col">Choices</th><th scope="col">Actions</th></tr>
           </thead>
           <tbody id="questions-body"></tbody>
         </table>
@@ -140,6 +162,6 @@
     </section>
   </main>
 
-  <script src="js/admin.f7367b2c.js"></script>
+  <script src="js/admin.45dd5b1c.js"></script>
 </body>
 </html>

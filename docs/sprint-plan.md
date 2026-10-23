@@ -4,6 +4,8 @@ Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..U
 
 **Overall status (2026-10-19):** Sprints 1-6 Done and shipped. Sprint 6 (Question bank) and D-32 (pick 1..N categories) were merged via PR #11 on 2026-10-11, and the hosted DB is migrated (FU-11). Follow-ups FU-10..FU-15 are all Done; no open items. Later owner requests were shipped outside the sprint cycle: Egypt questions (PR #13, #16), Arabic localization (PR #17, #19), the Gen Z set (PR #18), the AI set (PR #20), the Egyptians set (`sql/add-egyptians-questions.sql`, PR #22, 2026-10-15), the game start log (`api/game-log.php` writes one line per started game with time, player names and categories to a daily `logs/game-YYYY-MM-DD.log`, blocked from the web; PR #24, deployed 2026-10-18) and the "new questions" banner (gold strip at the top of the setup screen; Admin > Game settings turns it on or off and sets its text, stored as `banner_enabled` / `banner_text` settings, no DB migration; branch `new-questions-banner`, 2026-10-19).
 
+**Helpers (2026-10-23, outside the sprint cycle):** US-32 / D-36 (3 choices, Swap, Skip; once per contestant per game) implemented on branch `helpers` (`docs/sprints/helpers-dev.md`); game-tester verification next (max 2 fix loops), then the owner's local Chrome check before commit/PR. Needs `sql/migrate-add-wrong-options.sql` on every DB before the code; the wrong-option content (`sql/add-wrong-options.sql`) is produced in parallel and reviewed by the owner.
+
 | Sprint | Goal | Status |
 |---|---|---|
 | 1 | Foundation (DB + API) | Done |
