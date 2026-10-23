@@ -10,7 +10,7 @@ Decisions confirmed with user:
 - Each player/team gets a color; an answered cell is filled with the color of whoever answered it correctly.
 - ~~Admin page is **not** password-protected.~~ Changed 2026-10-04 (D-20): admin **write** operations are protected by HTTP Basic Auth when admin credentials are configured; otherwise writes are allowed only from localhost. See Security notes.
 
-## Delivery team: 5 project agents
+## Delivery team: 6 project agents
 The work is done by a simulated Scrum team, defined as project subagents in `BrainRush/.claude/agents/` (Markdown with frontmatter: `name`, `description`, `tools`, `model`, and a system prompt body). The product spec in the rest of this plan is the input to the Product Owner.
 
 | File | Agent | Role | Tools | Output |
@@ -20,6 +20,7 @@ The work is done by a simulated Scrum team, defined as project subagents in `Bra
 | `game-developer.md` | **game-developer** | Senior full-stack game developer (PHP 8 + PDO, MariaDB, vanilla JS/HTML/CSS). Implements only the stories of the current sprint, following the architecture/security rules below (prepared statements, `textContent`, no hard-coded board size). Writes a short sprint dev note. | Read, Write, Edit, Glob, Grep, Bash | code + `docs/sprints/sprint-N-dev.md` |
 | `game-tester.md` | **game-tester** | Senior QA. After each sprint, verifies every acceptance criterion: `php -l` on all PHP, API checks with `curl`, UI flows in the browser pane (setup limits, dynamic grid, timer, scoring, colors, refresh restore, results/tie, admin CRUD + 409s). Reports bugs with steps to reproduce; does not fix code. | Read, Glob, Grep, Bash, browser tools | `docs/sprints/sprint-N-test-report.md` |
 | `question-producer.md` | **question-producer** | Trivia content producer (added 2026-10-18, outside the sprint flow). Writes question sets with answers, `(accept X)` variants and Arabic text, checks every answer in 2+ reputable sources, assigns point values by relative difficulty and balances categories, then packages the set as an idempotent SQL file and loads it into the local DB. ~~No multiple-choice distractors (the host judges spoken answers).~~ Changed 2026-10-23 (D-36): every question gets 2 plausible wrong options in English and Arabic for the "3 choices" helper (same type and length as the answer, never also correct; similar-looking flags for flag questions). | Read, Write, Edit, Glob, Grep, Bash, WebSearch, WebFetch | `sql/add-<set>-questions.sql` + `docs/question-sets/<set>-review.md` |
+| `question-bank-manager.md` | **question-bank-manager** | Question bank manager (added 2026-10-23, outside the sprint flow). Keeps the bank at 10 questions per category and enabled point value: measures the gaps in the local DB, plans a batch of 10 (largest gap first, at most 4 per category), briefs the question-producer, checks the batch on a scratch copy of the DB, and after the owner's review applies removals to `docs/question-sets/rejected-answers.md`, loads the batch locally and commits it. Never touches the live DB; pushes only after the owner confirms. | Read, Write, Edit, Glob, Grep, Bash, WebFetch | `sql/add-auto-<date>-questions.sql` + `docs/question-sets/auto-<date>-review.md` (written by the producer) + run report |
 
 ### Workflow (I orchestrate)
 1. **product-owner** → writes `docs/product-backlog.md` from this plan.
@@ -31,6 +32,9 @@ The work is done by a simulated Scrum team, defined as project subagents in `Bra
 3. For each sprint: **game-developer** implements → **game-tester** tests → if bugs, back to developer (max 2 fix loops) → **product-owner** accepts → **scrum-master** updates status → **commit & push** (below).
 4. I summarize each sprint's result to you before starting the next one.
 
+### Automatic question top-up
+A Claude desktop scheduled task (`brainrush-question-topup`, Mon/Wed/Fri 09:00, runs while the app is open) runs **question-bank-manager** (plan) -> **question-producer** (writes the batch) -> **question-bank-manager** (validate) in the worktree `../BrainRush-auto-questions`. A run does nothing while an earlier batch is still in that worktree, and nothing is loaded, committed or pushed until the owner has reviewed the batch. The owner then tells a session which questions to remove; the manager applies that in "review" mode, and the owner opens the PR and imports on live as for other question sets.
+
 ### Git / GitHub (`https://github.com/ahmedfahim89/brainRush`)
 - Sprint 0 setup: `git init -b main`, add remote `origin`, `.gitignore` (excludes `api/config.php`; a `api/config.example.php` with placeholder values is committed instead, so no DB credentials ever reach GitHub). First commit on `main`: agents, docs (backlog + sprint plan), `.gitignore`, README stub → push `main`.
 - Each sprint: branch `sprint-N` (from the previous sprint's branch), commit the sprint's code + dev note + test report with message `Sprint N: <sprint goal>` (+ Co-Authored-By trailer), push, and open a PR to `main` with `gh pr create` listing stories done and test results — so you review/merge (org policy: AI code is human-reviewed before merge).
@@ -41,7 +45,7 @@ Note: project agents are loaded at session start; if they aren't picked up right
 ## File structure
 ```
 BrainRush/
-  .claude/agents/       # product-owner.md, scrum-master.md, game-developer.md, game-tester.md, question-producer.md
+  .claude/agents/       # product-owner.md, scrum-master.md, game-developer.md, game-tester.md, question-producer.md, question-bank-manager.md
   docs/                 # product-backlog.md, sprint-plan.md, sprints/sprint-N-{dev,test-report}.md
   index.html            # game (setup → board → question → results), single page
   admin.html            # admin CRUD page

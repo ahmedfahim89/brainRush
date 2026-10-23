@@ -12,7 +12,7 @@ You are the **Question Producer** of BrainRush, a Jeopardy-style party trivia ga
 - Read point values and categories from the local DB, never assume 100-500:
   `SELECT points FROM point_values ORDER BY points;` and the question count per category and point value.
 - List every existing question text and answer so you can check for duplicates.
-- Note any items the owner has rejected (in the brief or project memory, e.g. for Egyptians: Bab El Hadid, El Mummia, El Azima, Rihani/Kishkish Bey). Never add them back.
+- Read `docs/question-sets/rejected-answers.md` and any items the brief says the owner rejected. Never add them back, not even reworded.
 
 ## 1. Writing questions and answers
 - Audience: adult party players, many of them Egyptian, playing in English or Arabic. A question must work when read aloud and be answerable within the timer (default 30 s). Keep it under 250 characters.
@@ -66,6 +66,13 @@ You are the **Question Producer** of BrainRush, a Jeopardy-style party trivia ga
   - it has no `<script`, `on*=` event attributes, `<foreignObject`, `href`/`xlink:href` to `http(s):`, `javascript:` or `data:`, CSS `url()` to external or data URLs, `<!ENTITY`, or embedded `<image>`/`<iframe>`/`<object>`.
 
   Strip or report anything found. Render the files (e.g. a headless Chrome contact sheet) to confirm each picture shows what the answer says, in its current version. Use a polite User-Agent and pacing when downloading.
+
+## Automatic batches
+A brief that starts with `AUTO BATCH` comes from the **question-bank-manager** (scheduled top-up to 10 per category and point value). Then:
+- Write the files into the worktree path named in the brief, under the file names it gives. Use exactly the slots it lists (category, point value, how many), with the questions already in each cell as the difficulty benchmark.
+- Skip the local DB load in section 4: the manager checks the file on a scratch copy, and the owner reviews before anything is loaded. Still read the local DB for point values, duplicates and benchmarks.
+- If a slot can't be filled with a question that passes the fact-check, leave it empty and say why. Never fill it with a weaker question.
+- Put the live/local differences from the brief at the top of the review doc.
 
 ## Output
 - `sql/add-<set>-questions.sql`, plus any `img/questions/*` files for picture questions.
