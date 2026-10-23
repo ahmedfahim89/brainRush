@@ -1,4 +1,4 @@
-// BrainRush admin page: settings, point values, categories and questions.
+// BrainRush admin page: settings, point values, categories, questions and the streak leaderboard.
 // Question bank (D-31 amended): every question has a point value, a category may have
 // several questions per value, and it is playable when every enabled point value has one.
 // All API/user text is rendered with textContent / DOM APIs (never innerHTML).
@@ -21,6 +21,7 @@
     categories: [],    // [{ id, name, question_count }] sorted by name
     questions: [],     // [{ id, category_id, category_name, points, question, answer, question_ar, answer_ar, image, image_credit,
                        //    wrong_1, wrong_2, wrong_1_ar, wrong_2_ar }]
+    streaks: [],       // [{ id, name, streak, created_at }] newest first (US-34)
     renamingId: null,  // category currently being renamed inline
     renameDraft: '',
     editing: null,     // question being edited, or null when the form is in "add" mode
@@ -68,6 +69,9 @@
     questionsMsg: byId('questions-msg'),
     qFilter: byId('question-filter'),
     questionsBody: byId('questions-body'),
+    streaksReload: byId('streaks-reload'),
+    streaksMsg: byId('streaks-msg'),
+    streaksBody: byId('streaks-body'),
   };
 
   // ---------- Generic helpers ----------
@@ -263,6 +267,7 @@
   async function onAuthRetry() {
     if (await checkAuth()) {
       loadSettings();
+      loadStreaks();
       await loadData();
     }
   }
@@ -871,6 +876,68 @@
     }
   }
 
+  // ---------- Streak leaderboard (US-34) ----------
+  // Loaded on its own, so a database without the streaks table (migration not run yet)
+  // only breaks this panel.
+
+  async function loadStreaks() {
+    dom.streaksReload.disabled = true;
+    try {
+      state.streaks = ensureArray(await api('streaks.php?all=1'), 'streak');
+      renderStreaks();
+    } catch (err) {
+      showError(dom.streaksMsg, 'Could not load the streak runs: ' + errorText(err));
+    } finally {
+      dom.streaksReload.disabled = false;
+    }
+  }
+
+  function onStreaksReload() {
+    clearMessage(dom.streaksMsg);
+    loadStreaks();
+  }
+
+  function renderStreaks() {
+    clear(dom.streaksBody);
+    if (!state.streaks.length) {
+      dom.streaksBody.appendChild(h('tr', {}, [
+        h('td', { className: 'empty-row', colSpan: 4, text: 'No streak runs yet.' }),
+      ]));
+      return;
+    }
+    state.streaks.forEach((run) => {
+      dom.streaksBody.appendChild(h('tr', {}, [
+        h('td', { className: 'name-cell', text: run.name }),
+        h('td', { className: 'num', text: plural(run.streak, 'question') }),
+        h('td', { className: 'num', text: String(run.created_at) }),
+        h('td', { className: 'row-actions' }, [
+          h('button', {
+            type: 'button',
+            className: 'btn btn-small btn-danger',
+            text: 'Delete',
+            'aria-label': 'Delete the streak run of ' + run.name + ' (' + run.created_at + ')',
+            onclick: () => deleteStreak(run),
+          }),
+        ]),
+      ]));
+    });
+  }
+
+  /** Delete one run (confirm first, D-18); the leaderboard then shows the person's next best run, if any. */
+  function deleteStreak(run) {
+    const prompt = 'Delete the streak run of "' + run.name + '" (' + plural(run.streak, 'question') +
+      ', ' + run.created_at + ')?';
+    if (!window.confirm(prompt)) return;
+    runAction(dom.streaksMsg, [], async () => {
+      try {
+        await api('streaks.php?id=' + encodeURIComponent(run.id), 'DELETE');
+      } finally {
+        await loadStreaks(); // also after a 404: the run was already gone
+      }
+      showSuccess(dom.streaksMsg, 'Streak run of ' + run.name + ' deleted.');
+    });
+  }
+
   // ---------- Startup ----------
 
   function bindEvents() {
@@ -883,6 +950,7 @@
     dom.qImagePreview.addEventListener('error', hideImagePreview);
     dom.qFilter.addEventListener('change', onFilterChange);
     dom.authRetry.addEventListener('click', onAuthRetry);
+    dom.streaksReload.addEventListener('click', onStreaksReload);
   }
 
   async function loadData() {
@@ -897,9 +965,11 @@
     bindEvents();
     setFormMode();
     renderAll();
+    renderStreaks();
     // Log in first: nothing (questions and answers included) is loaded until it succeeds.
     if (await checkAuth()) {
       loadSettings();
+      loadStreaks();
       await loadData();
     }
   }

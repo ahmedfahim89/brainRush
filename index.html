@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BrainRush</title>
-  <link rel="stylesheet" href="css/style.6240296b.css">
+  <link rel="stylesheet" href="css/style.de7729fa.css">
 </head>
 <body class="game">
   <header class="page-header">
@@ -29,17 +29,22 @@
       <div id="setup-load-msg" class="msg" role="alert" hidden></div>
 
       <form id="setup-form" novalidate>
-        <fieldset class="setup-block">
+        <fieldset id="players-block" class="setup-block">
           <legend>Who is playing?</legend>
-          <div class="mode-toggle" role="radiogroup" aria-label="Play mode">
-            <label class="mode-option">
-              <input type="radio" name="mode" value="players" checked>
-              <span>Players <small id="mode-limit-players" class="mode-limit"></small></span>
-            </label>
-            <label class="mode-option">
-              <input type="radio" name="mode" value="teams">
-              <span>Teams <small id="mode-limit-teams" class="mode-limit"></small></span>
-            </label>
+          <div class="mode-row">
+            <div class="mode-toggle" role="radiogroup" aria-label="Play mode">
+              <label class="mode-option">
+                <input type="radio" name="mode" value="players" checked>
+                <span>Players <small id="mode-limit-players" class="mode-limit"></small></span>
+              </label>
+              <label class="mode-option">
+                <input type="radio" name="mode" value="teams">
+                <span>Teams <small id="mode-limit-teams" class="mode-limit"></small></span>
+              </label>
+            </div>
+            <!-- Streak Challenge (US-33): Players mode with exactly 1 player; next to the mode
+                 toggle so it is seen without scrolling, also on small screens -->
+            <button type="button" id="streak-open-btn" class="btn btn-streak" hidden>Streak Challenge <small class="mode-limit">(solo)</small></button>
           </div>
           <p class="hint">Click a color circle to switch to the next free color.</p>
           <ol id="entry-list" class="entry-list"></ol>
@@ -47,7 +52,23 @@
           <button type="button" id="entry-add" class="btn">Add player</button>
         </fieldset>
 
-        <fieldset class="setup-block">
+        <!-- Streak Challenge (US-33): replaces the player row and the category picker while chosen -->
+        <fieldset id="streak-block" class="setup-block" hidden>
+          <legend>Streak Challenge</legend>
+          <p class="hint">Questions come from every category. Pick 1 of 3 answers before the time runs out: one wrong answer or time's up ends the run. Your streak goes on the shared leaderboard with your name.</p>
+          <div class="field streak-name-field">
+            <label for="streak-name">Challenger name</label>
+            <input id="streak-name" type="text" maxlength="30" autocomplete="off" aria-describedby="streak-name-error">
+            <p id="streak-name-error" class="field-error" hidden></p>
+          </div>
+          <div class="actions">
+            <button type="button" id="streak-cancel" class="btn">Back to a normal game</button>
+            <!-- US-34: the only way to the leaderboard from setup -->
+            <button type="button" id="streak-board-btn" class="btn btn-leaderboard"><span aria-hidden="true">🏆</span> Streak leaderboard</button>
+          </div>
+        </fieldset>
+
+        <fieldset id="cat-block" class="setup-block">
           <legend id="cat-legend">Select categories</legend>
           <p id="cat-count" class="hint"></p>
           <div id="cat-warning" class="msg msg-warning" role="alert" hidden></div>
@@ -74,6 +95,8 @@
 
         <div class="actions start-row">
           <button type="submit" id="start-btn" class="btn btn-primary btn-large" disabled>Start Game</button>
+          <!-- Streak Challenge (US-33): takes Start Game's place while the streak setup is open -->
+          <button type="button" id="streak-btn" class="btn btn-primary btn-large" hidden>Start Streak Challenge</button>
         </div>
         <p id="start-msg" class="msg msg-error" role="alert" hidden></p>
       </form>
@@ -140,6 +163,20 @@
           <ul id="score-rows" class="score-rows"></ul>
           <button type="button" id="back-btn" class="btn btn-primary btn-large btn-block">Back to Board</button>
         </section>
+
+        <!-- Streak Challenge (US-33): replaces the scoring panel while a run is played -->
+        <section id="streak-panel" class="streak-panel" aria-labelledby="streak-panel-title" hidden>
+          <h3 id="streak-panel-title" class="visually-hidden">Streak Challenge</h3>
+          <div class="streak-head">
+            <p id="streak-run-name" class="streak-name"></p>
+            <p class="streak-count-line">Streak <span id="streak-count" class="streak-count" aria-live="polite"></span></p>
+          </div>
+          <p class="hint">Pick the right answer before the time runs out. One wrong answer ends the run.</p>
+          <ol id="streak-choices" class="streak-choices" aria-label="Choices"></ol>
+          <p id="streak-feedback" class="streak-feedback" role="status" aria-live="polite"></p>
+          <button type="button" id="streak-next" class="btn btn-primary btn-large btn-block" hidden>Next question</button>
+          <button type="button" id="streak-end" class="btn btn-end btn-block">End run</button>
+        </section>
       </div>
     </section>
 
@@ -152,8 +189,22 @@
         <button type="button" id="new-game-btn" class="btn btn-primary btn-large">New Game</button>
       </div>
     </section>
+
+    <!-- Streak leaderboard (US-34): after a run, or from the setup screen -->
+    <section id="screen-leaderboard" class="screen leaderboard" aria-labelledby="leaderboard-title" hidden>
+      <h2 id="leaderboard-title" tabindex="-1">Streak leaderboard</h2>
+      <p id="lb-headline" class="lb-headline" hidden></p>
+      <p id="lb-rank" class="lb-rank" hidden></p>
+      <div id="lb-msg" class="msg" role="alert" hidden></div>
+      <ol id="lb-list" class="results-list lb-list" aria-label="Top 10 streaks"></ol>
+      <div class="actions start-row">
+        <button type="button" id="lb-again" class="btn btn-primary btn-large">Play again</button>
+        <button type="button" id="lb-new" class="btn btn-large">New Game</button>
+        <button type="button" id="lb-back" class="btn btn-primary btn-large">Back</button>
+      </div>
+    </section>
   </main>
 
-  <script src="js/game.6819355e.js"></script>
+  <script src="js/game.559ba0b5.js"></script>
 </body>
 </html>

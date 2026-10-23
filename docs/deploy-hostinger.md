@@ -43,7 +43,7 @@ You need:
 3. Open the **Import** tab, click **Choose file** and pick **`sql/schema-hosted.sql`** from the project.
    Do **not** use `sql/schema.sql`. It contains `CREATE DATABASE`/`USE`, which shared hosting does not allow.
 4. Leave the other options as they are and click **Import** (or **Go**).
-5. Expected result: a green success message, and four tables in the sidebar: `categories`, `point_values`, `questions`, `settings`.
+5. Expected result: a green success message, and five tables in the sidebar: `categories`, `point_values`, `questions`, `settings`, `streaks` (the Streak Challenge leaderboard, empty at first).
    The sample data has 6 categories with 25 questions each (5 per point value) and point values 100–500.
    This step is for a **new, empty** database only. A database that was imported before Sprint 6 is updated with `sql/migrate-question-bank.sql` instead (step 8.4).
 
@@ -73,7 +73,7 @@ Upload only what the website needs. Keep the folder structure:
 | `css/` (whole folder) | **`api/config.php` from your computer** (it holds your *local* database settings; create a new one on the server in step 5) |
 | `img/` (whole folder, including `img/questions/` with the question pictures) | |
 | `js/` (whole folder) | **`password.txt`**, and any other local file with passwords or notes (never, under any name) |
-| `api/` (all `.php` files: `auth.php`, `categories.php`, `config.example.php`, `db.php`, `game-log.php`, `points.php`, `questions.php`, `settings.php`) | `logs/` (the server writes its own daily `logs/game-YYYY-MM-DD.log`) |
+| `api/` (all `.php` files: `auth.php`, `categories.php`, `config.example.php`, `db.php`, `game-log.php`, `points.php`, `questions.php`, `settings.php`, `streaks.php`) | `logs/` (the server writes its own daily `logs/game-YYYY-MM-DD.log`) |
 
 In hPanel, **Files → File Manager** can upload a `.zip` and extract it. Zip the files from the left column, upload the zip into `public_html`, extract it, then delete the zip. Build the zip from the left column only. Do **not** zip the whole project folder: that would pull in `password.txt` and your local `api/config.php`.
 
@@ -172,6 +172,11 @@ The database content and `api/config.php` belong to the live site. A redeploy on
      3. Update the code (step 3). With File Manager/FTP upload `api/db.php`, `api/categories.php`, `api/questions.php`, `index.html`, `admin.html` and the new hashed `js/game.*.js`, `js/admin.*.js` and `css/style.*.css`, then delete the old js/css files they replace.
      4. Import **`sql/add-wrong-options.sql`** (the reviewed wrong options). Until then every question has none, so the game works and the 3 choices chip is simply greyed out; Swap and Skip work right away.
      5. Smoke check: open a question, use 3 choices for a player (A/B/C shown), and check that the admin questions table shows ✓ in the Choices column.
+   - **Streak Challenge (US-33, US-34, D-37): import `sql/migrate-add-streak.sql` once, BEFORE the code update in step 3**, and after `migrate-add-wrong-options.sql` (the streak's choices use the wrong options). It only creates the `streaks` table (the leaderboard runs). The new `api/streaks.php` reads and writes it, so deploying the code first breaks the leaderboard until the migration runs; the old code ignores the table.
+     1. Back up first (step 2).
+     2. In phpMyAdmin, select your database, open **Import**, choose **`sql/migrate-add-streak.sql`** and click **Import** (or **Go**). Expected result: a green success message and a new, empty `streaks` table (`id`, `name`, `streak`, `created_at`). Safe to import again.
+     3. Update the code (step 3). With File Manager/FTP upload `api/questions.php`, `api/streaks.php` (new), `api/game-log.php`, `index.html`, `admin.html` and the new hashed `js/game.*.js`, `js/admin.*.js` and `css/style.*.css`, plus `how-to-play.html`, `terms.html` and `llms.txt`; then delete the old js/css files they replace. No `.htaccess` change is needed.
+     4. Smoke check: in setup with exactly 1 player, click **Start Streak Challenge**, enter a challenger name, answer one question right and one wrong, and check that **See results** shows the run on the leaderboard. In Admin, **Streak leaderboard** lists the run; delete it there (it asks for a login, US-29).
    - **Sprint 6 (question bank): import `sql/migrate-question-bank.sql` once.** Questions keep their point value, but a category may now hold several questions per value, and each new game draws one at random for every board cell. Do this right after the code update in step 3. Until then the old one-per-slot key still blocks a second question at the same category and point value; the game keeps working.
      1. Back up first (step 2). The migration changes the `questions` table.
      2. In phpMyAdmin, click your database in the left sidebar so it is selected, open **Import**, choose **`sql/migrate-question-bank.sql`** and click **Import** (or **Go**). The file has no `CREATE DATABASE`/`USE`, so it runs on the selected database.
