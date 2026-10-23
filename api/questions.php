@@ -9,6 +9,9 @@
 // POST   /api/questions.php?random=1                 body { exclude?: [id, ...], seen?: [id, ...] }
 //                                                          -> { category: {id, name}, points, question }
 //                                                          for the Swap helper (US-32); 409 if none left
+// POST   /api/questions.php?streak=1                 body { exclude?: [id, ...], seen?: [id, ...] }
+//                                                          -> { questions: [streak_question(), ...] }, up to
+//                                                          20 for the Streak Challenge (US-33); [] if none left
 // POST   /api/questions.php                          body { category_id, points, question, answer,
 //                                                          question_ar?, answer_ar?, image?,
 //                                                          image_credit?, wrong_1?, wrong_2?,
@@ -16,8 +19,8 @@
 // PUT    /api/questions.php?id=<id>                  body: any of the POST fields -> 200
 // DELETE /api/questions.php?id=<id>                  -> 200
 // The full list (first two GETs) and all writes need admin access (require_admin: 401/403
-// otherwise); only the board payload (GET or POST), the played count and the random question
-// are public, they are what the game plays from.
+// otherwise); only the board payload (GET or POST), the played count, the random question and
+// the streak batch are public, they are what the game plays from.
 //
 // Question bank (D-31 amended): every question has a category and a point value, and a
 // category may have any number of questions per point value. The board draws one
@@ -39,6 +42,9 @@ const IMAGE_CREDIT_MAX = 255;
 
 // "3 choices" helper (US-32): two wrong options per language, NULL = none yet.
 const WRONG_OPTION_MAX = 255;
+
+// Streak Challenge (US-33): questions per batch; the game asks for more when it runs low.
+const STREAK_BATCH = 20;
 
 /**
  * A text as the game shows it as a choice (choiceText() in js/game.js): cut at its first
@@ -338,6 +344,174 @@ function random_question(PDO $pdo, array $exclude, array $seen): array
     ];
 }
 
+/**
+ * Streak Challenge batch (US-33): up to STREAK_BATCH questions from every category at an enabled
+ * point value, never an excluded id (the run's questions so far). Unseen questions come first in
+ * random order, then seen ones, the one seen longest ago first (the board rule, draw_from_pool).
+ * Each one gets 3 choices (streak_choices()); a question that cannot get 2 wrong choices is skipped.
+ * Returns [] once nothing is left to draw.
+ */
+function streak_batch(PDO $pdo, array $exclude, array $seen): array
+{
+    $seenRank = array_flip($seen);
+    $excluded = array_flip($exclude);
+    $names = $pdo->query('SELECT id, name FROM categories')->fetchAll(PDO::FETCH_KEY_PAIR);
+    $rows = $pdo->query(
+        'SELECT ' . CELL_COLUMNS . ' FROM questions
+          WHERE points IN (SELECT points FROM point_values WHERE enabled = 1) ORDER BY id ASC'
+    )->fetchAll();
+
+    // Answers to borrow wrong choices from, by kind (picture or text) and by category, so a flag
+    // question gets flag answers. The pool to draw from is keyed by id.
+    $byKind = [];
+    $byCategory = [];
+    $pool = [];
+    foreach ($rows as $r) {
+        $kind = $r['image'] === '' ? 'text' : 'picture';
+        $byKind[$kind][] = $r;
+        $byCategory[$kind][(int) $r['category_id']][] = $r;
+        $id = (int) $r['id'];
+        if (!isset($excluded[$id])) {
+            $pool[$id] = ['id' => $id, 'row' => $r];
+        }
+    }
+
+    $batch = [];
+    while ($pool && count($batch) < STREAK_BATCH) {
+        $picked = draw_from_pool($pool, $seenRank);
+        unset($pool[$picked['id']]);
+        $r = $picked['row'];
+        $kind = $r['image'] === '' ? 'text' : 'picture';
+        $choices = streak_choices($r, [$byCategory[$kind][(int) $r['category_id']], $byKind[$kind]]);
+        if ($choices !== null) {
+            $batch[] = streak_question($r, $names[(int) $r['category_id']] ?? '', $choices);
+        }
+    }
+    return $batch;
+}
+
+/** A streak question: the board_cell() fields it needs, its category and points, the choices and `correct`. */
+function streak_question(array $r, string $categoryName, array $choices): array
+{
+    $cell = board_cell($r);
+    return [
+        'id'            => $cell['id'],
+        'category_name' => $categoryName,
+        'points'        => (int) $r['points'],
+        'question'      => $cell['question'],
+        'question_ar'   => has_arabic($r) ? $cell['question_ar'] : null,
+        'image'         => $cell['image'],
+        'image_credit'  => $cell['image_credit'],
+        'choices'       => $choices['choices'],
+        'correct'       => $choices['correct'],
+    ];
+}
+
+/** The question has an Arabic version: both the Arabic question and the Arabic answer are filled. */
+function has_arabic(array $r): bool
+{
+    return trim((string) $r['question_ar']) !== '' && trim((string) $r['answer_ar']) !== '';
+}
+
+/** One choice as the game shows it: {text, text_ar}, both cut by choice_text(); text_ar null without Arabic. */
+function streak_choice(string $text, ?string $textAr): array
+{
+    return ['text' => choice_text($text, false), 'text_ar' => $textAr === null ? null : choice_text($textAr, true)];
+}
+
+/** Two choices look the same: equal English, or equal Arabic, after fold_text(). */
+function choices_clash(array $a, array $b): bool
+{
+    if (fold_text($a['text']) === fold_text($b['text'])) {
+        return true;
+    }
+    return $a['text_ar'] !== null && $b['text_ar'] !== null && fold_text($a['text_ar']) === fold_text($b['text_ar']);
+}
+
+/**
+ * { choices: [{text, text_ar}] x3 in random order, correct: index of the answer }, or null when
+ * the question cannot get 2 wrong choices. The stored wrong options are used when the question
+ * has a complete pair (and the Arabic pair too when it has an Arabic version) that differs from
+ * the answer; otherwise 2 answers are borrowed from $pools (borrow_choices()).
+ */
+function streak_choices(array $r, array $pools): ?array
+{
+    $arabic = has_arabic($r);
+    $right = streak_choice($r['answer'], $arabic ? $r['answer_ar'] : null);
+    $wrong = stored_choices($r, $arabic, $right) ?? borrow_choices($r, $arabic, $right, $pools);
+    if ($wrong === null) {
+        return null;
+    }
+    $all = [$right, $wrong[0], $wrong[1]];
+    $order = shuffled([0, 1, 2]);
+    return [
+        'choices' => array_map(fn(int $i): array => $all[$i], $order),
+        'correct' => array_search(0, $order, true),
+    ];
+}
+
+/** The stored wrong options as 2 choices, or null when the pair is incomplete or clashes. */
+function stored_choices(array $r, bool $arabic, array $right): ?array
+{
+    $filled = fn(string $column): bool => trim((string) $r[$column]) !== '';
+    if (!$filled('wrong_1') || !$filled('wrong_2') || ($arabic && (!$filled('wrong_1_ar') || !$filled('wrong_2_ar')))) {
+        return null;
+    }
+    $wrong = [
+        streak_choice($r['wrong_1'], $arabic ? $r['wrong_1_ar'] : null),
+        streak_choice($r['wrong_2'], $arabic ? $r['wrong_2_ar'] : null),
+    ];
+    // The API already checks this on save; rows loaded by SQL files are checked here.
+    if (choices_clash($wrong[0], $wrong[1]) || choices_clash($wrong[0], $right) || choices_clash($wrong[1], $right)) {
+        return null;
+    }
+    return $wrong;
+}
+
+/**
+ * 2 answers of other questions as wrong choices: from the first pool (same category and kind),
+ * then the next (same kind, any category). They need Arabic when the question has Arabic, and
+ * must not clash with the answer or each other. A choice that appears inside the full answer
+ * is skipped too, so an "(accept …)" alternative never shows up as a wrong choice. Null if fewer than 2.
+ */
+function borrow_choices(array $r, bool $arabic, array $right, array $pools): ?array
+{
+    $answers = [fold_text($r['answer']), $arabic ? fold_text($r['answer_ar']) : null];
+    $chosen = [];
+    foreach ($pools as $pool) {
+        foreach (shuffled($pool) as $other) {
+            if ((int) $other['id'] === (int) $r['id'] || ($arabic && !has_arabic($other))) {
+                continue;
+            }
+            $choice = streak_choice($other['answer'], $arabic ? $other['answer_ar'] : null);
+            $inAnswer = strpos($answers[0], fold_text($choice['text'])) !== false ||
+                ($arabic && strpos($answers[1], fold_text($choice['text_ar'])) !== false);
+            $clash = $inAnswer || choices_clash($choice, $right);
+            foreach ($chosen as $taken) {
+                $clash = $clash || choices_clash($choice, $taken);
+            }
+            if (!$clash) {
+                $chosen[] = $choice;
+                if (count($chosen) === 2) {
+                    return $chosen;
+                }
+            }
+        }
+    }
+    return null;
+}
+
+/** Copy of the list in random order (Fisher-Yates with random_int, like the board draw). */
+function shuffled(array $items): array
+{
+    $items = array_values($items);
+    for ($i = count($items) - 1; $i > 0; $i--) {
+        $j = random_int(0, $i);
+        [$items[$i], $items[$j]] = [$items[$j], $items[$i]];
+    }
+    return $items;
+}
+
 /** Optional text: null/empty -> null; otherwise trimmed and within $maxChars. */
 function optional_text($value, string $label, int $maxChars): ?string
 {
@@ -592,6 +766,11 @@ switch ($_SERVER['REQUEST_METHOD']) {
             $body = read_json_body();
             $exclude = parse_seen_ids($body['exclude'] ?? null, 'exclude');
             json_response(random_question(db(), $exclude, parse_seen_ids($body['seen'] ?? null)));
+        }
+        if (($_GET['streak'] ?? '') === '1') {
+            $body = read_json_body();
+            $exclude = parse_seen_ids($body['exclude'] ?? null, 'exclude');
+            json_response(['questions' => streak_batch(db(), $exclude, parse_seen_ids($body['seen'] ?? null))]);
         }
         require_admin();
         $body = read_json_body();

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BrainRush - Admin</title>
-  <link rel="stylesheet" href="css/style.6240296b.css">
+  <link rel="stylesheet" href="css/style.de7729fa.css">
 </head>
 <body class="admin">
   <header class="page-header">
@@ -160,8 +160,26 @@
         </table>
       </div>
     </section>
+
+    <!-- Streak leaderboard (US-34): every saved run, so junk or offensive names can be removed -->
+    <section class="panel panel-wide" id="streaks-panel" aria-labelledby="streaks-title">
+      <h2 id="streaks-title">Streak leaderboard</h2>
+      <p class="hint">Every saved Streak Challenge run, newest first. The game's leaderboard shows each challenger's best run (one per challenger name, not case-sensitive). Delete a run to take it off the leaderboard.</p>
+      <div class="actions">
+        <button type="button" id="streaks-reload" class="btn btn-small">Reload</button>
+      </div>
+      <p id="streaks-msg" class="msg" role="status" aria-live="polite" hidden></p>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th scope="col">Name</th><th scope="col">Streak</th><th scope="col">Played</th><th scope="col">Actions</th></tr>
+          </thead>
+          <tbody id="streaks-body"></tbody>
+        </table>
+      </div>
+    </section>
   </main>
 
-  <script src="js/admin.45dd5b1c.js"></script>
+  <script src="js/admin.05c942fb.js"></script>
 </body>
 </html>

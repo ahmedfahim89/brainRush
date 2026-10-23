@@ -41,6 +41,15 @@
   const CHOICES_SHORT_CHARS = 24; // text question: 3 choices this short sit side by side
   const WRONG_FIELDS = ['wrong_1', 'wrong_2', 'wrong_1_ar', 'wrong_2_ar'];
 
+  // Streak Challenge (US-33, US-34, D-37): saved under its own key, so the board game's saved
+  // state and its validation stay as they are.
+  const STREAK_KEY = 'brainrush.streak';
+  const STREAK_VERSION = 1;
+  const STREAK_REFILL_AT = 5;   // ask for the next batch once fewer questions are queued
+  const STREAK_MAX_QUEUE = 100; // a saved queue is never longer (batches are 20)
+  const STREAK_TIME_UP = -1;    // `picked` when the time ran out
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
   const MODES = {
     players: { limit: 6, title: 'Players', label: 'Player', one: 'player', many: 'players' },
     teams: { limit: 4, title: 'Teams', label: 'Team', one: 'team', many: 'teams' },
@@ -57,7 +66,8 @@
     { value: '#22b8cf', name: 'Cyan', ink: '#0b1026' },
   ];
 
-  const SCREENS = ['setup', 'board', 'question', 'results'];
+  const SCREENS = ['setup', 'board', 'question', 'results']; // a saved board game may be on these
+  const ALL_SCREENS = SCREENS.concat(['leaderboard']);
 
   // Central state. `setup` is the form being filled in (memory only);
   // `game` is the running game and is saved to localStorage on every change:
@@ -77,9 +87,25 @@
   };
 
   // Countdown of the open question (memory only; restarts at full length after a refresh, D-04).
-  const timer = { totalMs: 0, remainingMs: 0, endAt: 0, running: false, handle: null };
+  // onExpire runs when it reaches 0 (the Streak Challenge ends the run then; the board game has none).
+  const timer = { totalMs: 0, remainingMs: 0, endAt: 0, running: false, handle: null, onExpire: null };
   let scoringRows = []; // DOM references of the question screen's scoring rows
   let swapping = null; // id of the contestant whose Swap request is running (memory only)
+
+  // Streak Challenge run (US-33), saved under STREAK_KEY on every change; null when none:
+  //   { version, name, color, timerSeconds, count, queue: [question], usedIds: [id],
+  //     current: null | { q, lang, deadline, picked, leftMs? }, over }
+  // A question is the API's { id, category_name, points, question, question_ar, image,
+  // image_credit, choices: [{text, text_ar}] x3, correct } (choices already cut by the server).
+  // deadline = Date.now() ms when time is up, so a refresh keeps the remaining time; picked =
+  // null (open), the tapped choice or STREAK_TIME_UP; leftMs = time left when it was answered.
+  // count = right answers; over = the run ended (wrong answer, time's up or End run).
+  let streak = null;
+  let streakRequest = null;      // { run, promise } of the batch request in flight (memory only)
+  let finishing = false;         // the finished run is being saved
+  let lastStreakProfile = null;  // name, color and timer of the last run, for Play again
+  let leaderboardResult = null;  // the run shown on the leaderboard screen (null = opened from setup)
+  let leaderboardLoads = 0;      // drops leaderboard responses that arrive after a newer request
 
   let nextEntryKey = 1;
 
@@ -90,8 +116,18 @@
       board: byId('screen-board'),
       question: byId('screen-question'),
       results: byId('screen-results'),
+      leaderboard: byId('screen-leaderboard'),
     },
     setupForm: byId('setup-form'),
+    playersBlock: byId('players-block'),
+    catBlock: byId('cat-block'),
+    streakBlock: byId('streak-block'),
+    streakNameInput: byId('streak-name'),
+    streakNameError: byId('streak-name-error'),
+    streakCancel: byId('streak-cancel'),
+    streakOpenBtn: byId('streak-open-btn'),
+    streakBtn: byId('streak-btn'),
+    streakBoardBtn: byId('streak-board-btn'),
     loadMsg: byId('setup-load-msg'),
     newBanner: byId('new-banner'),
     modeInputs: Array.prototype.slice.call(document.querySelectorAll('input[name="mode"]')),
@@ -137,9 +173,24 @@
     helperMsg: byId('helper-msg'),
     scoreRows: byId('score-rows'),
     backBtn: byId('back-btn'),
+    streakPanel: byId('streak-panel'),
+    streakName: byId('streak-run-name'), // the run's name on the question screen (#streak-name is the setup input)
+    streakCount: byId('streak-count'),
+    streakChoices: byId('streak-choices'),
+    streakFeedback: byId('streak-feedback'),
+    streakNext: byId('streak-next'),
+    streakEnd: byId('streak-end'),
     resultsWinner: byId('results-winner'),
     resultsList: byId('results-list'),
     newGameBtn: byId('new-game-btn'),
+    lbTitle: byId('leaderboard-title'),
+    lbHeadline: byId('lb-headline'),
+    lbRank: byId('lb-rank'),
+    lbMsg: byId('lb-msg'),
+    lbList: byId('lb-list'),
+    lbAgain: byId('lb-again'),
+    lbNew: byId('lb-new'),
+    lbBack: byId('lb-back'),
   };
 
   // ---------- Generic helpers ----------
@@ -548,7 +599,7 @@
   function showScreen(name) {
     state.screen = name;
     if (name !== 'question') stopTimer();
-    SCREENS.forEach((key) => { dom.screens[key].hidden = key !== name; });
+    ALL_SCREENS.forEach((key) => { dom.screens[key].hidden = key !== name; });
     document.body.setAttribute('data-screen', name); // CSS: one-screen board layout (FU-03)
     window.scrollTo(0, 0);
     saveState();
@@ -573,6 +624,7 @@
       loading: true,
       loadError: '',
       starting: false,
+      streak: false,      // Streak Challenge chosen (US-33): its name field replaces the player row
     };
   }
 
@@ -942,8 +994,22 @@
   function updateStartButton() {
     dom.startBtn.disabled = startBlockReason() !== '';
     const down = !!state.setup && state.setup.maintenance;
-    dom.startBtn.hidden = down;
+    dom.startBtn.hidden = down || (!!state.setup && state.setup.streak);
     dom.maintenanceOverlay.hidden = !down;
+    updateStreakButtons(down);
+  }
+
+  /**
+   * Streak Challenge buttons (US-33). "Streak Challenge (solo)" sits next to the mode toggle, only
+   * in Players mode with exactly 1 player; "Start Streak Challenge" takes Start Game's place while
+   * the streak setup (which holds the leaderboard button) is open. The streak needs no playable
+   * category pick, so only maintenance, loading, a failed load or a running start block it.
+   */
+  function updateStreakButtons(down) {
+    const s = state.setup;
+    dom.streakOpenBtn.hidden = !s || down || s.streak || s.mode !== 'players' || s.entries.length !== 1;
+    dom.streakBtn.hidden = !s || down || !s.streak;
+    dom.streakBtn.disabled = !s || s.loading || s.starting || s.loadError === 'network';
   }
 
   /** D-02: required, unique after trimming, case-insensitive. Marks each bad entry inline. */
@@ -1077,6 +1143,10 @@
 
   async function onStart(event) {
     event.preventDefault();
+    if (state.setup && state.setup.streak) { // Enter in the challenger name field
+      onStreakStart();
+      return;
+    }
     if (startBlockReason()) return;
     clearMessage(dom.startMsg);
     const namesOk = validateNames();
@@ -1141,14 +1211,18 @@
 
   /** Record the started game in the server's game log. Fire-and-forget: a failure never blocks play. */
   function logGameStart(game) {
+    postGameLog({
+      mode: game.mode,
+      players: game.contestants.map((c) => c.name),
+      categories: game.categories.map((c) => c.id),
+    });
+  }
+
+  function postGameLog(body) {
     fetch(API_BASE + 'game-log.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        mode: game.mode,
-        players: game.contestants.map((c) => c.name),
-        categories: game.categories.map((c) => c.id),
-      }),
+      body: JSON.stringify(body),
     }).catch(() => {});
   }
 
@@ -1324,6 +1398,7 @@
     const cur = g.current;
     const active = activeQuestion(g);
     const q = active.question;
+    setStreakLayout(false);
     renderQuestionHeading(active);
     // Arabic first when the question has an Arabic version; a restored choice is kept.
     if (!hasArabic(q)) cur.lang = 'en';
@@ -1387,22 +1462,29 @@
   /** Show the question and its answer in the open question's language (cur.lang). */
   function renderQuestionLang(q) {
     const arabic = state.game.current.lang === 'ar';
-    const question = arabic ? q.question_ar : q.question;
-    const dir = arabic ? 'rtl' : 'ltr';
-    const lang = arabic ? 'ar' : 'en';
-    dom.qText.textContent = question;
-    dom.qText.dir = dir;
-    dom.qText.lang = lang;
-    dom.qText.style.setProperty('--q-scale', String(questionScale(question)));
+    renderQuestionText(arabic ? q.question_ar : q.question, arabic);
     dom.answerValue.textContent = arabic ? q.answer_ar : q.answer;
-    dom.answerValue.dir = dir;
-    dom.answerValue.lang = lang;
+    dom.answerValue.dir = arabic ? 'rtl' : 'ltr';
+    dom.answerValue.lang = arabic ? 'ar' : 'en';
     dom.answerText.classList.toggle('is-rtl', arabic);
-    dom.langBtn.hidden = !hasArabic(q);
+    renderLangButton(hasArabic(q), arabic);
+    renderChoices(q, arabic);
+  }
+
+  /** The question text in its language (board game and Streak Challenge). */
+  function renderQuestionText(text, arabic) {
+    dom.qText.textContent = text;
+    dom.qText.dir = arabic ? 'rtl' : 'ltr';
+    dom.qText.lang = arabic ? 'ar' : 'en';
+    dom.qText.style.setProperty('--q-scale', String(questionScale(text)));
+  }
+
+  /** The language button, shown when the question has Arabic; it offers the other language. */
+  function renderLangButton(available, arabic) {
+    dom.langBtn.hidden = !available;
     dom.langBtn.textContent = arabic ? 'English' : 'العربية';
     dom.langBtn.lang = arabic ? 'en' : 'ar';
     dom.langBtn.setAttribute('aria-label', arabic ? 'Show question in English' : 'Show question in Arabic');
-    renderChoices(q, arabic);
   }
 
   /** Wrong options are there for the "3 choices" helper (parseQuestion keeps only complete pairs). */
@@ -1452,6 +1534,10 @@
   }
 
   function toggleLang() {
+    if (streakOnScreen()) {
+      toggleStreakLang();
+      return;
+    }
     const cur = state.game && state.game.current;
     if (!cur) return;
     const q = activeQuestion(state.game).question;
@@ -1746,12 +1832,26 @@
     return window.performance && performance.now ? performance.now() : Date.now();
   }
 
-  function startTimer(seconds) {
+  /**
+   * Start the countdown at full length. The Streak Challenge passes the time left until its saved
+   * deadline (so a refresh keeps it) and onExpire, which ends the run at 0.
+   */
+  function startTimer(seconds, remainingMs, onExpire) {
     stopTimer();
     timer.totalMs = seconds * 1000;
-    timer.remainingMs = timer.totalMs;
+    timer.remainingMs = remainingMs === undefined ? timer.totalMs : Math.max(0, Math.min(remainingMs, timer.totalMs));
+    timer.onExpire = onExpire || null;
     dom.timerStatus.textContent = '';
     resumeTimer();
+  }
+
+  /** A stopped countdown showing `remainingMs` (a streak question that was already answered). */
+  function showTimerAt(seconds, remainingMs) {
+    stopTimer();
+    timer.totalMs = seconds * 1000;
+    timer.remainingMs = Math.max(0, Math.min(remainingMs, timer.totalMs));
+    timer.onExpire = null;
+    renderTimer();
   }
 
   function resumeTimer() {
@@ -1778,11 +1878,13 @@
   /** Remaining time comes from the end timestamp, so throttled intervals never drift. */
   function tickTimer() {
     timer.remainingMs = Math.max(0, timer.endAt - now());
-    if (timer.remainingMs === 0) {
+    const expired = timer.remainingMs === 0;
+    if (expired) {
       stopTimer(); // D-03: stop at 0 (silently), nothing is auto-scored or closed
       dom.timerStatus.textContent = "Time's up!";
     }
     renderTimer();
+    if (expired && timer.onExpire) timer.onExpire(); // Streak Challenge: time's up ends the run
   }
 
   function renderTimer() {
@@ -1795,6 +1897,7 @@
   }
 
   function onPauseClick() {
+    if (!state.game) return; // no Pause in the Streak Challenge
     if (timer.running) pauseTimer();
     else resumeTimer();
   }
@@ -1850,7 +1953,689 @@
     stopTimer();
     state.game = null;
     clearSavedState();
+    streak = null;
+    saveStreak();
     startSetup();
+  }
+
+  // ---------- Streak Challenge: setup (US-33) ----------
+
+  /** Normal game or Streak Challenge: the challenger name field replaces the player row and the categories. */
+  function renderSetupMode() {
+    const s = state.setup;
+    dom.playersBlock.hidden = s.streak;
+    dom.catBlock.hidden = s.streak;
+    dom.streakBlock.hidden = !s.streak;
+    updateStartButton();
+  }
+
+  /** "Streak Challenge (solo)": open the challenger name field (prefilled from the player's name). */
+  function onStreakOpen() {
+    const s = state.setup;
+    if (!s || s.streak) return;
+    s.streak = true;
+    if (!dom.streakNameInput.value.trim()) {
+      dom.streakNameInput.value = cleanName(s.entries[0].name).slice(0, NAME_MAX);
+    }
+    setFieldError(dom.streakNameInput, dom.streakNameError, '');
+    clearMessage(dom.startMsg);
+    renderSetupMode();
+    dom.streakNameInput.focus();
+  }
+
+  function onStreakCancel() {
+    state.setup.streak = false;
+    clearMessage(dom.startMsg);
+    renderSetupMode();
+    dom.streakOpenBtn.focus();
+  }
+
+  function setFieldError(input, errorNode, message) {
+    errorNode.textContent = message;
+    errorNode.hidden = !message;
+    if (message) input.setAttribute('aria-invalid', 'true');
+    else input.removeAttribute('aria-invalid');
+  }
+
+  /** A name as it is saved: trimmed, inner spaces collapsed. */
+  function cleanName(text) {
+    return text.trim().replace(/\s+/g, ' ');
+  }
+
+  /** Challenger name: required, at most NAME_MAX characters (D-22). Marks the field inline when bad. */
+  function validateStreakName() {
+    const name = cleanName(dom.streakNameInput.value);
+    const message = !name ? 'Challenger name is required'
+      : name.length > NAME_MAX ? 'Challenger name must be at most ' + NAME_MAX + ' characters' : '';
+    setFieldError(dom.streakNameInput, dom.streakNameError, message);
+    return message === '';
+  }
+
+  /** Start a run from the setup screen: name and timer checked like the board game's (no categories). */
+  async function onStreakStart() {
+    const s = state.setup;
+    if (!s || !s.streak || dom.streakBtn.disabled) return;
+    clearMessage(dom.startMsg);
+    const nameOk = validateStreakName();
+    const timerSeconds = validateTimer();
+    if (!nameOk || timerSeconds === null) {
+      showMessage(dom.startMsg, 'The Streak Challenge cannot start yet. Please fix the errors above.', 'error');
+      const target = [dom.streakNameInput, dom.timerInput]
+        .find((input) => input.getAttribute('aria-invalid') === 'true');
+      if (target) target.focus();
+      return;
+    }
+    s.starting = true;
+    dom.streakBtn.textContent = 'Starting...';
+    updateStartButton();
+    try {
+      await startStreakRun({
+        name: cleanName(dom.streakNameInput.value),
+        color: s.entries[0].color,
+        timerSeconds: timerSeconds,
+      });
+    } catch (err) {
+      // Stay on setup with every input intact (as US-06).
+      showMessage(dom.startMsg, 'Could not start the Streak Challenge: ' + errorText(err), 'error');
+    } finally {
+      s.starting = false;
+      dom.streakBtn.textContent = 'Start Streak Challenge';
+      updateStartButton();
+    }
+  }
+
+  // ---------- Streak Challenge: the run (US-33, D-37) ----------
+
+  function saveStreak() {
+    try {
+      if (streak) window.localStorage.setItem(STREAK_KEY, JSON.stringify(streak));
+      else window.localStorage.removeItem(STREAK_KEY);
+    } catch (err) {
+      // Storage full or disabled: the run still works, it just won't survive a refresh.
+    }
+  }
+
+  /** The saved run, or null when nothing valid is saved (corrupt data is removed). */
+  function loadStreak() {
+    let raw = null;
+    try {
+      raw = window.localStorage.getItem(STREAK_KEY);
+    } catch (err) {
+      return null;
+    }
+    if (raw === null) return null;
+    try {
+      const saved = JSON.parse(raw);
+      if (isValidStreak(saved)) return saved;
+    } catch (err) {
+      // invalid JSON: discard it
+    }
+    try {
+      window.localStorage.removeItem(STREAK_KEY);
+    } catch (err) {
+      // nothing to clear
+    }
+    return null;
+  }
+
+  function isValidStreakName(name) {
+    return typeof name === 'string' && name.trim() !== '' && name.trim().length <= NAME_MAX;
+  }
+
+  /** A streak question: 3 non-empty choices, a valid `correct`, and Arabic choices when it has an Arabic question. */
+  function isValidStreakQuestion(q) {
+    if (!isPlainObject(q) || !Number.isInteger(q.id) || q.id < 1 || typeof q.category_name !== 'string' ||
+        !Number.isInteger(q.points) || q.points < 1 || typeof q.question !== 'string' ||
+        !isOptionalText(q.question_ar) || !isValidImage(q.image) || !isOptionalText(q.image_credit) ||
+        !Array.isArray(q.choices) || q.choices.length !== CHOICE_LETTERS.length ||
+        !Number.isInteger(q.correct) || q.correct < 0 || q.correct >= CHOICE_LETTERS.length) return false;
+    const arabic = isFilled(q.question_ar);
+    return q.choices.every((c) => isPlainObject(c) && isFilled(c.text) &&
+      (arabic ? isFilled(c.text_ar) : isOptionalText(c.text_ar)));
+  }
+
+  function isValidStreak(run) {
+    const range = timerRange();
+    return isPlainObject(run) && run.version === STREAK_VERSION &&
+      isValidStreakName(run.name) &&
+      PALETTE.some((p) => p.value === run.color) &&
+      Number.isInteger(run.timerSeconds) && run.timerSeconds >= range.min && run.timerSeconds <= range.max &&
+      typeof run.over === 'boolean' &&
+      Array.isArray(run.queue) && run.queue.length <= STREAK_MAX_QUEUE && run.queue.every(isValidStreakQuestion) &&
+      Array.isArray(run.usedIds) && run.usedIds.length <= SEEN_MAX &&
+      run.usedIds.every((id) => Number.isInteger(id) && id > 0) &&
+      Number.isInteger(run.count) && run.count >= 0 && run.count <= run.usedIds.length &&
+      isValidStreakCurrent(run.current, run);
+  }
+
+  /** The open question: one of the run's, a known language and pick, and a wrong pick only in an ended run. */
+  function isValidStreakCurrent(cur, run) {
+    if (cur === null) return true;
+    if (!isPlainObject(cur) || !isValidStreakQuestion(cur.q) || run.usedIds.indexOf(cur.q.id) === -1) return false;
+    const langOk = cur.lang === 'en' || (cur.lang === 'ar' && isFilled(cur.q.question_ar));
+    const pickedOk = cur.picked === null || cur.picked === STREAK_TIME_UP ||
+      (Number.isInteger(cur.picked) && cur.picked >= 0 && cur.picked < CHOICE_LETTERS.length);
+    const lost = cur.picked !== null && cur.picked !== cur.q.correct;
+    return langOk && pickedOk && Number.isFinite(cur.deadline) && (!lost || run.over) &&
+      (cur.leftMs === undefined || (Number.isFinite(cur.leftMs) && cur.leftMs >= 0));
+  }
+
+  /** The fields the game keeps of a streak question checked by isValidStreakQuestion. */
+  function parseStreakQuestion(q) {
+    const arabic = isFilled(q.question_ar);
+    return {
+      id: q.id,
+      category_name: q.category_name,
+      points: q.points,
+      question: q.question,
+      question_ar: arabic ? q.question_ar : null,
+      image: typeof q.image === 'string' ? q.image : null,
+      image_credit: typeof q.image_credit === 'string' ? q.image_credit : null,
+      choices: q.choices.map((c) => ({ text: c.text, text_ar: arabic ? c.text_ar : null })),
+      correct: q.correct,
+    };
+  }
+
+  function streakProfile(run) {
+    return { name: run.name, color: run.color, timerSeconds: run.timerSeconds };
+  }
+
+  /** The streak question screen is showing (state.game is null during a run). */
+  function streakOnScreen() {
+    return state.screen === 'question' && !state.game && !!streak && !!streak.current;
+  }
+
+  /** Up to 20 questions from every category, none of `exclude`, unseen first. Throws on errors. */
+  async function fetchStreakBatch(exclude) {
+    const data = await apiPost('questions.php?streak=1', { exclude: exclude, seen: loadSeen() });
+    if (!isPlainObject(data) || !Array.isArray(data.questions) ||
+        !data.questions.every((q) => isValidStreakQuestion(q))) {
+      throw new Error('The server sent unexpected questions.');
+    }
+    return data.questions.map(parseStreakQuestion);
+  }
+
+  /** Ids this run must not get again: the questions played and the ones queued. */
+  function streakTakenIds(run) {
+    return run.usedIds.concat(run.queue.map((q) => q.id));
+  }
+
+  /** Queue new questions (never one the run already has) and fetch their pictures up front. */
+  function addToQueue(run, questions) {
+    const taken = streakTakenIds(run);
+    questions.forEach((q) => {
+      if (taken.indexOf(q.id) !== -1 || run.queue.length >= STREAK_MAX_QUEUE) return;
+      taken.push(q.id);
+      run.queue.push(q);
+      if (q.image) new Image().src = q.image;
+    });
+    if (streak === run) saveStreak();
+  }
+
+  /** The next batch for this run (one request at a time). Resolves with the number of questions received. */
+  function requestStreakBatch(run) {
+    if (streakRequest && streakRequest.run === run) return streakRequest.promise;
+    const request = { run: run, promise: null };
+    request.promise = fetchStreakBatch(streakTakenIds(run)).then((questions) => {
+      if (streak === run) addToQueue(run, questions);
+      return questions.length;
+    }).finally(() => {
+      if (streakRequest === request) streakRequest = null;
+    });
+    streakRequest = request;
+    return request.promise;
+  }
+
+  /** Top up the queue in the background; a failure is retried after the next answer. */
+  function refillStreak(run) {
+    if (!run.over && run.queue.length < STREAK_REFILL_AT) requestStreakBatch(run).catch(() => {});
+  }
+
+  /** Start a new run with this name and timer. Throws (nothing changes) when no question can be loaded. */
+  async function startStreakRun(profile) {
+    const questions = await fetchStreakBatch([]);
+    if (!questions.length) throw new Error('There are no questions to play yet.');
+    stopTimer();
+    state.game = null;
+    clearSavedState();
+    streak = {
+      version: STREAK_VERSION,
+      name: profile.name,
+      color: profile.color,
+      timerSeconds: profile.timerSeconds,
+      count: 0,
+      queue: [],
+      usedIds: [],
+      current: null,
+      over: false,
+    };
+    lastStreakProfile = profile;
+    addToQueue(streak, questions);
+    postGameLog({ mode: 'streak', players: [streak.name] });
+    nextStreakQuestion();
+  }
+
+  /** Open the next question (waiting for the next batch when the queue is empty). */
+  async function nextStreakQuestion() {
+    const run = streak;
+    if (!run || run.over) return;
+    if (!run.queue.length) {
+      setStreakLoading(true);
+      let failure = '';
+      try {
+        await requestStreakBatch(run);
+      } catch (err) {
+        failure = errorText(err);
+      }
+      if (streak !== run || run.over) return; // ended (End run) while loading
+      setStreakLoading(false);
+      if (!run.queue.length) {
+        if (failure) {
+          showStreakFeedback('Could not load the next question: ' + failure + ' Try Next again.', 'is-bad');
+          return;
+        }
+        run.over = true; // every question was played in this run: it ends with the full streak
+        finishStreak();
+        return;
+      }
+    }
+    const q = run.queue.shift();
+    run.usedIds.push(q.id);
+    run.current = {
+      q: q,
+      lang: isFilled(q.question_ar) ? 'ar' : 'en', // Arabic first, as on the board
+      deadline: Date.now() + run.timerSeconds * 1000,
+      picked: null,
+    };
+    markSeen(q.id); // later boards and runs avoid it too
+    saveStreak();
+    showStreakQuestion();
+    refillStreak(run);
+  }
+
+  /** The streak layout of the question screen: the streak panel replaces scoring, answer and Pause/Reset (CSS). */
+  function setStreakLayout(on) {
+    dom.screens.question.classList.toggle('streak', on);
+    dom.streakPanel.hidden = !on;
+    if (on) { // the 3 choices helper list of the board game is not used
+      clear(dom.qChoices);
+      dom.qChoices.hidden = true;
+      dom.qImage.parentElement.classList.remove('has-choices');
+    }
+  }
+
+  /** Render the run's open question; its timer counts to the saved deadline (also after a refresh). */
+  function showStreakQuestion() {
+    const run = streak;
+    const cur = run.current;
+    const q = cur.q;
+    setStreakLayout(true);
+    dom.qHeading.textContent = q.category_name + ' ' + EN_DASH + ' ' + q.points;
+    renderQuestionImage(q);
+    renderStreakLang();
+    renderStreakPanel();
+    showScreen('question');
+    if (cur.picked !== null) {
+      showTimerAt(run.timerSeconds, cur.leftMs || 0);
+      dom.timerStatus.textContent = cur.picked === STREAK_TIME_UP ? "Time's up!" : '';
+      dom.streakNext.focus();
+      return;
+    }
+    // Never more than one full timer: a deadline moved forward in storage is pulled back.
+    cur.deadline = Math.min(cur.deadline, Date.now() + run.timerSeconds * 1000);
+    saveStreak();
+    const left = cur.deadline - Date.now();
+    if (left <= 0) { // the time ran out while the page was closed
+      showTimerAt(run.timerSeconds, 0);
+      streakAnswer(null);
+      return;
+    }
+    startTimer(run.timerSeconds, left, () => streakAnswer(null));
+    dom.qHeading.focus();
+  }
+
+  /** Question text, language button and choices in the open question's language. */
+  function renderStreakLang() {
+    const cur = streak.current;
+    const arabic = cur.lang === 'ar';
+    renderQuestionText(arabic ? cur.q.question_ar : cur.q.question, arabic);
+    renderLangButton(isFilled(cur.q.question_ar), arabic);
+    renderStreakChoices();
+  }
+
+  function toggleStreakLang() {
+    const cur = streak.current;
+    if (!isFilled(cur.q.question_ar)) return;
+    cur.lang = cur.lang === 'ar' ? 'en' : 'ar';
+    renderStreakLang();
+    renderStreakPanel(); // the feedback names the right answer in the shown language
+    saveStreak();
+  }
+
+  /** 3 choice buttons, A/B/C in the server's order. Once answered: the right one green, a wrong pick red. */
+  function renderStreakChoices() {
+    const cur = streak.current;
+    const arabic = cur.lang === 'ar';
+    const answered = cur.picked !== null;
+    const list = dom.streakChoices;
+    clear(list);
+    list.dir = arabic ? 'rtl' : 'ltr';
+    list.lang = arabic ? 'ar' : 'en';
+    cur.q.choices.forEach((choice, index) => {
+      const isRight = answered && index === cur.q.correct;
+      const isWrong = answered && index === cur.picked && !isRight;
+      const text = arabic ? choice.text_ar : choice.text;
+      const note = isRight ? ', the right answer' : isWrong ? ', your answer' : '';
+      list.appendChild(h('li', {}, [
+        h('button', {
+          type: 'button',
+          className: 'choice streak-choice' + (isRight ? ' is-right' : '') + (isWrong ? ' is-wrong' : ''),
+          disabled: answered,
+          'aria-label': CHOICE_LETTERS[index] + ': ' + text + note,
+          onclick: () => streakAnswer(index),
+        }, [
+          h('span', { className: 'choice-letter', text: CHOICE_LETTERS[index], 'aria-hidden': 'true' }),
+          h('span', { className: 'choice-text', text: text }),
+        ]),
+      ]));
+    });
+  }
+
+  /** Name, streak count, feedback and the Next / See results and End run buttons. */
+  function renderStreakPanel() {
+    const run = streak;
+    const cur = run.current;
+    const lost = cur.picked !== null && cur.picked !== cur.q.correct;
+    dom.streakName.textContent = run.name;
+    dom.streakName.style.borderLeftColor = paletteEntry(run.color).value;
+    dom.streakCount.textContent = String(run.count);
+    if (cur.picked === null) {
+      showStreakFeedback('', '');
+    } else if (!lost) {
+      showStreakFeedback('Correct! Your streak is ' + run.count + '.', 'is-good');
+    } else {
+      const right = cur.q.choices[cur.q.correct];
+      const arabic = cur.lang === 'ar';
+      showStreakFeedback((cur.picked === STREAK_TIME_UP ? "Time's up!" : 'Wrong!') +
+        ' The right answer was ' + CHOICE_LETTERS[cur.q.correct] + ', ', 'is-bad',
+        { text: arabic ? right.text_ar : right.text, arabic: arabic });
+    }
+    dom.streakNext.hidden = cur.picked === null;
+    dom.streakNext.textContent = lost ? 'See results' : 'Next question';
+    dom.streakNext.disabled = finishing;
+    dom.streakEnd.hidden = lost;
+    dom.streakEnd.disabled = finishing;
+  }
+
+  /**
+   * The feedback line; `answer` ({text, arabic}) is appended in its own <bdi> with its direction,
+   * so an Arabic answer never pulls the sentence's closing full stop to its left edge.
+   */
+  function showStreakFeedback(text, kind, answer) {
+    clear(dom.streakFeedback);
+    dom.streakFeedback.appendChild(document.createTextNode(text));
+    if (answer) {
+      dom.streakFeedback.appendChild(h('bdi', {
+        text: answer.text,
+        dir: answer.arabic ? 'rtl' : 'ltr',
+        lang: answer.arabic ? 'ar' : 'en',
+      }));
+      dom.streakFeedback.appendChild(document.createTextNode('.'));
+    }
+    dom.streakFeedback.className = 'streak-feedback' + (kind ? ' ' + kind : '');
+  }
+
+  function setStreakLoading(loading) {
+    dom.streakNext.disabled = loading;
+    dom.streakNext.textContent = loading ? 'Loading...' : 'Next question';
+  }
+
+  /** A tapped choice, or null when the time ran out. Right: +1 and Next; wrong or too late: the run is over. */
+  function streakAnswer(index) {
+    const run = streak;
+    const cur = run && run.current;
+    if (!cur || cur.picked !== null || run.over || !streakOnScreen()) return;
+    const leftMs = cur.deadline - Date.now();
+    stopTimer();
+    cur.leftMs = Math.max(0, leftMs);
+    cur.picked = index === null || leftMs <= 0 ? STREAK_TIME_UP : index;
+    if (cur.picked === cur.q.correct) run.count += 1;
+    else run.over = true;
+    saveStreak();
+    showTimerAt(run.timerSeconds, cur.leftMs);
+    if (cur.picked === STREAK_TIME_UP) dom.timerStatus.textContent = "Time's up!";
+    renderStreakChoices();
+    renderStreakPanel();
+    dom.streakNext.focus(); // Enter goes on
+    refillStreak(run);
+  }
+
+  function onStreakNext() {
+    const run = streak;
+    if (!run || !run.current || run.current.picked === null || dom.streakNext.disabled) return;
+    if (run.over) finishStreak();
+    else nextStreakQuestion();
+  }
+
+  /** Enter anywhere on the answered question means Next (buttons and links handle Enter themselves). */
+  function onKeyDown(event) {
+    if (event.key !== 'Enter' || !streakOnScreen() || dom.streakNext.hidden || dom.streakNext.disabled) return;
+    const target = event.target;
+    if (target && target.closest && target.closest('button, a, input, select, textarea')) return;
+    event.preventDefault();
+    onStreakNext();
+  }
+
+  /** End run: stop now and save the streak so far (confirm first). */
+  function onStreakEnd() {
+    const run = streak;
+    if (!run || run.over || !streakOnScreen()) return;
+    const text = run.count > 0
+      ? 'End the run now? Your streak of ' + run.count + ' is saved to the leaderboard.'
+      : 'End the run now? You have no streak yet, so nothing is saved.';
+    if (!window.confirm(text)) return;
+    if (streak !== run || run.over) return; // the time ran out while the confirm was open
+    run.over = true;
+    finishStreak();
+  }
+
+  /** The run is over: save it when the streak is 1 or more (D-37), then show the leaderboard. */
+  async function finishStreak() {
+    const run = streak;
+    if (!run || finishing) return;
+    finishing = true;
+    run.over = true;
+    stopTimer();
+    saveStreak();
+    lastStreakProfile = streakProfile(run);
+    const result = {
+      name: run.name,
+      count: run.count,
+      saving: run.count >= 1,
+      saved: null,      // { rank, best } from the server
+      saveError: '',
+    };
+    openLeaderboard(result);
+    if (result.saving) {
+      try {
+        const saved = await apiPost('streaks.php', { name: run.name, streak: run.count });
+        if (!isPlainObject(saved) || !Number.isInteger(saved.rank) || !Number.isInteger(saved.best)) {
+          throw new Error('The server sent an unexpected response.');
+        }
+        result.saved = saved;
+      } catch (err) {
+        result.saveError = errorText(err);
+      }
+      result.saving = false;
+    }
+    finishing = false;
+    // A saved run is done; an unsaved one stays (and is saved again after a refresh) until Try again works.
+    if (streak === run && !result.saveError) {
+      streak = null;
+      saveStreak();
+    }
+    if (leaderboardResult !== result || state.screen !== 'leaderboard') return;
+    renderLeaderboardHead(result);
+    loadLeaderboardRows();
+  }
+
+  /** US-17 for the streak: reopen the saved run. An open question keeps its deadline. */
+  function restoreStreak(run) {
+    streak = run;
+    lastStreakProfile = streakProfile(run);
+    const cur = run.current;
+    const lost = cur !== null && cur.picked !== null && cur.picked !== cur.q.correct;
+    if (run.over && !lost) { // ended with End run or the last question: save it now
+      finishStreak();
+      return;
+    }
+    if (cur !== null) {
+      showStreakQuestion();
+      return;
+    }
+    if (!run.queue.length) throw new Error('The saved run has no question.');
+    nextStreakQuestion();
+  }
+
+  // ---------- Streak leaderboard (US-34) ----------
+
+  /** "2026-10-18" -> "18 Oct 2026" (the server date of the run, not "5 days ago"). */
+  function formatRunDate(date) {
+    const parts = date.split('-');
+    return Number(parts[2]) + ' ' + MONTHS[Number(parts[1]) - 1] + ' ' + parts[0];
+  }
+
+  /** The leaderboard screen: after a run (`result`) with headline, rank, Play again and New Game; from setup (null) with Back. */
+  function openLeaderboard(result) {
+    leaderboardResult = result;
+    clearMessage(dom.lbMsg);
+    renderLeaderboardHead(result);
+    clear(dom.lbList);
+    dom.lbList.appendChild(h('li', { className: 'lb-empty', text: 'Loading the leaderboard...' }));
+    dom.lbAgain.hidden = !result;
+    dom.lbNew.hidden = !result;
+    dom.lbBack.hidden = !!result;
+    showScreen('leaderboard');
+    dom.lbTitle.focus();
+    if (!result || !result.saving) loadLeaderboardRows();
+  }
+
+  /** Headline ("Ahmed Fahim: 13 in a row!") and the rank line, or the save error with Try again. */
+  function renderLeaderboardHead(result) {
+    dom.lbHeadline.hidden = !result;
+    dom.lbRank.hidden = !result;
+    dom.lbAgain.disabled = !!result && result.saving;
+    dom.lbNew.disabled = !!result && result.saving;
+    if (!result) return;
+    dom.lbHeadline.textContent = result.count > 0
+      ? result.name + ': ' + result.count + ' in a row!'
+      : 'No streak this time';
+    if (result.saving) {
+      dom.lbRank.textContent = 'Saving your streak...';
+    } else if (result.saved) {
+      const best = result.saved.best > result.count ? 'Your best is still ' + result.saved.best + '. ' : '';
+      dom.lbRank.textContent = best + 'You are #' + result.saved.rank + ' on the leaderboard.';
+    } else if (result.saveError) {
+      dom.lbRank.hidden = true;
+      clear(dom.lbMsg);
+      dom.lbMsg.className = 'msg msg-error';
+      dom.lbMsg.appendChild(h('span', { text: 'Your streak could not be saved: ' + result.saveError + ' ' }));
+      dom.lbMsg.appendChild(h('button', { type: 'button', className: 'btn btn-small', text: 'Try again', onclick: finishStreak }));
+      dom.lbMsg.hidden = false;
+    } else {
+      dom.lbRank.textContent = 'Only streaks of 1 or more go on the leaderboard.';
+    }
+  }
+
+  /** Fetch and show the top 10; this person's rows are highlighted. */
+  async function loadLeaderboardRows() {
+    const load = ++leaderboardLoads;
+    const result = leaderboardResult;
+    let rows = null;
+    let failure = '';
+    try {
+      const data = await apiGet('streaks.php');
+      if (!Array.isArray(data)) throw new Error('The server sent an unexpected leaderboard.');
+      rows = data.filter((r) => isPlainObject(r) && typeof r.name === 'string' &&
+        Number.isInteger(r.streak) &&
+        typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date));
+    } catch (err) {
+      failure = errorText(err);
+    }
+    if (load !== leaderboardLoads || state.screen !== 'leaderboard') return;
+    renderLeaderboardRows(rows, result, failure);
+  }
+
+  /**
+   * Rows reading "1. Ahmed Fahim · 13 questions · 18 Oct 2026" (rendered with textContent only).
+   * The name sits left and "· 13 questions · 18 Oct 2026" right; the space text nodes between the
+   * flex items are not drawn but keep the row's text (and what screen readers read) in that format.
+   */
+  function renderLeaderboardRows(rows, result, failure) {
+    clear(dom.lbList);
+    if (failure || !rows.length) {
+      dom.lbList.appendChild(h('li', {
+        className: 'lb-empty',
+        text: failure ? 'Could not load the leaderboard: ' + failure : 'No streaks yet. Be the first!',
+      }));
+      return;
+    }
+    const me = result ? result.name.toLowerCase() : null;
+    rows.forEach((r, index) => {
+      const name = r.name;
+      const isMe = me !== null && name.toLowerCase() === me;
+      dom.lbList.appendChild(h('li', { className: 'result-row' + (isMe ? ' is-me' : '') }, [
+        h('span', { className: 'result-rank', text: (index + 1) + '.' }),
+        document.createTextNode(' '),
+        h('span', { className: 'result-name', text: name }),
+        document.createTextNode(' '),
+        h('span', {
+          className: 'lb-meta',
+          text: DOT + ' ' + plural(r.streak, 'question') + ' ' + DOT + ' ' + formatRunDate(r.date),
+        }),
+      ]));
+    });
+  }
+
+  /** Leaving a run whose save failed loses it: ask first. */
+  function confirmDropUnsaved() {
+    if (!streak) return true;
+    if (!window.confirm('Your streak of ' + streak.count + ' was not saved. Leave it unsaved?')) return false;
+    streak = null;
+    saveStreak();
+    return true;
+  }
+
+  /** Play again: a new run with the same name and timer. */
+  async function onPlayAgain() {
+    const profile = lastStreakProfile;
+    if (!profile || dom.lbAgain.disabled || !confirmDropUnsaved()) return;
+    clearMessage(dom.lbMsg);
+    dom.lbAgain.disabled = true;
+    dom.lbAgain.textContent = 'Starting...';
+    try {
+      await startStreakRun(profile);
+    } catch (err) {
+      showMessage(dom.lbMsg, 'Could not start a new run: ' + errorText(err), 'error');
+    } finally {
+      dom.lbAgain.disabled = false;
+      dom.lbAgain.textContent = 'Play again';
+    }
+  }
+
+  function onLeaderboardNewGame() {
+    if (dom.lbNew.disabled || !confirmDropUnsaved()) return;
+    newGame();
+  }
+
+  /** "Streak leaderboard" in the streak setup; Back returns to the setup as it was. */
+  function onLeaderboardOpen() {
+    openLeaderboard(null);
+  }
+
+  function onLeaderboardBack() {
+    showScreen('setup');
+    dom.streakBoardBtn.focus();
   }
 
   // ---------- Startup ----------
@@ -1864,9 +2649,27 @@
     clearMessage(dom.catError);
     clearMessage(dom.startMsg);
     dom.startBtn.textContent = 'Start Game';
+    dom.streakBtn.textContent = 'Start Streak Challenge';
+    dom.streakNameInput.value = '';
+    setFieldError(dom.streakNameInput, dom.streakNameError, '');
     renderEntries();
+    renderSetupMode();
     showScreen('setup');
     loadSetupData();
+  }
+
+  function bindStreakEvents() {
+    dom.streakOpenBtn.addEventListener('click', onStreakOpen);
+    dom.streakBtn.addEventListener('click', onStreakStart);
+    dom.streakCancel.addEventListener('click', onStreakCancel);
+    dom.streakBoardBtn.addEventListener('click', onLeaderboardOpen);
+    dom.streakNameInput.addEventListener('input', () => setFieldError(dom.streakNameInput, dom.streakNameError, ''));
+    dom.streakNext.addEventListener('click', onStreakNext);
+    dom.streakEnd.addEventListener('click', onStreakEnd);
+    dom.lbAgain.addEventListener('click', onPlayAgain);
+    dom.lbNew.addEventListener('click', onLeaderboardNewGame);
+    dom.lbBack.addEventListener('click', onLeaderboardBack);
+    document.addEventListener('keydown', onKeyDown);
   }
 
   function bindEvents() {
@@ -1883,6 +2686,7 @@
     dom.timerReset.addEventListener('click', onResetClick);
     dom.backBtn.addEventListener('click', backToBoard);
     dom.newGameBtn.addEventListener('click', newGame);
+    bindStreakEvents();
   }
 
   /** US-17: reopen the saved screen. An open question restarts its timer at full length (D-04). */
@@ -1914,6 +2718,17 @@
         stopTimer();
         state.game = null;
         clearSavedState();
+      }
+    }
+    const savedStreak = loadStreak();
+    if (savedStreak) {
+      try {
+        restoreStreak(savedStreak);
+        return;
+      } catch (err) {
+        stopTimer();
+        streak = null;
+        saveStreak();
       }
     }
     startSetup();

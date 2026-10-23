@@ -1,16 +1,19 @@
 <?php
-// POST /api/game-log.php  body { mode: 'players'|'teams', players: [name, ...], categories: [id, ...] } -> 201 { logged: true }
+// POST /api/game-log.php  body { mode: 'players'|'teams'|'streak', players: [name, ...], categories: [id, ...] } -> 201 { logged: true }
 // mode is optional and defaults to 'players'; players holds the player or team names.
+// A Streak Challenge run (US-33) sends mode 'streak', one name (the challenger name) and no categories
+// (its questions come from every category).
 // Appends one line per started game to that day's log file, logs/game-YYYY-MM-DD.log:
 //   <YYYY-MM-DD HH:MM, server time> | players: <name>, <name> | categories: <name>, <name>
 //   <YYYY-MM-DD HH:MM, server time> | teams: <name>, <name> | categories: <name>, <name>
+//   <YYYY-MM-DD HH:MM, server time> | streak: <name> | categories: all
 // Category names come from the database, so the log never holds client-made category text.
 // Public on purpose (every game start calls it); read_json_body() forces a CORS preflight.
 require_once __DIR__ . '/db.php';
 
 const GAME_LOG_DIR = __DIR__ . '/../logs';
-const GAME_LOG_MAX_BY_MODE = ['players' => 6, 'teams' => 4]; // MODES limits in js/game.js
-const GAME_LOG_NAME_MAX = 30;      // NAME_MAX in js/game.js (D-22)
+const GAME_LOG_MAX_BY_MODE = ['players' => 6, 'teams' => 4, 'streak' => 1]; // MODES limits in js/game.js
+const GAME_LOG_NAME_MAX = 30;      // NAME_MAX in js/game.js (D-22); also the challenger name
 const GAME_LOG_MAX_CATEGORIES = 10; // categories_per_game upper bound
 
 /** One log field: control characters (newlines, tabs) become spaces, so a name cannot forge a line. */
@@ -35,6 +38,9 @@ function read_mode($value): string
 function read_players($value, string $mode): array
 {
     $max = GAME_LOG_MAX_BY_MODE[$mode];
+    if ($mode === 'streak' && (!is_array($value) || count($value) !== 1)) {
+        bad_request('streak mode takes exactly 1 name');
+    }
     if (!is_array($value) || !$value || count($value) > $max) {
         bad_request("players must be a list of 1 to $max names");
     }
@@ -72,7 +78,8 @@ switch ($_SERVER['REQUEST_METHOD']) {
         $body = read_json_body();
         $mode = read_mode($body['mode'] ?? null);
         $players = read_players($body['players'] ?? null, $mode);
-        $categories = read_category_names(db(), $body['categories'] ?? null);
+        // A streak plays every category, so it sends none.
+        $categories = $mode === 'streak' ? ['all'] : read_category_names(db(), $body['categories'] ?? null);
 
         if (!is_dir(GAME_LOG_DIR)) {
             mkdir(GAME_LOG_DIR, 0755, true);

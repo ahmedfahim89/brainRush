@@ -6,6 +6,8 @@ Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..U
 
 **Helpers (2026-10-23, outside the sprint cycle):** US-32 / D-36 (3 choices, Swap, Skip; once per contestant per game) implemented on branch `helpers` (`docs/sprints/helpers-dev.md`); game-tester verification next (max 2 fix loops), then the owner's local Chrome check before commit/PR. Needs `sql/migrate-add-wrong-options.sql` on every DB before the code; the wrong-option content (`sql/add-wrong-options.sql`) is produced in parallel and reviewed by the owner.
 
+**Streak Challenge (2026-10-23, outside the sprint cycle):** US-33 / US-34 / D-37 (solo run of 3-choice questions until the first wrong answer or time's up, plus a shared top-10 leaderboard and an admin moderation list) implemented on branch `streak-mode` from main 4582c9d (`docs/sprints/streak-mode-dev.md`); game-tester verification next (max 2 fix loops), then the owner's local Chrome check before commit/PR. Needs `sql/migrate-add-streak.sql` (creates the `streaks` table) on every DB before the code; it reuses the helper's wrong options, so `sql/migrate-add-wrong-options.sql` must be there too.
+
 | Sprint | Goal | Status |
 |---|---|---|
 | 1 | Foundation (DB + API) | Done |

@@ -81,6 +81,19 @@ CREATE TABLE IF NOT EXISTS questions (
     ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
+-- Streak Challenge leaderboard (US-33, US-34, D-37): one row per finished run with a
+-- streak of 1 or more. The game shows the best run per person (the challenger name,
+-- case-insensitive via the _ci collation); on equal streaks the earliest run wins.
+CREATE TABLE IF NOT EXISTS streaks (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name       VARCHAR(30)  NOT NULL,
+  streak     INT UNSIGNED NOT NULL,
+  created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_streaks_name (name),
+  KEY idx_streaks_streak (streak)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
 -- ---------------------------------------------------------------------------
 -- Seed data
 -- ---------------------------------------------------------------------------
