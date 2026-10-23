@@ -518,6 +518,17 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Swapped cell (US-32): the old value is struck through; the replacing question is shown small. */
+.board-cell .cell-points.is-struck { text-decoration: line-through; text-decoration-thickness: 0.08em; opacity: 0.6; }
+.cell-swap {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: min(clamp(0.5rem, calc(var(--cell-w) / 16), 0.7rem), 14cqh);
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* Label shrinks with column width and digit count so e.g. 10000 never wraps or overflows,
    and with the cell height (cqh of the cell) on short rows. */
 .cell-points {
@@ -574,6 +585,7 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 /* Helpers left (US-32): one small line of the chip symbols; a used helper is dimmed and struck */
 .score-helpers { grid-area: helpers; display: flex; justify-content: center; gap: 0.3rem; font-size: 0.7rem; font-weight: 700; line-height: 1; }
 .score-helper { padding: 0.12rem 0.4rem; background: rgba(0, 0, 0, 0.22); border-radius: 999px; }
+.score-helpers[hidden], .srow-helpers[hidden] { display: none; }
 .score-helper.is-used { opacity: 0.35; text-decoration: line-through; }
 
 /* Question screen (US-11..US-14): question left, scoring right; stacks on narrow screens */

@@ -530,8 +530,15 @@
     return isPlainObject(used) && Object.keys(used).every((key) => {
       const cell = used[key];
       return isBoardCellKey(key, g) && isPlainObject(cell) &&
-        (cell.owner === null || (Number.isInteger(cell.owner) && findContestant(g, cell.owner) !== null));
+        (cell.owner === null || (Number.isInteger(cell.owner) && findContestant(g, cell.owner) !== null)) &&
+        (cell.swap === undefined || isValidUsedSwap(cell.swap));
     });
+  }
+
+  /** A cell closed after a Swap: the category and points of the question that replaced it (shown on the board). */
+  function isValidUsedSwap(swap) {
+    return isPlainObject(swap) && typeof swap.catName === 'string' && swap.catName !== '' &&
+      Number.isInteger(swap.points) && swap.points > 0;
   }
 
   /** Open question: an unused cell, marks only for real contestants, at most one Correct (US-14), valid helper use. */
@@ -585,6 +592,7 @@
     const range = timerRange();
     return isValidContestants(g.contestants, MODES[g.mode]) &&
       Number.isInteger(g.timerSeconds) && g.timerSeconds >= range.min && g.timerSeconds <= range.max &&
+      (g.helpersOff === undefined || typeof g.helpersOff === 'boolean') && // games saved before the setting
       isValidBoard(g.points, g.categories) &&
       isValidUsed(g.used, g) && isValidCurrent(g.current, g);
   }
@@ -616,6 +624,7 @@
       mode: 'players',
       entries: [],
       maintenance: false, // start_game_hidden from settings (maintenance mode)
+      helpersOn: true,    // helpers_enabled from settings; a new game keeps it
       perGame: null,      // categories_per_game from settings
       timerDefault: null, // timer_seconds from settings
       playable: [],       // [{id, name}] from categories.php?playable=1
@@ -905,6 +914,7 @@
       s.timerDefault = Number.isInteger(settings.timer_seconds) ? settings.timer_seconds : null;
       renderBanner(settings);
       s.maintenance = settings.start_game_hidden === 1;
+      s.helpersOn = settings.helpers_enabled !== 0; // a missing row means on
       s.playable = results[1].filter((c) => isPlainObject(c) && Number.isInteger(c.id) && typeof c.name === 'string')
         .map((c) => ({ id: c.id, name: c.name }));
       s.selected = s.selected.filter((id) => id === SURPRISE || s.playable.some((c) => c.id === id));
@@ -1199,6 +1209,7 @@
         id: i + 1, name: e.name.trim(), color: e.color, score: 0, helpers: allHelpers(),
       })),
       timerSeconds: timerSeconds, // this game only; the admin setting is not changed
+      helpersOff: !s.helpersOn,   // admin setting when the game starts (helpers_enabled)
       points: board.points,
       categories: board.categories,
       used: {},
@@ -1288,14 +1299,23 @@
         onclick: () => openQuestion(category.id, points),
       }, [label]);
     }
-    const owner = g.used[key].owner === null ? null : findContestant(g, g.used[key].owner);
+    const used = g.used[key];
+    const owner = used.owner === null ? null : findContestant(g, used.owner);
+    const swap = used.swap;
+    // After a Swap the old value is struck through and the question that replaced it is shown small.
+    if (swap) label.classList.add('is-struck');
     const cell = h('button', {
       type: 'button',
       className: 'board-cell is-used ' + (owner ? 'is-owned' : 'is-unanswered'),
       disabled: true, // disabled buttons ignore clicks
-      'aria-label': categoryLabel(category) + ', ' + points + ' points, ' +
+      'aria-label': categoryLabel(category) + ', ' + points + ' points' +
+        (swap ? ', swapped to ' + swap.catName + ' ' + EN_DASH + ' ' + swap.points : '') + ', ' +
         (owner ? 'won by ' + owner.name : 'no correct answer'),
-    }, [label, owner ? h('span', { className: 'cell-owner', text: owner.name }) : null]);
+    }, [
+      label,
+      swap ? h('span', { className: 'cell-swap', text: swap.catName + ' ' + EN_DASH + ' ' + swap.points }) : null,
+      owner ? h('span', { className: 'cell-owner', text: owner.name }) : null,
+    ]);
     if (owner) {
       const color = paletteEntry(owner.color);
       cell.style.backgroundColor = color.value;
@@ -1369,7 +1389,7 @@
   function renderHelpersLeft(contestant) {
     const left = HELPER_KEYS.filter((key) => contestant.helpers[key]).map((key) => HELPERS[key].name);
     const text = left.length ? 'Helpers left: ' + left.join(', ') : 'No helpers left';
-    return h('span', { className: 'score-helpers', title: text }, [
+    return h('span', { className: 'score-helpers', title: text, hidden: state.game.helpersOff === true }, [
       h('span', { className: 'visually-hidden', text: text }),
     ].concat(HELPER_KEYS.map((key) => h('span', {
       className: 'score-helper' + (contestant.helpers[key] ? '' : ' is-used'),
@@ -1613,7 +1633,8 @@
           onclick: () => markContestant(c, 'wrong'),
         }),
       };
-      const chips = h('span', { className: 'srow-helpers' }, HELPER_KEYS.map((key) => helperBtns[key]));
+      const chips = h('span', { className: 'srow-helpers', hidden: g.helpersOff === true },
+        HELPER_KEYS.map((key) => helperBtns[key]));
       ref.row = h('li', { className: 'srow' }, [name, chips, ref.score, ref.status, ref.correct, ref.wrong]);
       ref.row.style.borderLeftColor = color.value;
       dom.scoreRows.appendChild(ref.row);
@@ -1664,6 +1685,7 @@
   function helperBlockReason(contestant, key) {
     const g = state.game;
     const cur = g.current;
+    if (g.helpersOff) return 'helpers are turned off';
     if (swapping !== null) {
       return swapping === contestant.id && key === 'swap' ? 'loading a new question' : 'wait for the swap';
     }
@@ -1819,7 +1841,10 @@
     const cur = g && g.current;
     if (!cur) return;
     stopTimer();
-    g.used[cellKey(cur.catId, cur.points)] = { owner: correctContestantId(cur) };
+    const cell = { owner: correctContestantId(cur) };
+    // A Swap replaced the question: the board shows the old value struck through and the new one small.
+    if (cur.swap) cell.swap = { catName: cur.swap.catName, points: cur.swap.points };
+    g.used[cellKey(cur.catId, cur.points)] = cell;
     g.current = null;
     renderGame();
     showScreen('board'); // also saves the state

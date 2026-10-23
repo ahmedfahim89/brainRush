@@ -105,6 +105,7 @@ INSERT IGNORE INTO settings (name, value) VALUES
   ('timer_seconds', '30'),
   ('banner_enabled', '0'),
   ('start_game_hidden', '0'),
+  ('helpers_enabled', '1'),
   ('banner_text', 'New questions added - try them now!');
 
 INSERT IGNORE INTO point_values (points) VALUES

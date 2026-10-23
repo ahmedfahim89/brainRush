@@ -70,7 +70,7 @@ Players read the guide at `how-to-play.html`, linked as "How to play" in the gam
 
 ## Admin usage (`admin.html`)
 
-- **Game settings:** categories per game (1–10) and the default timer (5–600 seconds).
+- **Game settings:** categories per game (1–10) and the default timer (5–600 seconds). **Game helpers** (3 choices, Swap, Skip) can be switched off here; new games then hide them, and a game already in progress keeps its helpers.
 - **Point values:** these are the board rows, each with its number of questions. Add values such as 1000 or 10000, or delete unused ones. A value that still has questions cannot be deleted. **Disable** hides a value from the board (e.g. disable 600 and the board shows 100–500) without deleting its questions; **Enable** brings it back. At least one value must stay enabled. A database from before this feature needs `sql/migrate-disable-points.sql` first.
 - **Categories:** each shows its number of questions and a status. A category is *playable*, and offered in game setup, when it has at least one question for every enabled point value; otherwise it shows "Not playable: missing 600" (the values without a question). You can add, rename inline, or delete; deleting a category also deletes its questions, after a confirmation.
 - **Questions:** filter by category, then add, edit or delete. Each question has a category, a point value (any value; several questions may share a category and value), a question text and an answer. The list is sorted by category, then points. More questions per cell mean more variety between games. The same question text twice in one category is refused (not case-sensitive).
