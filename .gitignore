@@ -4,3 +4,5 @@ Thumbs.db
 *.log
 .claude/settings.local.json
 /password.txt
+# Internal-only files (credentials and local config)
+/InternalUse/
