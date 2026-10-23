@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BrainRush - Admin</title>
-  <link rel="stylesheet" href="css/style.de7729fa.css">
+  <link rel="stylesheet" href="css/style.9589bead.css">
 </head>
 <body class="admin">
   <header class="page-header">
@@ -42,6 +42,11 @@
           Maintenance mode: hide the Start Game button
         </label>
         <p class="hint">When on, players see a "back within 24 hours" popup instead of the game.</p>
+        <label class="check-label" for="setting-helpers-enabled">
+          <input id="setting-helpers-enabled" name="helpers_enabled" type="checkbox">
+          Game helpers: 3 choices, Swap and Skip
+        </label>
+        <p class="hint">When off, the helper buttons are hidden for new games. A game already in progress keeps its helpers.</p>
         <div class="actions">
           <button type="submit" class="btn btn-primary">Save settings</button>
         </div>
@@ -180,6 +185,6 @@
     </section>
   </main>
 
-  <script src="js/admin.05c942fb.js"></script>
+  <script src="js/admin.0067ed84.js"></script>
 </body>
 </html>
