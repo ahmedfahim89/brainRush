@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BrainRush - Admin</title>
-  <link rel="stylesheet" href="css/style.60c521bb.css">
+  <link rel="stylesheet" href="css/style.f96fbd1d.css">
 </head>
 <body class="admin">
   <header class="page-header">
@@ -186,8 +186,31 @@
         </table>
       </div>
     </section>
+
+    <!-- Game logs: read-only view of the .log/.txt files in the logs folder -->
+    <section class="panel panel-wide" id="logs-panel" aria-labelledby="logs-title">
+      <h2 id="logs-title">Game logs</h2>
+      <p class="hint">The files in the <code>logs</code> folder, newest first. Click a file name to view its content.</p>
+      <div class="actions">
+        <button type="button" id="logs-reload" class="btn btn-small">Reload</button>
+      </div>
+      <p id="logs-msg" class="msg" role="status" aria-live="polite" hidden></p>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th scope="col">File</th><th scope="col">Size</th><th scope="col">Modified</th></tr>
+          </thead>
+          <tbody id="logs-body"></tbody>
+        </table>
+      </div>
+      <div id="log-viewer" class="log-viewer" hidden>
+        <h3 id="log-viewer-title"></h3>
+        <p id="log-viewer-note" class="hint" hidden></p>
+        <pre id="log-content" class="log-content" tabindex="0" aria-labelledby="log-viewer-title"></pre>
+      </div>
+    </section>
   </main>
 
-  <script src="js/admin.c338f454.js"></script>
+  <script src="js/admin.6c1aceb1.js"></script>
 </body>
 </html>

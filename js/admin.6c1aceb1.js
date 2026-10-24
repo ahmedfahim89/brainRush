@@ -1,4 +1,4 @@
-// BrainRush admin page: settings, point values, categories, questions and the streak leaderboard.
+// BrainRush admin page: settings, point values, categories, questions, the streak leaderboard and the game logs.
 // Question bank (D-31 amended): every question has a point value, a category may have
 // several questions per value, and it is playable when every enabled point value has one.
 // All API/user text is rendered with textContent / DOM APIs (never innerHTML).
@@ -22,6 +22,8 @@
     questions: [],     // [{ id, category_id, category_name, points, question, answer, question_ar, answer_ar, image, image_credit,
                        //    wrong_1, wrong_2, wrong_1_ar, wrong_2_ar }]
     streaks: [],       // [{ id, name, streak, created_at }] newest first (US-34)
+    logs: [],          // [{ name, size, modified }] newest first
+    openLog: null,     // name of the log file shown in the viewer, or null
     renamingId: null,  // category currently being renamed inline
     renameDraft: '',
     editing: null,     // question being edited, or null when the form is in "add" mode
@@ -76,6 +78,13 @@
     streaksReload: byId('streaks-reload'),
     streaksMsg: byId('streaks-msg'),
     streaksBody: byId('streaks-body'),
+    logsReload: byId('logs-reload'),
+    logsMsg: byId('logs-msg'),
+    logsBody: byId('logs-body'),
+    logViewer: byId('log-viewer'),
+    logViewerTitle: byId('log-viewer-title'),
+    logViewerNote: byId('log-viewer-note'),
+    logContent: byId('log-content'),
   };
 
   // ---------- Generic helpers ----------
@@ -272,6 +281,7 @@
     if (await checkAuth()) {
       loadSettings();
       loadStreaks();
+      loadLogs();
       await loadData();
     }
   }
@@ -972,6 +982,95 @@
     });
   }
 
+  // ---------- Game logs ----------
+  // Read-only: the list of .log/.txt files in the logs folder; a click shows one file's content.
+
+  /** File size for the list: bytes, KB or MB. */
+  function fileSize(bytes) {
+    if (bytes < 1024) return plural(bytes, 'byte');
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  async function loadLogs() {
+    dom.logsReload.disabled = true;
+    try {
+      state.logs = ensureArray(await api('logs.php'), 'log file');
+      renderLogs();
+      // Keep the open file current (a log grows while games are played); close it if it is gone.
+      if (state.openLog !== null) {
+        if (state.logs.some((log) => log.name === state.openLog)) {
+          await openLog(state.openLog);
+        } else {
+          closeLog();
+        }
+      }
+    } catch (err) {
+      showError(dom.logsMsg, 'Could not load the log files: ' + errorText(err));
+    } finally {
+      dom.logsReload.disabled = false;
+    }
+  }
+
+  function onLogsReload() {
+    clearMessage(dom.logsMsg);
+    loadLogs();
+  }
+
+  function renderLogs() {
+    clear(dom.logsBody);
+    if (!state.logs.length) {
+      dom.logsBody.appendChild(h('tr', {}, [
+        h('td', { className: 'empty-row', colSpan: 3, text: 'No log files yet.' }),
+      ]));
+      return;
+    }
+    state.logs.forEach((log) => {
+      dom.logsBody.appendChild(h('tr', { className: log.name === state.openLog ? 'is-open' : '' }, [
+        h('td', { className: 'name-cell' }, [
+          h('button', {
+            type: 'button',
+            className: 'link-btn',
+            text: log.name,
+            'aria-label': 'View ' + log.name,
+            onclick: () => {
+              clearMessage(dom.logsMsg);
+              openLog(log.name);
+            },
+          }),
+        ]),
+        h('td', { className: 'num', text: fileSize(log.size) }),
+        h('td', { className: 'num', text: String(log.modified) }),
+      ]));
+    });
+  }
+
+  /** Fetch one file and show it in the viewer below the list. */
+  async function openLog(name) {
+    try {
+      const data = await api('logs.php?file=' + encodeURIComponent(name));
+      state.openLog = name;
+      dom.logViewerTitle.textContent = name;
+      dom.logContent.textContent = data.content || '(empty file)';
+      dom.logViewerNote.hidden = !data.truncated;
+      dom.logViewerNote.textContent = data.truncated
+        ? 'This file is ' + fileSize(data.size) + '; only its last 1 MB (the newest lines) is shown.'
+        : '';
+      dom.logViewer.hidden = false;
+      renderLogs();
+    } catch (err) {
+      showError(dom.logsMsg, 'Could not open ' + name + ': ' + errorText(err));
+      if (err instanceof ApiError && err.status === 404) loadLogs(); // the file is gone: refresh the list
+    }
+  }
+
+  function closeLog() {
+    state.openLog = null;
+    dom.logViewer.hidden = true;
+    clear(dom.logContent);
+    renderLogs();
+  }
+
   // ---------- Startup ----------
 
   function bindEvents() {
@@ -986,6 +1085,7 @@
     dom.qPointsFilter.addEventListener('change', onFilterChange);
     dom.authRetry.addEventListener('click', onAuthRetry);
     dom.streaksReload.addEventListener('click', onStreaksReload);
+    dom.logsReload.addEventListener('click', onLogsReload);
   }
 
   async function loadData() {
@@ -1001,10 +1101,12 @@
     setFormMode();
     renderAll();
     renderStreaks();
+    renderLogs();
     // Log in first: nothing (questions and answers included) is loaded until it succeeds.
     if (await checkAuth()) {
       loadSettings();
       loadStreaks();
+      loadLogs();
       await loadData();
     }
   }
