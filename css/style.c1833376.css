@@ -93,6 +93,40 @@ a { color: var(--gold); }
 .maintenance-card p { margin: 0; }
 .maintenance-img { display: block; width: 100%; height: auto; margin-bottom: 1rem; border-radius: var(--radius); }
 
+/* ---------- Double score popup (D-40) ---------- */
+.double-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 102; /* above the page header: the popup must be closed first */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(5, 8, 22, 0.88);
+}
+.double-overlay[hidden] { display: none; }
+.double-card {
+  max-width: 28rem;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 1.5rem 1.25rem;
+  border: 2px solid var(--gold);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: 0 0 32px rgba(245, 197, 24, 0.35);
+  text-align: center;
+  font-size: 1.15rem;
+  line-height: 1.5;
+}
+.double-card p { margin: 0 0 1.2rem; }
+.double-card .double-title {
+  margin-bottom: 0.6rem;
+  color: var(--gold);
+  font-size: 2rem;
+  font-weight: 800;
+  animation: banner-pulse 1.6s ease-in-out infinite;
+}
+
 /* ---------- Form controls ---------- */
 input, select, textarea, button { font: inherit; }
 /* No double-tap zoom when the host taps buttons quickly (e.g. + / - on the scoreboard) */
@@ -439,6 +473,7 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 @media (prefers-reduced-motion: reduce) {
   .new-banner::before { animation: none; }
   .new-banner::after { display: none; }
+  .double-card .double-title { animation: none; }
 }
 
 /* Board: columns = categories, rows = point values (both from data; JS sets --cols and --digits) */
@@ -549,6 +584,16 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 }
 /* Swapped cell (US-32): the old value is struck through; the replacing question is shown small. */
 .board-cell .cell-points.is-struck { text-decoration: line-through; text-decoration-thickness: 0.08em; opacity: 0.6; }
+/* Played double-score cell (D-40): a small "×2" tag in the top-right corner */
+.board-cell.is-double { position: relative; }
+.cell-double {
+  position: absolute;
+  top: 0.15rem;
+  right: 0.3rem;
+  font-size: min(clamp(0.55rem, calc(var(--cell-w) / 12), 0.85rem), 22cqh);
+  font-weight: 800;
+  line-height: 1;
+}
 .cell-swap {
   max-width: 100%;
   overflow: hidden;
@@ -710,6 +755,22 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 
 .lang-btn { margin: 0 0 1.2rem; }
 .lang-btn[hidden] { display: none; }
+
+/* Double score (D-40): gold "×2 Double score" badge after the heading */
+.question-double {
+  display: inline-block;
+  margin-left: 0.8rem;
+  padding: 0.1rem 0.6rem;
+  color: #1a1a1a;
+  background: var(--gold);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: 0;
+  vertical-align: middle;
+  white-space: nowrap;
+}
 
 /* Swap helper (US-32): "Swapped from History – 300" after the new question's heading */
 .question-swap-note {
@@ -876,6 +937,10 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 /* The mark that was given stays clearly visible while its buttons are disabled */
 .btn-correct.is-chosen { opacity: 1; color: #0b1026; background: var(--success); border-color: var(--success); }
 .btn-wrong.is-chosen { opacity: 1; color: #0b1026; background: var(--danger); border-color: var(--danger); }
+/* Double score (D-40): Correct is a gold button with white text instead of green */
+.btn-correct.is-double { color: #ffffff; background: var(--gold); border-color: var(--gold); font-weight: 700; }
+@media (hover: hover) { .btn-correct.is-double:hover:not(:disabled) { background: var(--gold-dark); border-color: var(--gold-dark); } }
+.btn-correct.is-double.is-chosen { color: #ffffff; background: var(--gold); border-color: var(--gold); }
 .btn-block { display: block; width: 100%; }
 
 @media (max-width: 960px) {

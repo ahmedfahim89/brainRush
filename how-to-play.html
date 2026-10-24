@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BrainRush - How to play</title>
-  <link rel="stylesheet" href="css/style.f96fbd1d.css">
+  <link rel="stylesheet" href="css/style.c1833376.css">
   <link rel="stylesheet" href="css/guide.12d2b532.css">
 </head>
 <body class="guide">
@@ -27,6 +27,7 @@
         <li><a href="#question">Answering a question</a></li>
         <li><a href="#scoring">Scoring</a></li>
         <li><a href="#helpers">Helpers</a></li>
+        <li><a href="#double">&times;2 Double score</a></li>
         <li><a href="#ending">Ending the game</a></li>
         <li><a href="#streak">💀 Sudden Death Streak (solo)</a></li>
         <li><a href="#tips">Tips and questions</a></li>
@@ -81,7 +82,7 @@
       <ul>
         <li>Each <strong>column</strong> is a category and each <strong>row</strong> is a point value, from the lowest at the top to the highest at the bottom. More points means a harder question.</li>
         <li>Click a cell to open its question. Your group decides who picks next, for example taking turns.</li>
-        <li>After a question, its cell closes. It takes the <strong>color and name</strong> of whoever answered correctly, or turns <strong>grey</strong> if nobody did. A closed cell can't be opened again.</li>
+        <li>After a question, its cell closes. It takes the <strong>color and name</strong> of whoever answered correctly, or turns <strong>grey</strong> if nobody did. A closed cell can't be opened again. The <a href="#double">double score</a> cell also shows a small <strong>&times;2</strong> in its corner once it has been played.</li>
         <li>The <strong>scoreboard</strong> below the board shows every score. The host can use <strong>&minus;</strong> and <strong>+</strong> to fix a score if a mark was wrong.</li>
       </ul>
     </section>
@@ -105,6 +106,7 @@
         <li>Only <strong>one</strong> player or team can be correct on each question, but anyone may try, unless someone has used a <a href="#helpers">helper</a> on it.</li>
         <li>Each player or team can be marked only once per question, and a mark can't be undone. To fix a mistake, use <strong>&minus;</strong> / <strong>+</strong> on the scoreboard.</li>
         <li><strong>Back to Board</strong> closes the question for good, whether or not anyone answered.</li>
+        <li>One hidden question on every board is worth <a href="#double">double</a> for a correct answer.</li>
       </ul>
       <h3>Example</h3>
       <p>Sara, Omar and Lina open a 300 question.</p>
@@ -142,6 +144,30 @@
       </ul>
       <h3>Example</h3>
       <p>Omar opens a 400 question and has no idea. He uses <strong>Skip</strong> and loses 200 instead of risking 400. Later, Lina uses <strong>3 choices</strong> on a 300 question, picks B and gets it right: +300.</p>
+    </section>
+
+    <section id="double" class="guide-section">
+      <h2>&times;2 Double score</h2>
+      <p>Every game hides <strong>one double score question</strong> somewhere on the board. It is picked at random when the game starts, and nothing on the board shows which one it is.</p>
+      <ul>
+        <li>When someone opens it, a <strong>&times;2 Double score!</strong> popup appears and shows what the question is worth. The timer waits until the host clicks <strong>Let's play</strong>.</li>
+        <li>The question's heading shows a gold <strong>&times;2 Double score</strong> badge, and the <strong>Correct</strong> buttons turn gold and show the doubled points.</li>
+        <li><strong>&check; Correct</strong> earns <strong>twice</strong> the question's points.</li>
+        <li><strong>&cross; Wrong</strong> costs only the <strong>normal</strong> points: there is no double penalty, so it's worth having a go!</li>
+        <li><strong>Swap</strong> keeps the double: the new question is worth twice its own points. <strong>Skip</strong> costs half the normal points, as usual.</li>
+        <li>Once it has been played, its cell on the board shows a small <strong>&times;2</strong> in the corner.</li>
+      </ul>
+      <h3>Example</h3>
+      <p>Sara opens a 300 question and the Double score popup appears.</p>
+      <table class="guide-table">
+        <thead>
+          <tr><th scope="col">What happens</th><th scope="col">Host marks</th><th scope="col">Score change</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Omar answers first, but gets it wrong</td><td>Omar: Wrong</td><td class="neg">Omar &minus;300</td></tr>
+          <tr><td>Sara answers correctly</td><td>Sara: Correct</td><td class="pos">Sara +600</td></tr>
+        </tbody>
+      </table>
     </section>
 
     <section id="ending" class="guide-section">
