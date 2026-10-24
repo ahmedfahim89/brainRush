@@ -249,6 +249,35 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 .data-table td.name-cell { min-width: 9rem; overflow-wrap: anywhere; }
 .rename-input { max-width: 22rem; }
 
+/* Game logs: file names look like links; the open file's row is highlighted */
+.link-btn {
+  padding: 0;
+  color: var(--gold);
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.link-btn:hover { color: var(--text); }
+.data-table tr.is-open td { background: rgba(245, 197, 24, 0.08); }
+.log-viewer { margin-top: 1rem; }
+.log-viewer h3 { margin: 0 0 0.4rem; overflow-wrap: anywhere; }
+.log-content {
+  max-height: 28rem;
+  margin: 0;
+  padding: 0.8rem 1rem;
+  overflow: auto;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  white-space: pre;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
 .badge {
   display: inline-block;
   padding: 0.1rem 0.5rem;
