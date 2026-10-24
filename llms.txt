@@ -4,6 +4,7 @@
 
 - Up to 6 players or 4 teams, each with their own color.
 - A correct answer adds the question's points, a wrong one takes them away.
+- One random question on each board is secretly worth double points for a correct answer; a popup reveals it when it is opened.
 - Every question has a countdown timer.
 - Each player or team has 3 helpers per game: 3 choices, Swap (a random new question) and Skip (lose only half the points).
 - Playing alone, the Streak Challenge asks multiple-choice questions from every category until the first wrong answer or time's up; the longest streaks go on a shared top-10 leaderboard under the challenger name the player enters.

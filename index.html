@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BrainRush</title>
-  <link rel="stylesheet" href="css/style.f96fbd1d.css">
+  <link rel="stylesheet" href="css/style.c1833376.css">
 </head>
 <body class="game">
   <header class="page-header">
@@ -17,6 +17,15 @@
     <div class="maintenance-card">
       <img class="maintenance-img" src="img/maintenance.jpg" alt="" width="1024" height="559">
       <p id="maintenance-text">Poor AI agents are working late tonight to deliver the cool features you asked for. The game will be playable again within 24 hours.</p>
+    </div>
+  </div>
+
+  <!-- Double score (D-40): shown when the host opens the game's hidden double-score cell -->
+  <div id="double-overlay" class="double-overlay" role="alertdialog" aria-modal="true" aria-labelledby="double-title" aria-describedby="double-text" hidden>
+    <div class="double-card">
+      <p id="double-title" class="double-title">&times;2 Double score!</p>
+      <p id="double-text"></p>
+      <button type="button" id="double-ok" class="btn btn-primary btn-large">Let's play</button>
     </div>
   </div>
 
@@ -205,6 +214,6 @@
     </section>
   </main>
 
-  <script src="js/game.6fc810cf.js"></script>
+  <script src="js/game.b19c6269.js"></script>
 </body>
 </html>

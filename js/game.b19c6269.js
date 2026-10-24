@@ -28,6 +28,7 @@
   const CHECK = String.fromCharCode(0x2713);   // check mark
   const CROSS = String.fromCharCode(0x2717);   // ballot x
   const ELLIPSIS = String.fromCharCode(0x2026);
+  const DOUBLE_FACTOR = 2; // D-40: a Correct on the hidden double-score cell earns this many times its points
 
   // Helpers (US-32, D-36): each contestant may use each one once per game. `chip` is the
   // icon-sized text on the scoring row and the scoreboard; `name` is used in confirms and tooltips.
@@ -74,6 +75,7 @@
   //   { mode, contestants: [{id, name, color, score, helpers: {choices, swap, skip}}], timerSeconds, points,
   //     categories: [{id, name, questions, hidden}] (hidden = unopened "Surprise me!" pick, shown as "?"),
   //     used: { "<categoryId>:<points>": { owner: contestantId | null } },
+  //     double?: "<categoryId>:<points>" (D-40: the hidden double-score cell, picked at Start),
   //     current: null | { catId, points, marks: { "<contestantId>": "correct" | "wrong" }, answerShown,
   //                       lang, by?, choiceOrder?, swap? } }
   // helpers: true = still available (US-32). On the open question: by = id of the contestant who
@@ -147,6 +149,10 @@
     playedReset: byId('played-reset'),
     startBtn: byId('start-btn'),
     maintenanceOverlay: byId('maintenance-overlay'),
+    main: document.querySelector('.game-main'),
+    doubleOverlay: byId('double-overlay'),
+    doubleText: byId('double-text'),
+    doubleOk: byId('double-ok'),
     startMsg: byId('start-msg'),
     boardInfo: byId('board-info'),
     board: byId('board'),
@@ -342,6 +348,17 @@
     if (cur.swap) return { question: cur.swap.question, points: cur.swap.points, catName: cur.swap.catName };
     const category = findCategory(g, cur.catId);
     return { question: category.questions[String(cur.points)], points: cur.points, catName: category.name };
+  }
+
+  /** D-40: the open question is on the game's hidden double-score cell (also after a Swap). */
+  function isDoubleCurrent(g) {
+    return g.current !== null && g.double === cellKey(g.current.catId, g.current.points);
+  }
+
+  /** Points a Correct earns on the open question: doubled on the double-score cell (D-40). */
+  function correctPoints(g) {
+    const points = activeQuestion(g).points;
+    return isDoubleCurrent(g) ? points * DOUBLE_FACTOR : points;
   }
 
   // ---------- Persistence (saveState / loadState, US-17) ----------
@@ -594,6 +611,7 @@
       Number.isInteger(g.timerSeconds) && g.timerSeconds >= range.min && g.timerSeconds <= range.max &&
       (g.helpersOff === undefined || typeof g.helpersOff === 'boolean') && // games saved before the setting
       isValidBoard(g.points, g.categories) &&
+      (g.double === undefined || (typeof g.double === 'string' && isBoardCellKey(g.double, g))) && // games saved before D-40
       isValidUsed(g.used, g) && isValidCurrent(g.current, g);
   }
 
@@ -1213,11 +1231,18 @@
       points: board.points,
       categories: board.categories,
       used: {},
+      double: pickDoubleCell(board.categories, board.points), // D-40: secret until it is opened
       current: null,
     };
     renderGame();
     showScreen('board'); // also saves the state
     logGameStart(state.game);
+  }
+
+  /** D-40: one random cell of the board is worth double; nothing shows it until it is opened. */
+  function pickDoubleCell(categories, points) {
+    const category = categories[Math.floor(Math.random() * categories.length)];
+    return cellKey(category.id, points[Math.floor(Math.random() * points.length)]);
   }
 
   /** Record the started game in the server's game log. Fire-and-forget: a failure never blocks play. */
@@ -1302,16 +1327,18 @@
     const used = g.used[key];
     const owner = used.owner === null ? null : findContestant(g, used.owner);
     const swap = used.swap;
+    const double = key === g.double; // D-40: shown once played, with a small "×2" in the corner
     // After a Swap the old value is struck through and the question that replaced it is shown small.
     if (swap) label.classList.add('is-struck');
     const cell = h('button', {
       type: 'button',
-      className: 'board-cell is-used ' + (owner ? 'is-owned' : 'is-unanswered'),
+      className: 'board-cell is-used ' + (owner ? 'is-owned' : 'is-unanswered') + (double ? ' is-double' : ''),
       disabled: true, // disabled buttons ignore clicks
-      'aria-label': categoryLabel(category) + ', ' + points + ' points' +
+      'aria-label': categoryLabel(category) + ', ' + points + ' points' + (double ? ', double score' : '') +
         (swap ? ', swapped to ' + swap.catName + ' ' + EN_DASH + ' ' + swap.points : '') + ', ' +
         (owner ? 'won by ' + owner.name : 'no correct answer'),
     }, [
+      double ? h('span', { className: 'cell-double', text: TIMES + DOUBLE_FACTOR, 'aria-hidden': 'true' }) : null,
       label,
       swap ? h('span', { className: 'cell-swap', text: swap.catName + ' ' + EN_DASH + ' ' + swap.points }) : null,
       owner ? h('span', { className: 'cell-owner', text: owner.name }) : null,
@@ -1410,6 +1437,26 @@
     // Opened = played: later boards in this browser avoid it.
     markSeen(category.questions[String(points)].id);
     showQuestion();
+    if (isDoubleCurrent(g)) showDoublePopup();
+  }
+
+  /** D-40: announce the double-score question; its timer waits until the popup is closed. */
+  function showDoublePopup() {
+    const points = activeQuestion(state.game).points;
+    dom.doubleText.textContent = 'A correct answer earns +' + points * DOUBLE_FACTOR + ' instead of +' + points +
+      '. A wrong answer costs the normal ' + MINUS + points + '.';
+    pauseTimer();
+    dom.doubleOverlay.hidden = false;
+    dom.main.inert = true; // keyboard focus stays on the popup
+    dom.doubleOk.focus();
+  }
+
+  function closeDoublePopup() {
+    if (dom.doubleOverlay.hidden) return;
+    dom.doubleOverlay.hidden = true;
+    dom.main.inert = false;
+    resumeTimer();
+    dom.qHeading.focus();
   }
 
   /** Render the open question and (re)start its timer at full length (also used on restore, D-04, and after a Swap). */
@@ -1433,12 +1480,18 @@
     dom.qHeading.focus();
   }
 
-  /** "Category – 300"; after a Swap the new question's, with a small "Swapped from History – 300" note. */
+  /**
+   * "Category – 300"; a "×2 Double score" badge on the double-score cell (D-40); after a Swap the
+   * new question's, with a small "Swapped from History – 300" note.
+   */
   function renderQuestionHeading(active) {
     const g = state.game;
     const cur = g.current;
     clear(dom.qHeading);
     dom.qHeading.appendChild(document.createTextNode(active.catName + ' ' + EN_DASH + ' ' + active.points));
+    if (isDoubleCurrent(g)) {
+      dom.qHeading.appendChild(h('span', { className: 'question-double', text: TIMES + DOUBLE_FACTOR + ' Double score' }));
+    }
     if (cur.swap) {
       const original = findCategory(g, cur.catId);
       dom.qHeading.appendChild(h('span', {
@@ -1594,10 +1647,11 @@
     dom.answerText.focus();
   }
 
-  /** One row per contestant in their color with the helper chips and Correct (+p) / Wrong (-p). */
+  /** One row per contestant in their color with the helper chips and Correct (+p, +2p on the double, D-40) / Wrong (-p). */
   function renderScoringRows() {
     const g = state.game;
     const p = activeQuestion(g).points;
+    const win = correctPoints(g);
     clear(dom.scoreRows);
     scoringRows = g.contestants.map((c) => {
       const color = paletteEntry(c.color);
@@ -1620,9 +1674,9 @@
         status: h('span', { className: 'visually-hidden', 'aria-live': 'polite' }),
         correct: h('button', {
           type: 'button',
-          className: 'btn btn-correct',
-          text: CHECK + ' Correct (+' + p + ')',
-          'aria-label': 'Correct for ' + c.name + ', plus ' + p + ' points',
+          className: 'btn btn-correct' + (win !== p ? ' is-double' : ''), // gold on the double (D-40)
+          text: CHECK + ' Correct (+' + win + ')',
+          'aria-label': 'Correct for ' + c.name + ', plus ' + win + ' points' + (win !== p ? ' (double score)' : ''),
           onclick: () => markContestant(c, 'correct'),
         }),
         wrong: h('button', {
@@ -1707,9 +1761,10 @@
     if (hasOwn(cur.marks, key)) return;
     if (result === 'correct' && correctContestantId(cur) !== null) return;
     if (cur.by !== undefined && cur.by !== contestant.id) return; // the helper made it their question
+    // D-40: only a Correct is doubled on the double-score cell; a Wrong costs the normal points.
     const points = activeQuestion(state.game).points;
     cur.marks[key] = result;
-    contestant.score += result === 'correct' ? points : -points;
+    contestant.score += result === 'correct' ? correctPoints(state.game) : -points;
     updateScoringRows();
     saveState();
     focusNextScoringButton();
@@ -2444,6 +2499,10 @@
 
   /** Enter anywhere on the answered question means Next (buttons and links handle Enter themselves). */
   function onKeyDown(event) {
+    if (event.key === 'Escape' && !dom.doubleOverlay.hidden) {
+      closeDoublePopup();
+      return;
+    }
     if (event.key !== 'Enter' || !streakOnScreen() || dom.streakNext.hidden || dom.streakNext.disabled) return;
     const target = event.target;
     if (target && target.closest && target.closest('button, a, input, select, textarea')) return;
@@ -2710,6 +2769,7 @@
     dom.timerPause.addEventListener('click', onPauseClick);
     dom.timerReset.addEventListener('click', onResetClick);
     dom.backBtn.addEventListener('click', backToBoard);
+    dom.doubleOk.addEventListener('click', closeDoublePopup);
     dom.newGameBtn.addEventListener('click', newGame);
     bindStreakEvents();
   }
