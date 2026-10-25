@@ -394,6 +394,16 @@ As the site owner, I want a Google AdSense banner on the Streak leaderboard scre
 - **Given** an ad blocker or no network, **then** the ad area hides itself and the game works as before.
 - **Given** the site pages, **then** a Privacy Policy page (`privacy.html`) holds the former "Your data" section of the Terms plus an "Ads and cookies" section, and is linked as "Privacy" in the game, guide and Terms headers and in `llms.txt`.
 
+## Epic E15 — Search and sharing
+
+### US-39 Search engine and link-preview basics (Should)
+As the site owner, I want BrainRush to describe itself to search engines and link previews, so that people searching for trivia or quiz games can find it and shared links look good. *(Added 2026-10-25, D-42.)*
+- **Given** the game page, **then** its title is "BrainRush – Free Online Trivia Quiz Game for Parties, Teams & Family", it has a meta description, a canonical URL (`https://brainrush.integration.ninja/`), Open Graph and Twitter card tags with `img/og-image.png` (1200×630), and a JSON-LD block (`WebSite` + `WebApplication`, free, English and Arabic).
+- **Given** the setup screen, **then** a short visible line under "New game" says what BrainRush is and links to How to play.
+- **Given** the guide, Terms and Privacy pages, **then** each has a descriptive title, a meta description and a canonical URL; the guide also has Open Graph tags.
+- **Given** the admin page, **then** it carries `noindex, nofollow`.
+- **Given** the site root, **then** `robots.txt` blocks `/api/` and points to `sitemap.xml`, which lists the game, guide, Privacy and Terms pages.
+
 ---
 
 ## Story status
@@ -409,7 +419,7 @@ As the site owner, I want a Google AdSense banner on the Streak leaderboard scre
 | Helpers (outside the sprint cycle, branch `helpers`) | US-32 | Implemented 2026-10-23 (`docs/sprints/helpers-dev.md`); in test. The wrong-option content (`sql/add-wrong-options.sql`) is produced separately and reviewed by the owner. |
 | Streak Challenge (outside the sprint cycle, branch `streak-mode`) | US-33, US-34 | Accepted with follow-ups 2026-10-23 (`docs/sprints/streak-mode-test-report.md`: 61 PASS, 0 FAIL, 2 PENDING; the 3 Minor bugs fixed in fix loop 1 and checked in code by the PO). Open: FU-16 to FU-19. Needs `sql/migrate-add-streak.sql` before the code. |
 
-US-01 to US-21 and US-23 to US-30 accepted. US-22 retired 2026-10-11 by D-31. US-31 shipped (PR #46). US-32 in test. US-35 (player guide) and US-36 (Terms of Service) added 2026-10-23. US-33 and US-34 (Streak Challenge) accepted with follow-ups 2026-10-23. US-37 (double score question) added 2026-10-25, branch `double-score`. US-38 (ads) added 2026-10-25, branch `ads`. Open items are listed under "Follow-ups after Sprint 4", "Follow-ups after Sprint 6" and "Follow-ups after the Streak Challenge".
+US-01 to US-21 and US-23 to US-30 accepted. US-22 retired 2026-10-11 by D-31. US-31 shipped (PR #46). US-32 in test. US-35 (player guide) and US-36 (Terms of Service) added 2026-10-23. US-33 and US-34 (Streak Challenge) accepted with follow-ups 2026-10-23. US-37 (double score question) added 2026-10-25, branch `double-score`. US-38 (ads) added 2026-10-25, branch `ads`. US-39 (search and sharing) added 2026-10-25, branch `seo`. Open items are listed under "Follow-ups after Sprint 4", "Follow-ups after Sprint 6" and "Follow-ups after the Streak Challenge".
 
 ---
 
@@ -483,6 +493,7 @@ US-32. |
 | D-39 | Terms of Service | Owner decision 2026-10-23. A separate static page `terms.html`, in English only, with no JS and no CSS of its own (it reuses the guide styles). It is linked as "Terms" in the game header (new tab) and in the guide's header. Players don't accept anything: there is no checkbox, and Start is not affected. It names the owner, Ahmed Fahim, with the contact ahmedfahim89@gmail.com. A short "Your data" section replaces a separate privacy page. There is no governing-law clause. US-36. |
 | D-40 | Double score question | Owner decision 2026-10-25. At Start the browser picks one random cell of the board (`game.double`, "<categoryId>:<points>", saved with the game; the saved version stays 3 and a save without it simply has no double, like `helpersOff`). It stays secret until opened; a popup then announces it and holds the timer. Only a Correct is doubled (`2 × p`); a Wrong costs `p`. The double belongs to the cell, so after a Swap the new question's points are doubled; Skip stays `Math.round(p / 2)`. The ± corrections are unchanged. Client-only: no API, DB or game-log change. US-37. |
 | D-41 | Ads | Owner decision 2026-10-25. Google AdSense, set up for H5 Games Ads (AdMob is for native apps only). For now only a responsive display banner on the Streak leaderboard screen (the Results banner was dropped the same day so that the consent message never covers the winner announcement); interstitial/rewarded `adBreak` placements need a separate H5 Games Ads approval and can reuse the loader later. Off by default: the `ads_enabled`, `ads_client` and `ads_slot` settings (no migration; a missing row means off) are set in Admin. Maintenance mode also turns ads off. Test mode on localhost. A separate `privacy.html` now holds the Terms' "Your data" section (amends D-39) with an "Ads and cookies" section. Consent for the EEA/UK/CH uses AdSense's own Privacy & messaging, so there is no consent code. ads.txt goes on the root domain (`integration.ninja`), not in this repo, because Google reads it from the root domain. US-38. |
+| D-42 | Search and sharing | Owner decision 2026-10-25. No hashtags or `meta keywords` (Google ignores both). Instead: descriptive titles and meta descriptions, canonical URLs (the game's is `/`, not `/index.html`), one visible intro line on the setup screen, Open Graph/Twitter tags with a 1200×630 `img/og-image.png`, a static JSON-LD block (`WebSite` + `WebApplication`) on the game page, `noindex` on admin, `robots.txt` (blocks `/api/` only, so crawlers can read admin's `noindex`) and a hand-kept `sitemap.xml`. Google Search Console is set up by the owner. US-39. |
 
 ---
 
