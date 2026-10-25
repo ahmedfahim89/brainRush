@@ -3,11 +3,50 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BrainRush</title>
+  <title>BrainRush – Free Online Trivia Quiz Game for Parties, Teams &amp; Family</title>
+  <!-- SEO and link previews (D-42). Keep the texts in step with how-to-play.html and llms.txt. -->
+  <meta name="description" content="Free Jeopardy-style trivia game in English and Arabic. Pick categories, play in teams on one shared screen, or try the solo Sudden Death streak. No sign-up.">
+  <link rel="canonical" href="https://brainrush.integration.ninja/">
+  <meta name="theme-color" content="#0b1026">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="BrainRush">
+  <meta property="og:title" content="BrainRush – Free Online Trivia Quiz Game">
+  <meta property="og:description" content="Jeopardy-style trivia for parties, classrooms and family nights, in English and Arabic. Free, no sign-up.">
+  <meta property="og:url" content="https://brainrush.integration.ninja/">
+  <meta property="og:image" content="https://brainrush.integration.ninja/img/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="BrainRush logo: a gold lightning bolt and the words BrainRush, free trivia quiz game">
+  <meta name="twitter:card" content="summary_large_image">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "name": "BrainRush",
+        "url": "https://brainrush.integration.ninja/"
+      },
+      {
+        "@type": "WebApplication",
+        "name": "BrainRush",
+        "url": "https://brainrush.integration.ninja/",
+        "description": "Free Jeopardy-style trivia quiz game for parties, classrooms and family nights. Players or teams pick questions from a board of categories and point values on one shared screen. Questions in English and Arabic, with a solo Sudden Death streak mode and a top-10 leaderboard.",
+        "image": "https://brainrush.integration.ninja/img/logo-512.png",
+        "applicationCategory": "GameApplication",
+        "genre": ["Trivia", "Quiz", "Party game"],
+        "operatingSystem": "Any (web browser)",
+        "inLanguage": ["en", "ar"],
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    ]
+  }
+  </script>
   <link rel="icon" href="img/logo.svg" type="image/svg+xml">
   <link rel="icon" href="img/favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.534fb2da.css">
+  <link rel="stylesheet" href="css/style.548078e5.css">
 </head>
 <body class="game">
   <header class="page-header">
@@ -38,6 +77,8 @@
       <!-- "New questions" banner: text and on/off are set in Admin > Game settings -->
       <p id="new-banner" class="new-banner" role="status" hidden></p>
       <h2 id="setup-title">New game</h2>
+      <!-- Home intro (D-42): visible text that tells players and search engines what BrainRush is -->
+      <p class="site-intro">Free Jeopardy-style trivia quiz game for parties, classrooms and family nights: questions in English and Arabic, players or teams on one shared screen. <a href="how-to-play.html" target="_blank" rel="noopener">How to play</a></p>
       <div id="setup-load-msg" class="msg" role="alert" hidden></div>
 
       <form id="setup-form" novalidate>

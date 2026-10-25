@@ -16,7 +16,7 @@ This file lists no questions or answers, on purpose.
 
 ## Play
 
-- [Play BrainRush](https://brainrush.integration.ninja/index.html): set up players or teams, pick categories and start a game
+- [Play BrainRush](https://brainrush.integration.ninja/): set up players or teams, pick categories and start a game
 - [How to play](https://brainrush.integration.ninja/how-to-play.html): player guide covering setup, the board, answering, scoring, helpers, ending the game and the Streak Challenge
 
 ## Optional

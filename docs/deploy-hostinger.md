@@ -205,6 +205,20 @@ The code ships with ads **off**, so you can deploy it before AdSense approves th
 
 To turn ads off, untick **Show ads**. Maintenance mode also hides them.
 
+## 10. Search engines and link previews (US-39, D-42)
+
+1. **Deploy the code** (section 8, step 3). With File Manager/FTP upload `index.html`, `how-to-play.html`, `terms.html`, `privacy.html`, `admin.html`, `llms.txt`, the new `robots.txt`, `sitemap.xml` and `img/og-image.png`, and the new hashed `css/style.*.css` (delete the old one). Check that `https://brainrush.integration.ninja/robots.txt` and `/sitemap.xml` open.
+2. **Google Search Console** (search.google.com/search-console, same Google account as AdSense):
+   1. **Add property** → **URL prefix** → `https://brainrush.integration.ninja/`.
+   2. Verify with **HTML file**: download Google's `google….html` file and upload it unchanged into the BrainRush folder in File Manager (next to `index.html`), then click **Verify**. **Keep the file there**: deleting it un-verifies the site. A Git deploy does not remove it, because it is not in the repository.
+   3. **Sitemaps** → enter `sitemap.xml` → **Submit**. The status should become **Success**.
+   4. **URL inspection** → paste `https://brainrush.integration.ninja/` → **Request indexing**. Do the same for `/how-to-play.html`.
+   5. Google needs days to a few weeks to index a new site. **Performance** then shows which searches find BrainRush.
+3. **Optional checks:**
+   - Structured data: search.google.com/test/rich-results with the game URL. It should find the `WebSite` and `WebApplication` items with no errors.
+   - Link preview: paste the game URL into a WhatsApp chat to yourself. It should show the BrainRush picture, title and description. WhatsApp and Facebook cache previews, so a link shared before this deploy may show the old (empty) preview for a while.
+4. **Keep the sitemap current:** when a page's text changes noticeably, update its `<lastmod>` date in `sitemap.xml`. Add a new public page to the sitemap too.
+
 ## Troubleshooting
 
 | Symptom | Likely cause / fix |

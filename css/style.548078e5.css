@@ -336,6 +336,8 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 
 /* Setup */
 .setup { max-width: 54rem; margin: 0 auto; }
+/* Home intro (D-42): one short muted line under "New game" that says what BrainRush is */
+.site-intro { margin: -0.3rem 0 1rem; color: var(--muted); font-size: 0.95rem; }
 .setup-block {
   min-width: 0;
   margin: 0 0 1.25rem;
