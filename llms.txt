@@ -23,4 +23,4 @@ This file lists no questions or answers, on purpose.
 
 - [Categories](https://brainrush.integration.ninja/api/categories.php): JSON list of the current categories and how many questions each has
 - [Terms of Service](https://brainrush.integration.ninja/terms.html): rules for using the site
-- [Privacy Policy](https://brainrush.integration.ninja/privacy.html): what the game saves, and how the Google AdSense ads on the Results and Leaderboard screens use cookies
+- [Privacy Policy](https://brainrush.integration.ninja/privacy.html): what the game saves, and how the Google AdSense ads on the Streak leaderboard screen use cookies
