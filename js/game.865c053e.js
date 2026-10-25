@@ -149,7 +149,7 @@
     playedReset: byId('played-reset'),
     startBtn: byId('start-btn'),
     maintenanceOverlay: byId('maintenance-overlay'),
-    adSlots: { results: byId('ad-results'), leaderboard: byId('ad-leaderboard') }, // D-41
+    adSlots: { leaderboard: byId('ad-leaderboard') }, // D-41: screen name -> ad slot
     main: document.querySelector('.game-main'),
     doubleOverlay: byId('double-overlay'),
     doubleText: byId('double-text'),
@@ -634,8 +634,9 @@
   }
 
   // ---------- Ads (D-41) ----------
-  // Google AdSense banner on the Results and Streak leaderboard screens only, never during play.
-  // Off unless the admin turned it on and entered both IDs; the script loads on the first ad screen.
+  // Google AdSense banner on the Streak leaderboard screen only: never during play, and not on Results,
+  // so the consent message never covers the winner. Off unless the admin turned it on and entered both
+  // IDs; the script (and Google's consent message) loads when the leaderboard first opens.
 
   const AD_SCRIPT = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js';
   const ads = {
@@ -696,7 +697,7 @@
     document.head.appendChild(script);
   }
 
-  /** Show the banner when the Results or Leaderboard screen opens (the screen must be visible first). */
+  /** Show the banner when an ad screen (the Leaderboard) opens; the screen must be visible first. */
   async function showAd(name) {
     const slot = dom.adSlots[name];
     if (!slot) return;

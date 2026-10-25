@@ -11,7 +11,7 @@ const SETTING_RULES = [
     'banner_enabled'      => [0, 1], // "new questions" banner on the game setup screen
     'start_game_hidden'   => [0, 1], // maintenance mode: hides Start Game and shows an overlay
     'helpers_enabled'     => [0, 1], // 3 choices, Swap and Skip; a missing row counts as on
-    'ads_enabled'         => [0, 1], // AdSense banner on Results and Leaderboard (D-41); a missing row counts as off
+    'ads_enabled'         => [0, 1], // AdSense banner on the Streak leaderboard (D-41); a missing row counts as off
 ];
 
 // Editable text settings and their maximum length in characters.

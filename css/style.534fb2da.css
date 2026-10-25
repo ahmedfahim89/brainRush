@@ -1066,7 +1066,7 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 .lb-list .is-me .lb-meta { color: var(--text); }
 .lb-empty { padding: 0.6rem; color: var(--muted); text-align: center; }
 
-/* Ads (D-41): AdSense banner under the Results/Leaderboard buttons, well apart from them so it is never
+/* Ads (D-41): AdSense banner under the Streak leaderboard buttons, well apart from them so it is never
    clicked by mistake. No reserved height: nothing sits below it, so a late ad moves nothing (D-30). */
 .ad-slot { margin: 1.6rem auto 0; padding-top: 0.6rem; border-top: 1px solid var(--border); text-align: center; }
 .ad-slot:has(ins[data-ad-status="unfilled"]) { display: none; } /* no ad to show: no empty box */
