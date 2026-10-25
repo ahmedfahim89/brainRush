@@ -62,6 +62,7 @@ a { color: var(--gold); }
   background: #0e1433;
 }
 .page-header h1 { margin: 0; }
+.brand-logo { width: 2.2rem; height: 2.2rem; vertical-align: middle; margin-right: 0.6rem; }
 .nav-link { font-weight: 600; text-decoration: none; }
 @media (hover: hover) { .nav-link:hover { text-decoration: underline; } }
 
