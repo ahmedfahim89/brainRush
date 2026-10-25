@@ -211,6 +211,7 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 
 .stack input { max-width: 12rem; }
 .stack input.wide-input { max-width: none; }
+.stack input.id-input { max-width: 18rem; } /* AdSense publisher ID (D-41) */
 .stack .hint { margin: 0.2rem 0 0; }
 /* Checkbox and its text on one line (banner on/off in Game settings) */
 .check-label { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.8rem; color: var(--text); cursor: pointer; }
@@ -1064,6 +1065,12 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 .lb-meta { color: var(--muted); font-size: 0.95rem; white-space: nowrap; }
 .lb-list .is-me .lb-meta { color: var(--text); }
 .lb-empty { padding: 0.6rem; color: var(--muted); text-align: center; }
+
+/* Ads (D-41): AdSense banner under the Results/Leaderboard buttons, well apart from them so it is never
+   clicked by mistake. No reserved height: nothing sits below it, so a late ad moves nothing (D-30). */
+.ad-slot { margin: 1.6rem auto 0; padding-top: 0.6rem; border-top: 1px solid var(--border); text-align: center; }
+.ad-slot:has(ins[data-ad-status="unfilled"]) { display: none; } /* no ad to show: no empty box */
+.ad-label { display: block; margin-bottom: 0.3rem; color: var(--muted); font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; }
 
 /* ---------- Phones (portrait, up to 600px wide) ----------
    The game targets laptops and projectors (D-30). On a phone: less padding, the setup label above

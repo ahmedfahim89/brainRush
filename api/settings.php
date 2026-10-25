@@ -1,6 +1,6 @@
 <?php
-// GET  /api/settings.php  -> { categories_per_game, timer_seconds, banner_enabled, banner_text, start_game_hidden, helpers_enabled }
-// PUT  /api/settings.php  body { categories_per_game?, timer_seconds?, banner_enabled?, banner_text?, start_game_hidden?, helpers_enabled? } -> updated settings
+// GET  /api/settings.php  -> { categories_per_game, timer_seconds, banner_enabled, banner_text, start_game_hidden, helpers_enabled, ads_enabled, ads_client, ads_slot }
+// PUT  /api/settings.php  body { categories_per_game?, timer_seconds?, banner_enabled?, banner_text?, start_game_hidden?, helpers_enabled?, ads_enabled?, ads_client?, ads_slot? } -> updated settings
 // Writes need admin access (require_admin: 401/403 otherwise).
 require_once __DIR__ . '/db.php';
 
@@ -11,11 +11,19 @@ const SETTING_RULES = [
     'banner_enabled'      => [0, 1], // "new questions" banner on the game setup screen
     'start_game_hidden'   => [0, 1], // maintenance mode: hides Start Game and shows an overlay
     'helpers_enabled'     => [0, 1], // 3 choices, Swap and Skip; a missing row counts as on
+    'ads_enabled'         => [0, 1], // AdSense banner on Results and Leaderboard (D-41); a missing row counts as off
 ];
 
 // Editable text settings and their maximum length in characters.
 const TEXT_SETTING_RULES = [
     'banner_text' => 150,
+];
+
+// AdSense IDs (D-41): public values that go into the page, so only their format is checked.
+// Empty is allowed so the admin can clear them.
+const AD_SETTING_RULES = [
+    'ads_client' => ['/^(ca-pub-\d{10,20})?$/', 'ads_client must look like ca-pub-1234567890123456'],
+    'ads_slot'   => ['/^\d{0,20}$/', 'ads_slot must be the ad unit number (digits only)'],
 ];
 
 /** Current settings: integers and text (null if a row is missing). */
@@ -26,7 +34,7 @@ function load_settings(PDO $pdo): array
     foreach (array_keys(SETTING_RULES) as $name) {
         $settings[$name] = isset($rows[$name]) ? (int) $rows[$name] : null;
     }
-    foreach (array_keys(TEXT_SETTING_RULES) as $name) {
+    foreach (array_merge(array_keys(TEXT_SETTING_RULES), array_keys(AD_SETTING_RULES)) as $name) {
         $settings[$name] = isset($rows[$name]) ? (string) $rows[$name] : null;
     }
     return $settings;
@@ -51,9 +59,22 @@ function validate_settings(array $body): array
             $updates[$name] = require_text($body[$name], $name, $maxChars);
         }
     }
+    foreach (AD_SETTING_RULES as $name => [$pattern, $message]) {
+        if (!array_key_exists($name, $body)) {
+            continue;
+        }
+        if ($body[$name] !== null && !is_string($body[$name])) {
+            bad_request("$name must be text");
+        }
+        $value = trim((string) $body[$name]);
+        if (!preg_match($pattern, $value)) {
+            bad_request($message);
+        }
+        $updates[$name] = $value;
+    }
     if (!$updates) {
         bad_request('Provide at least one of: ' . implode(', ', array_merge(
-            array_keys(SETTING_RULES), array_keys(TEXT_SETTING_RULES))));
+            array_keys(SETTING_RULES), array_keys(TEXT_SETTING_RULES), array_keys(AD_SETTING_RULES))));
     }
     return $updates;
 }

@@ -149,6 +149,7 @@
     playedReset: byId('played-reset'),
     startBtn: byId('start-btn'),
     maintenanceOverlay: byId('maintenance-overlay'),
+    adSlots: { results: byId('ad-results'), leaderboard: byId('ad-leaderboard') }, // D-41
     main: document.querySelector('.game-main'),
     doubleOverlay: byId('double-overlay'),
     doubleText: byId('double-text'),
@@ -629,6 +630,95 @@
     document.body.setAttribute('data-screen', name); // CSS: one-screen board layout (FU-03)
     window.scrollTo(0, 0);
     saveState();
+    showAd(name);
+  }
+
+  // ---------- Ads (D-41) ----------
+  // Google AdSense banner on the Results and Streak leaderboard screens only, never during play.
+  // Off unless the admin turned it on and entered both IDs; the script loads on the first ad screen.
+
+  const AD_SCRIPT = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js';
+  const ads = {
+    config: undefined, // { client, slot } when ads are on, null when off, undefined until settings are known
+    loading: null,     // pending settings.php request
+    script: false,     // adsbygoogle.js tag added
+    failed: false,     // the script could not load (ad blocker, offline)
+  };
+
+  /** This computer: AdSense runs in test mode (placeholder ads, nothing counted). */
+  function isLocalHost() {
+    return ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+  }
+
+  /** Remember the ad settings from settings.php (every settings load calls this). */
+  function setAdConfig(settings) {
+    const on = settings.ads_enabled === 1 && settings.start_game_hidden !== 1
+      && typeof settings.ads_client === 'string' && /^ca-pub-\d{10,20}$/.test(settings.ads_client)
+      && typeof settings.ads_slot === 'string' && /^\d{1,20}$/.test(settings.ads_slot);
+    ads.config = on ? { client: settings.ads_client, slot: settings.ads_slot } : null;
+  }
+
+  /** The ad settings; loaded once here when a restored game skipped the setup screen. */
+  async function loadAdConfig() {
+    if (ads.config !== undefined) return ads.config;
+    if (!ads.loading) {
+      ads.loading = apiGet('settings.php')
+        .then((settings) => {
+          if (isPlainObject(settings)) setAdConfig(settings);
+          else ads.config = null;
+        })
+        .catch(() => { ads.config = null; })
+        .then(() => { ads.loading = null; });
+    }
+    await ads.loading;
+    return ads.config;
+  }
+
+  /**
+   * Add adsbygoogle.js once. It also defines the H5 Games Ads helpers (adBreak/adConfig) so
+   * interstitial or rewarded placements can be added later; none are used yet.
+   */
+  function loadAdScript(config) {
+    if (ads.script) return;
+    ads.script = true;
+    window.adsbygoogle = window.adsbygoogle || [];
+    window.adConfig = window.adConfig || function (o) { window.adsbygoogle.push(o); };
+    window.adBreak = window.adBreak || window.adConfig;
+    const script = document.createElement('script');
+    script.async = true;
+    script.crossOrigin = 'anonymous';
+    if (isLocalHost()) script.setAttribute('data-adbreak-test', 'on');
+    script.src = AD_SCRIPT + '?client=' + encodeURIComponent(config.client);
+    script.addEventListener('error', () => {
+      ads.failed = true;
+      Object.keys(dom.adSlots).forEach((key) => { dom.adSlots[key].hidden = true; });
+    });
+    document.head.appendChild(script);
+  }
+
+  /** Show the banner when the Results or Leaderboard screen opens (the screen must be visible first). */
+  async function showAd(name) {
+    const slot = dom.adSlots[name];
+    if (!slot) return;
+    const config = await loadAdConfig();
+    if (!config || ads.failed || state.screen !== name) return;
+    loadAdScript(config);
+    slot.hidden = false;
+    if (slot.querySelector('ins')) return; // filled once: AdSense does not allow refreshing a unit
+    const ins = document.createElement('ins');
+    ins.className = 'adsbygoogle';
+    ins.style.display = 'block';
+    ins.setAttribute('data-ad-client', config.client);
+    ins.setAttribute('data-ad-slot', config.slot);
+    ins.setAttribute('data-ad-format', 'auto');
+    ins.setAttribute('data-full-width-responsive', 'true');
+    if (isLocalHost()) ins.setAttribute('data-adtest', 'on');
+    slot.appendChild(ins);
+    try {
+      window.adsbygoogle.push({});
+    } catch (err) {
+      slot.hidden = true;
+    }
   }
 
   // ---------- Setup: contestants (US-01, US-02, US-03) ----------
@@ -931,6 +1021,7 @@
         ? settings.categories_per_game : null;
       s.timerDefault = Number.isInteger(settings.timer_seconds) ? settings.timer_seconds : null;
       renderBanner(settings);
+      setAdConfig(settings);
       s.maintenance = settings.start_game_hidden === 1;
       s.helpersOn = settings.helpers_enabled !== 0; // a missing row means on
       s.playable = results[1].filter((c) => isPlainObject(c) && Number.isInteger(c.id) && typeof c.name === 'string')

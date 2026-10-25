@@ -382,6 +382,18 @@ As a contestant, I want one hidden question on the board to be worth double, so 
 - **Given** a refresh, **then** the double-score cell is kept (saved with the game); a refresh on the open double question shows the badge but not the popup again. A game saved before this feature has no double-score cell. The Streak Challenge has none.
 - **Given** the player guide (US-35) and `llms.txt`, **then** they describe the double-score question. The guide has its own "×2 Double score" section (in the contents list, after Helpers) with an example, plus short pointers from The board and Scoring.
 
+## Epic E14 — Ads
+
+### US-38 Ads on Results and Leaderboard (Should)
+As the site owner, I want a Google AdSense banner on the Results and Streak leaderboard screens, so that the site can earn money without disturbing play. *(Added 2026-10-25, D-41.)*
+- **Given** Admin > Game settings, **then** there is a "Show ads" checkbox, an AdSense publisher ID field (`ca-pub-` + 10–20 digits) and an ad unit slot ID field (digits). A wrong format, or ads on with an empty ID, shows an error and saves nothing; the API returns 400 for the same cases. Both IDs may be cleared.
+- **Given** ads are off, or an ID is missing, or maintenance mode is on, **then** no request goes to `googlesyndication.com` and no ad area is shown anywhere.
+- **Given** ads are on, **when** the Results or Streak leaderboard screen opens (also after a refresh), **then** the AdSense script loads once and a responsive banner labelled "Advertisement" shows under the buttons, with clear space between them. Setup, Board and Question screens never show an ad.
+- **Given** the banner was filled once, **when** the screen opens again, **then** the same banner is shown; it is never refreshed.
+- **Given** the site runs on this computer (localhost), **then** AdSense runs in test mode (`data-adbreak-test`, `data-adtest`).
+- **Given** an ad blocker or no network, **then** the ad area hides itself and the game works as before.
+- **Given** the site pages, **then** a Privacy Policy page (`privacy.html`) holds the former "Your data" section of the Terms plus an "Ads and cookies" section, and is linked as "Privacy" in the game, guide and Terms headers and in `llms.txt`.
+
 ---
 
 ## Story status
@@ -397,7 +409,7 @@ As a contestant, I want one hidden question on the board to be worth double, so 
 | Helpers (outside the sprint cycle, branch `helpers`) | US-32 | Implemented 2026-10-23 (`docs/sprints/helpers-dev.md`); in test. The wrong-option content (`sql/add-wrong-options.sql`) is produced separately and reviewed by the owner. |
 | Streak Challenge (outside the sprint cycle, branch `streak-mode`) | US-33, US-34 | Accepted with follow-ups 2026-10-23 (`docs/sprints/streak-mode-test-report.md`: 61 PASS, 0 FAIL, 2 PENDING; the 3 Minor bugs fixed in fix loop 1 and checked in code by the PO). Open: FU-16 to FU-19. Needs `sql/migrate-add-streak.sql` before the code. |
 
-US-01 to US-21 and US-23 to US-30 accepted. US-22 retired 2026-10-11 by D-31. US-31 shipped (PR #46). US-32 in test. US-35 (player guide) and US-36 (Terms of Service) added 2026-10-23. US-33 and US-34 (Streak Challenge) accepted with follow-ups 2026-10-23. US-37 (double score question) added 2026-10-25, branch `double-score`. Open items are listed under "Follow-ups after Sprint 4", "Follow-ups after Sprint 6" and "Follow-ups after the Streak Challenge".
+US-01 to US-21 and US-23 to US-30 accepted. US-22 retired 2026-10-11 by D-31. US-31 shipped (PR #46). US-32 in test. US-35 (player guide) and US-36 (Terms of Service) added 2026-10-23. US-33 and US-34 (Streak Challenge) accepted with follow-ups 2026-10-23. US-37 (double score question) added 2026-10-25, branch `double-score`. US-38 (ads) added 2026-10-25, branch `ads`. Open items are listed under "Follow-ups after Sprint 4", "Follow-ups after Sprint 6" and "Follow-ups after the Streak Challenge".
 
 ---
 
@@ -470,6 +482,7 @@ US-32. |
 | D-38 | Player guide | Owner decision 2026-10-23. A separate static page `how-to-play.html` (no JS), in English only, with its own `css/guide.css` on top of the shared stylesheet. The game header links to it in a new tab, so a running game and an open question's timer are not touched. It names no category and no admin-set limit or default. It describes the game without helpers; a helpers section follows once that feature lands. US-35. |
 | D-39 | Terms of Service | Owner decision 2026-10-23. A separate static page `terms.html`, in English only, with no JS and no CSS of its own (it reuses the guide styles). It is linked as "Terms" in the game header (new tab) and in the guide's header. Players don't accept anything: there is no checkbox, and Start is not affected. It names the owner, Ahmed Fahim, with the contact ahmedfahim89@gmail.com. A short "Your data" section replaces a separate privacy page. There is no governing-law clause. US-36. |
 | D-40 | Double score question | Owner decision 2026-10-25. At Start the browser picks one random cell of the board (`game.double`, "<categoryId>:<points>", saved with the game; the saved version stays 3 and a save without it simply has no double, like `helpersOff`). It stays secret until opened; a popup then announces it and holds the timer. Only a Correct is doubled (`2 × p`); a Wrong costs `p`. The double belongs to the cell, so after a Swap the new question's points are doubled; Skip stays `Math.round(p / 2)`. The ± corrections are unchanged. Client-only: no API, DB or game-log change. US-37. |
+| D-41 | Ads | Owner decision 2026-10-25. Google AdSense, set up for H5 Games Ads (AdMob is for native apps only). For now only a responsive display banner on the Results and Streak leaderboard screens; interstitial/rewarded `adBreak` placements need a separate H5 Games Ads approval and can reuse the loader later. Off by default: the `ads_enabled`, `ads_client` and `ads_slot` settings (no migration; a missing row means off) are set in Admin. Maintenance mode also turns ads off. Test mode on localhost. A separate `privacy.html` now holds the Terms' "Your data" section (amends D-39) with an "Ads and cookies" section. Consent for the EEA/UK/CH uses AdSense's own Privacy & messaging, so there is no consent code. ads.txt goes on the root domain (`integration.ninja`), not in this repo, because Google reads it from the root domain. US-38. |
 
 ---
 

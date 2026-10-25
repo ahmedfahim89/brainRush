@@ -9,6 +9,9 @@
   const LABEL_MAX = 60; // question text length used in confirms and button labels
   const BANNER_MAX = 150; // banner_text limit in api/settings.php
   const BANNER_DEFAULT = 'New questions added - try them now!'; // same as the seed in sql/schema.sql
+  // AdSense IDs (D-41): same formats as api/settings.php; empty clears them.
+  const ADS_CLIENT_PATTERN = /^(ca-pub-\d{10,20})?$/;
+  const ADS_SLOT_PATTERN = /^\d{0,20}$/;
   // Picture questions: same rule as api/questions.php (a file under img/questions/).
   const IMAGE_PATTERN = /^img\/questions\/[a-z0-9][a-z0-9-]*\.(svg|jpg|jpeg|png|webp)$/;
   // "3 choices" helper (US-32): wrong-option fields, as in api/questions.php.
@@ -16,7 +19,7 @@
   const CHECK = String.fromCharCode(0x2713); // check mark
 
   const state = {
-    settings: null,    // { categories_per_game, timer_seconds, banner_enabled, banner_text }
+    settings: null,    // { categories_per_game, timer_seconds, banner_enabled, banner_text, ..., ads_enabled, ads_client, ads_slot }
     points: [],        // [{ id, points, enabled, question_count }] ascending
     categories: [],    // [{ id, name, question_count }] sorted by name
     questions: [],     // [{ id, category_id, category_name, points, question, answer, question_ar, answer_ar, image, image_credit,
@@ -43,6 +46,9 @@
     settingBannerText: byId('setting-banner-text'),
     settingStartHidden: byId('setting-start-hidden'),
     settingHelpersEnabled: byId('setting-helpers-enabled'),
+    settingAdsEnabled: byId('setting-ads-enabled'),
+    settingAdsClient: byId('setting-ads-client'),
+    settingAdsSlot: byId('setting-ads-slot'),
     settingsMsg: byId('settings-msg'),
     pointsForm: byId('points-form'),
     pointNew: byId('point-new'),
@@ -321,6 +327,9 @@
     dom.settingStartHidden.checked = settings.start_game_hidden === 1;
     dom.settingHelpersEnabled.checked = settings.helpers_enabled !== 0; // a missing row means on
     dom.settingBannerText.value = typeof settings.banner_text === 'string' ? settings.banner_text : BANNER_DEFAULT;
+    dom.settingAdsEnabled.checked = settings.ads_enabled === 1; // a missing row means off
+    dom.settingAdsClient.value = typeof settings.ads_client === 'string' ? settings.ads_client : '';
+    dom.settingAdsSlot.value = typeof settings.ads_slot === 'string' ? settings.ads_slot : '';
     renderCategorySummary();
   }
 
@@ -342,7 +351,14 @@
     if (!bannerText) bannerError = 'Banner text is required.';
     // Array.from counts characters like the server does (an emoji is one, not two)
     else if (Array.from(bannerText).length > BANNER_MAX) bannerError = 'Banner text must be at most ' + BANNER_MAX + ' characters.';
-    const errors = [perGame.error, timer.error, bannerError].filter(Boolean);
+    const adsEnabled = dom.settingAdsEnabled.checked;
+    const adsClient = dom.settingAdsClient.value.trim();
+    const adsSlot = dom.settingAdsSlot.value.trim();
+    let adsError = '';
+    if (!ADS_CLIENT_PATTERN.test(adsClient)) adsError = 'The publisher ID must look like ca-pub-1234567890123456.';
+    else if (!ADS_SLOT_PATTERN.test(adsSlot)) adsError = 'The ad unit slot ID must be digits only.';
+    else if (adsEnabled && (!adsClient || !adsSlot)) adsError = 'To show ads, enter the publisher ID and the ad unit slot ID.';
+    const errors = [perGame.error, timer.error, bannerError, adsError].filter(Boolean);
     if (errors.length) {
       showError(dom.settingsMsg, errors.join('\n'));
       return;
@@ -356,6 +372,9 @@
         banner_text: bannerText,
         start_game_hidden: dom.settingStartHidden.checked ? 1 : 0,
         helpers_enabled: dom.settingHelpersEnabled.checked ? 1 : 0,
+        ads_enabled: adsEnabled ? 1 : 0,
+        ads_client: adsClient,
+        ads_slot: adsSlot,
       });
       fillSettings(saved);
       showSuccess(dom.settingsMsg, 'Settings saved.');
