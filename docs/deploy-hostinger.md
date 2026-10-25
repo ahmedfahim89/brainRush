@@ -186,6 +186,25 @@ The database content and `api/config.php` belong to the live site. A redeploy on
 5. Open the site. You don't need a hard refresh. JavaScript and CSS are cached for up to 7 days, but every changed file gets a new name with a content hash (see "Asset file names" in `README.md`), so browsers and the CDN load it fresh. If a page still shows old content, check that the live `index.html`/`admin.html` reference the same `js/…`/`css/…` names as `main`. If they do not, the deploy did not run. If they do, press **Ctrl+F5**, and purge the Hostinger CDN cache (step 6) if that does not help. Then repeat the quick checks: the game loads, admin asks for the login, a save works, and `/sql/schema.sql` and `/password.txt` are blocked (403/404).
    A game that was running in a browser before the redeploy is restored if its saved data is still valid. Otherwise that browser simply shows a fresh setup.
 
+## 9. Ads (Google AdSense, US-38, D-41)
+
+The code ships with ads **off**, so you can deploy it before AdSense approves the site. There is no database change.
+
+1. **Deploy the code** (section 8, step 3). With File Manager/FTP, upload `api/settings.php`, `index.html`, `admin.html`, `privacy.html` (new), `terms.html`, `how-to-play.html`, `llms.txt`, `.htaccess`, the new site icon files `img/logo.svg`, `img/favicon-32.png` and `img/apple-touch-icon.png`, and the new hashed `js/game.*.js`, `js/admin.*.js` and `css/style.*.css`, then delete the old js/css files they replace. Check that `https://brainrush.integration.ninja/privacy.html` opens.
+2. **Apply for AdSense** at adsense.google.com. Under **Sites**, add the **root domain `integration.ninja`**: AdSense lists root domains, and it covers `brainrush.integration.ninja`.
+3. **Create ads.txt on the root domain.** Google reads it from `https://integration.ninja/ads.txt`, not from the BrainRush folder.
+   1. Find your publisher ID: AdSense → **Account → Settings → Account information** (`pub-` and 16 digits), or **Sites → integration.ninja → ads.txt snippet**, which shows the whole line.
+   2. Create a plain-text file named exactly `ads.txt` with this one line, using your own ID: `google.com, pub-1234567890123456, DIRECT, f08c47fec0942fa0`. Use `pub-…` here, not `ca-pub-…`. `f08c47fec0942fa0` is Google's fixed ID, the same for everyone.
+   3. In hPanel, open **File Manager** for the **`integration.ninja`** website (not the `brainrush` subdomain) and put `ads.txt` in its `public_html/` folder.
+   4. Open `https://integration.ninja/ads.txt` in a private window. It must show the line as plain text (status 200), with at most one redirect. If it shows an old copy or 404, purge the CDN cache (section 6).
+   5. AdSense → **Sites** shows the ads.txt status. It can take a few days to change to **Authorized**.
+4. **Consent messages:** AdSense → **Privacy & messaging** → create and publish the **European regulations** message (EEA/UK/Switzerland) and the **US state regulations** message. Enter `https://brainrush.integration.ninja/privacy.html` as the privacy policy URL. The AdSense script shows these messages itself; there is no code for them.
+5. **After approval:** AdSense → **Ads → By ad unit → Display ads** → **Responsive** → create it, then copy the number from `data-ad-slot="…"`.
+6. **Turn ads on:** Admin → **Game settings** → enter the publisher ID (`ca-pub-…`) and the slot ID, tick **Show ads**, and save. Finish a game: the Results screen shows the banner under the buttons. A new ad unit can take up to an hour to show real ads; until then the area may stay blank.
+7. **Optional, later: H5 Games Ads** (interstitial and rewarded ads, for example between questions). This needs a separate approval. With an approved AdSense account, apply with Google's H5 Games Ads form (adsense.google.com/start/h5-beta/). The loader already defines `adBreak`/`adConfig`, so only the placements need code.
+
+To turn ads off, untick **Show ads**. Maintenance mode also hides them.
+
 ## Troubleshooting
 
 | Symptom | Likely cause / fix |

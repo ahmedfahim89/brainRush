@@ -4,12 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>BrainRush</title>
-  <link rel="stylesheet" href="css/style.c1833376.css">
+  <link rel="icon" href="img/logo.svg" type="image/svg+xml">
+  <link rel="icon" href="img/favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/style.5e241e4c.css">
 </head>
 <body class="game">
   <header class="page-header">
     <h1>BrainRush</h1>
-    <nav><a class="nav-link" href="how-to-play.html" target="_blank" rel="noopener">How to play</a> &middot; <a class="nav-link" href="terms.html" target="_blank" rel="noopener">Terms</a> &middot; <a class="nav-link" href="admin.html">Admin</a></nav>
+    <nav><a class="nav-link" href="how-to-play.html" target="_blank" rel="noopener">How to play</a> &middot; <a class="nav-link" href="terms.html" target="_blank" rel="noopener">Terms</a> &middot; <a class="nav-link" href="privacy.html" target="_blank" rel="noopener">Privacy</a> &middot; <a class="nav-link" href="admin.html">Admin</a></nav>
   </header>
 
   <!-- Maintenance mode: shown when the admin hides the Start Game button (Admin > Game settings) -->
@@ -197,6 +200,8 @@
       <div class="actions start-row">
         <button type="button" id="new-game-btn" class="btn btn-primary btn-large">New Game</button>
       </div>
+      <!-- Ads (D-41): filled by game.js when the admin turned ads on -->
+      <aside id="ad-results" class="ad-slot" aria-label="Advertisement" hidden><span class="ad-label">Advertisement</span></aside>
     </section>
 
     <!-- Streak leaderboard (US-34): after a run, or from the setup screen -->
@@ -211,9 +216,10 @@
         <button type="button" id="lb-new" class="btn btn-large">New Game</button>
         <button type="button" id="lb-back" class="btn btn-primary btn-large">Back</button>
       </div>
+      <aside id="ad-leaderboard" class="ad-slot" aria-label="Advertisement" hidden><span class="ad-label">Advertisement</span></aside>
     </section>
   </main>
 
-  <script src="js/game.b19c6269.js"></script>
+  <script src="js/game.639d7089.js"></script>
 </body>
 </html>

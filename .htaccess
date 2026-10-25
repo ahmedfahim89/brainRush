@@ -54,7 +54,7 @@ Options -Indexes
 # An SVG is a document that may contain scripts. When one is opened directly (not
 # through <img>), this policy keeps any script inside it from running; inline styles
 # and data: images still render. nosniff stops a browser from guessing another type.
-# It matches every .svg (only question pictures are SVGs): <If> path conditions are
+# It matches every .svg (question pictures and the img/logo.svg site icon): <If> path conditions are
 # avoided because LiteSpeed does not fully support them. No mod_headers = no-op.
 <IfModule mod_headers.c>
   <FilesMatch "\.svg$">
