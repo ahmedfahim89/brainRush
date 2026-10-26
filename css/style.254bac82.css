@@ -1085,18 +1085,22 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
   .setup-block { padding: 0.7rem 0.8rem 0.9rem; }
   .setup-pair { flex-direction: column; gap: 0; }
   .new-banner { gap: 0.5rem; padding: 0.5rem 0.7rem; font-size: 0.95rem; }
-  .entry-row { grid-template-columns: 2.4rem minmax(0, 1fr) auto; }
+  .entry-row { grid-template-columns: 48px minmax(0, 1fr) auto; }
   .entry-row .entry-label { grid-column: 1 / -1; }
   .entry-row .field-error { grid-column: 2 / -1; }
 
   /* Board: tighter gaps; names in normal case are narrower than in capitals */
-  .board { --gap: 0.3rem; --cat-h: 3rem; --board-w: calc(100vw - 1.5rem); }
+  .board-bar { margin-bottom: 0.5rem; }
+  /* rows at least 48px tall (US-40 touch targets); a lower category row and less space above the
+     scoreboard pay for it, so a full board scrolls no more than before */
+  .board { --gap: 0.3rem; --cat-h: 2.6rem; --row-min: 48px; --board-w: calc(100vw - 1.5rem); }
   .board-cat { padding: 0.3rem 0.15rem; text-transform: none; letter-spacing: 0; }
   .board-cell { padding: 0.15rem; }
-  .scoreboard-list { gap: 0.5rem; margin-top: 0.8rem; }
-  .score-card { flex-basis: 8.5rem; padding: 0.4rem 0.5rem; }
+  .scoreboard-list { gap: 0.5rem; margin-top: 0.3rem; }
+  /* tight padding: the 48px +/- buttons (US-40) then make a card no taller, so the board keeps its room */
+  .score-card { flex-basis: 8.5rem; row-gap: 0.1rem; padding: 0.15rem 0.5rem; }
   .score-value { font-size: 1.35rem; }
-  .score-btn { width: 2.4rem; height: 2.4rem; }
+  .score-btn { width: 48px; height: 48px; }
 
   /* Question: the timer buttons get their own line so the bar stays visible */
   .question-layout { gap: 0.9rem; }
@@ -1106,7 +1110,7 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
   .timer-controls { grid-column: 1 / -1; }
   .timer-controls .btn { flex: 1; }
   /* Scoring row: name, helper chips and score on top, Correct and Wrong side by side below */
-  .srow-name { flex-basis: calc(100% - 11rem); }
+  .srow-name { flex-basis: calc(100% - 13rem); } /* room for three 48px helper chips (US-40) */
   .srow .btn { flex: 1 1 0; align-self: stretch; padding: 0.4rem 0.3rem; font-size: 0.9rem; white-space: normal; }
   /* 3 choices: one per line, so short names are never split mid-word in narrow columns */
   .question-image:not([hidden]) ~ .question-choices,
@@ -1118,8 +1122,19 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 
   /* Streak: the panel stacks under the question (960px rule); the leaderboard date goes on its own line */
   .streak-panel { padding: 0.9rem 0.9rem 1rem; }
-  .streak-choice { padding: 0.6rem 0.8rem; }
+  .streak-choice { min-height: 48px; padding: 0.6rem 0.8rem; }
   .lb-list .result-row { flex-wrap: wrap; gap: 0 0.5rem; padding: 0.35rem 0.7rem; }
   .lb-list .result-name { flex-basis: calc(100% - 3rem); }
   .lb-meta { margin-left: 2.7rem; white-space: normal; }
+
+  /* Touch targets (US-40): buttons, fields and other small controls are at least 48px on phones
+     (Android guideline). The board cells keep their size, so the board still fits 375x812 (D-30).
+     Header links: vertical padding on an inline link enlarges the tap area without moving anything.
+     Text links inside a sentence (the setup intro) are exempt, as WCAG 2.5.8 allows. */
+  .page-header .nav-link { padding: 0.8rem 0.15rem; }
+  .game .btn, .game input[type="text"], .game input[type="number"] { min-height: 48px; }
+  .mode-option span { padding-top: 0.7rem; padding-bottom: 0.7rem; }
+  .cat-label { min-height: 48px; }
+  .swatch { width: 48px; height: 48px; }
+  .helper-chip { min-width: 48px; height: 48px; font-size: 0.8rem; }
 }

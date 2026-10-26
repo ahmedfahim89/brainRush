@@ -60,7 +60,7 @@ Pick **one** of the two ways below. Either way, the files go into the domain's *
    Hostinger only deploys into an **empty** folder. Delete the default `default.php` / `index.php` placeholder from `public_html` first (File Manager).
 4. Click **Create**, then **Deploy**.
 
-Git deployment copies the **whole repository**, including `docs/`, `sql/`, `.claude/` and `README.md`. That is expected: `.htaccess` blocks web access to all of them (you will check this in step 7). `api/config.php` and `password.txt` are git-ignored, so they are not in the repository and a deploy never creates, uploads or overwrites them. Keep it that way: never force-add (`git add -f`) a credentials file.
+Git deployment copies the **whole repository**, including `docs/`, `sql/`, `.claude/`, `android/` and `README.md`. That is expected: `.htaccess` blocks web access to all of them (you will check this in step 7). `api/config.php` and `password.txt` are git-ignored, so they are not in the repository and a deploy never creates, uploads or overwrites them. Keep it that way: never force-add (`git add -f`) a credentials file.
 
 ### Option B: File Manager or FTP
 
@@ -74,6 +74,7 @@ Upload only what the website needs. Keep the folder structure:
 | `img/` (whole folder, including `img/questions/` with the question pictures) | |
 | `js/` (whole folder) | **`password.txt`**, and any other local file with passwords or notes (never, under any name) |
 | `api/` (all `.php` files: `auth.php`, `categories.php`, `config.example.php`, `db.php`, `game-log.php`, `points.php`, `questions.php`, `settings.php`, `streaks.php`) | `logs/` (the server writes its own daily `logs/game-YYYY-MM-DD.log`) |
+| `manifest.webmanifest`, `sw.js`, `offline.html`, and the hidden folder `.well-known/` (with `assetlinks.json`), for the Android app (section 11) | `android/` (the Android app project; it is built on your computer, never served) |
 
 In hPanel, **Files → File Manager** can upload a `.zip` and extract it. Zip the files from the left column, upload the zip into `public_html`, extract it, then delete the zip. Build the zip from the left column only. Do **not** zip the whole project folder: that would pull in `password.txt` and your local `api/config.php`.
 
@@ -134,6 +135,7 @@ Do these checks in a normal browser window, replacing `your-domain.example`.
 - [ ] `https://your-domain.example/api/config.php`, `/api/config.example.php`, `/api/db.php`
 - [ ] `https://your-domain.example/docs/spec.md` and `/README.md` (Git deployment only; with Option B they do not exist → 404)
 - [ ] `https://your-domain.example/.claude/agents/game-developer.md` (Git deployment only)
+- [ ] `https://your-domain.example/android/` and `/android/twa-manifest.json` (Git deployment only, once the Android app project exists)
 - [ ] `https://your-domain.example/password.txt` (403 from `.htaccess` if a file were there by mistake, otherwise 404; it must never show content)
 - [ ] `https://your-domain.example/logs/game-YYYY-MM-DD.log` with today's date, after one game was started (game start log; read it in File Manager, never over the web)
 - [ ] `https://your-domain.example/css/` (directory listing disabled → 403)
@@ -218,6 +220,30 @@ To turn ads off, untick **Show ads**. Maintenance mode also hides them.
    - Structured data: search.google.com/test/rich-results with the game URL. It should find the `WebSite` and `WebApplication` items with no errors.
    - Link preview: paste the game URL into a WhatsApp chat to yourself. It should show the BrainRush picture, title and description. WhatsApp and Facebook cache previews, so a link shared before this deploy may show the old (empty) preview for a while.
 4. **Keep the sitemap current:** when a page's text changes noticeably, update its `<lastmod>` date in `sitemap.xml`. Add a new public page to the sitemap too.
+
+## 11. Android app (US-40, D-43)
+
+The Android app is a Trusted Web Activity: it opens this site full screen in Chrome, so every web deploy also updates the app. This web part can go live on its own, before the app exists. There is no database change.
+
+1. **Deploy the code** (section 8, step 3). With File Manager/FTP upload:
+   - the new files at the site root: `manifest.webmanifest`, `sw.js`, `offline.html`;
+   - the hidden folder **`.well-known/`** with `assetlinks.json` (show hidden files, as for `.htaccess`);
+   - the icons `img/icon-192.png`, `img/icon-512.png` and `img/icon-maskable-512.png`;
+   - **`.htaccess`** (it now blocks `android/`, sends the manifest and `assetlinks.json` with the right types, and gives `sw.js` `no-cache`);
+   - `index.html`, `how-to-play.html`, `terms.html`, `privacy.html`, `admin.html` (it shares the stylesheet), `sitemap.xml`, and the new hashed `js/game.*.js`, `js/app.*.js` (new: app mode, loaded by the game, guide, Terms and Privacy pages) and `css/style.*.css`; then delete the old js/css files they replace.
+2. **Purge the Hostinger CDN cache** (section 6), so the new `sw.js`, `manifest.webmanifest` and `assetlinks.json` are served instead of a missing or old copy.
+3. **Checks** in Chrome on a computer:
+   - `https://brainrush.integration.ninja/manifest.webmanifest` opens. DevTools (F12) → **Application → Manifest** shows no errors and all three icons, including the maskable one.
+   - **Application → Service workers** shows `sw.js` as activated. Tick **Offline** there and reload: the "You're offline" page shows. Untick it again.
+   - `https://brainrush.integration.ninja/.well-known/assetlinks.json` opens with status 200 as JSON. With Git deployment, `/android/` returns 403 once the app project exists.
+   - `https://brainrush.integration.ninja/?source=twa` in a new tab: the Admin link is hidden, the Streak leaderboard shows no ad, and How to play / Terms / Privacy open in the same tab. A normal tab without `?source=twa` is unchanged.
+4. **Signing fingerprint in `assetlinks.json` (before the app is tested).** The file in the repository holds the placeholder `REPLACE_WITH_SHA256_FROM_BUBBLEWRAP`. Chrome only opens the app without a URL bar when the file lists the SHA-256 fingerprint of the key that signed the app.
+   1. When the Android project is created, Bubblewrap creates the upload key (outside the repository) and prints its SHA-256 fingerprint (`AB:CD:…`, 32 pairs). `bubblewrap fingerprint generateAssetLinks` writes a ready `assetlinks.json` with it. `keytool -list -v -keystore <keystore file>` also shows it.
+   2. Replace the placeholder with that fingerprint, merge it through a pull request, deploy, and **purge the CDN** again.
+   3. After the first upload to Play Console, copy the **App signing key certificate** SHA-256 (Play Console → your app → **App integrity** → **App signing**) into `sha256_cert_fingerprints` as a second entry. Apps installed from Google Play are signed with that key, so without it they show a URL bar. Deploy and **purge the CDN** again.
+   4. Check the live file in a private window (status 200, the right fingerprints), then with Google's checker: `https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://brainrush.integration.ninja&relation=delegate_permission/common.handle_all_urls` must list the package `ninja.integration.brainrush`.
+   Fingerprints are public and safe to commit. The keystore and its passwords are not: keep them outside the repository and back them up.
+5. **Later changes.** A changed `offline.html` needs a new `CACHE` version in `sw.js` (for example `brainrush-offline-v2`), or phones keep showing the old copy. A changed icon needs a new file name, like the question pictures.
 
 ## Troubleshooting
 

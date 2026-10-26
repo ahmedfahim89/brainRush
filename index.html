@@ -46,7 +46,9 @@
   <link rel="icon" href="img/logo.svg" type="image/svg+xml">
   <link rel="icon" href="img/favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.50db26ae.css">
+  <!-- Web app manifest for the Android app (US-40, D-43) -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="css/style.254bac82.css">
 </head>
 <body class="game">
   <header class="page-header">
@@ -260,6 +262,8 @@
     </section>
   </main>
 
-  <script src="js/game.865c053e.js"></script>
+  <!-- Android app mode (US-40, D-43): loaded before game.js, which reads it -->
+  <script src="js/app.05c6d08d.js"></script>
+  <script src="js/game.8a8bdb94.js"></script>
 </body>
 </html>

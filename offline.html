@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>You're offline – BrainRush</title>
+  <!-- Offline page (US-40, D-43): sw.js caches this one file and shows it when a page can't load.
+       Self-contained (inline CSS and logo, no content-hashed asset), so it never goes stale. -->
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#0b1026">
+  <style>
+    * { box-sizing: border-box; }
+    html { font-size: 17px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      min-height: 100dvh;
+      margin: 0;
+      padding: 1.5rem;
+      color: #eef1ff;
+      background: #0b1026;
+      font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+      line-height: 1.45;
+    }
+    main {
+      max-width: 28rem;
+      padding: 1.5rem 1.25rem;
+      text-align: center;
+      background: #151c3d;
+      border: 2px solid #f5c518;
+      border-radius: 8px;
+    }
+    .logo { display: block; width: 4.5rem; height: 4.5rem; margin: 0 auto 0.8rem; }
+    h1 { margin: 0 0 0.6rem; color: #f5c518; font-size: 1.6rem; line-height: 1.2; }
+    p { margin: 0 0 1.2rem; color: #a3acd3; }
+    button {
+      min-height: 48px;
+      padding: 0.7rem 2rem;
+      color: #1a1a1a;
+      font: inherit;
+      font-size: 1.2rem;
+      font-weight: 600;
+      background: #f5c518;
+      border: 1px solid #f5c518;
+      border-radius: 6px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(245, 197, 24, 0.45); }
+    @media (hover: hover) { button:hover { background: #ffd84a; } }
+  </style>
+</head>
+<body>
+  <main>
+    <!-- Same shapes as img/logo.svg -->
+    <svg class="logo" viewBox="0 0 512 512" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#1d2654"/>
+          <stop offset="1" stop-color="#0b1026"/>
+        </linearGradient>
+        <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffe27a"/>
+          <stop offset="1" stop-color="#f5c518"/>
+        </linearGradient>
+      </defs>
+      <rect x="8" y="8" width="496" height="496" rx="104" fill="url(#bg)" stroke="#f5c518" stroke-width="16"/>
+      <path d="M292 72 L140 290 H242 L206 440 L372 210 H268 L336 72 Z" fill="url(#gold)" stroke="#c99d00" stroke-width="8" stroke-linejoin="round"/>
+    </svg>
+    <h1>You're offline</h1>
+    <p>BrainRush needs an internet connection. Check your Wi-Fi or mobile data, then try again. A running game stays saved on this device.</p>
+    <button type="button" id="retry">Try again</button>
+  </main>
+  <script>
+    'use strict';
+    // Reload the page that failed (the address is still the one that was asked for).
+    document.getElementById('retry').addEventListener('click', function () { window.location.reload(); });
+    window.addEventListener('online', function () { window.location.reload(); });
+  </script>
+</body>
+</html>

@@ -30,7 +30,8 @@ Options -Indexes
 
   # --- Block private files and folders (403) ---
   # Paths are relative to this folder, so this also works in a sub-folder install.
-  RewriteRule ^(sql|docs|logs|\.claude)(/|$) - [F,L]
+  # android/ is the Android app project (US-40, D-43); git deploy copies it, so block it too.
+  RewriteRule ^(sql|docs|logs|\.claude|android)(/|$) - [F,L]
   RewriteRule ^\.git - [F,L]
   RewriteRule ^README\.md$ - [F,L]
   RewriteRule ^password\.txt$ - [F,L]
@@ -60,5 +61,22 @@ Options -Indexes
   <FilesMatch "\.svg$">
     Header set Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; img-src data:"
     Header set X-Content-Type-Options "nosniff"
+  </FilesMatch>
+</IfModule>
+
+# --- Android app (US-40, D-43) ---
+# The web app manifest gets its registered type. /.well-known/assetlinks.json (Digital Asset
+# Links: lets the Android app open this site full screen) must stay public: no rule above
+# blocks it (the \.git/\.ht patterns only match those names), and it is sent as JSON.
+<IfModule mod_mime.c>
+  AddType application/manifest+json .webmanifest
+  AddType application/json .json
+</IfModule>
+
+# The service worker (sw.js at the root, offline page only) is revalidated on every visit, so
+# a new version is never held back by a cache. FilesMatch, not <If>: see the SVG rule above.
+<IfModule mod_headers.c>
+  <FilesMatch "^sw\.js$">
+    Header set Cache-Control "no-cache"
   </FilesMatch>
 </IfModule>
