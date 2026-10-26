@@ -1745,16 +1745,23 @@
     dom.answerValue.textContent = arabic ? q.answer_ar : q.answer;
     dom.answerValue.dir = arabic ? 'rtl' : 'ltr';
     dom.answerValue.lang = arabic ? 'ar' : 'en';
+    dom.answerValue.translate = !arabic;
     dom.answerText.classList.toggle('is-rtl', arabic);
     renderLangButton(hasArabic(q), arabic);
     renderChoices(q, arabic);
   }
 
-  /** The question text in its language (board game and Streak Challenge). */
+  /**
+   * The question text in its language (board game and Streak Challenge). Arabic text is marked
+   * translate="no" (US-40): otherwise Chrome offers "Translate page?" over the question, and in
+   * the Android app that sheet also takes the first Back press. The same goes for every Arabic
+   * answer, choice and label below.
+   */
   function renderQuestionText(text, arabic) {
     dom.qText.textContent = text;
     dom.qText.dir = arabic ? 'rtl' : 'ltr';
     dom.qText.lang = arabic ? 'ar' : 'en';
+    dom.qText.translate = !arabic;
     dom.qText.style.setProperty('--q-scale', String(questionScale(text)));
   }
 
@@ -1763,6 +1770,7 @@
     dom.langBtn.hidden = !available;
     dom.langBtn.textContent = arabic ? 'English' : 'العربية';
     dom.langBtn.lang = arabic ? 'en' : 'ar';
+    dom.langBtn.translate = arabic;
     dom.langBtn.setAttribute('aria-label', arabic ? 'Show question in English' : 'Show question in Arabic');
   }
 
@@ -1803,6 +1811,7 @@
     const texts = choiceTexts(q, arabic);
     list.dir = texts.arabic ? 'rtl' : 'ltr';
     list.lang = texts.arabic ? 'ar' : 'en';
+    list.translate = !texts.arabic;
     list.classList.toggle('is-short', texts.options.every((text) => text.length <= CHOICES_SHORT_CHARS));
     cur.choiceOrder.forEach((index, position) => {
       list.appendChild(h('li', { className: 'choice' + (index === 0 ? ' is-answer' : '') }, [
@@ -2608,6 +2617,7 @@
     clear(list);
     list.dir = arabic ? 'rtl' : 'ltr';
     list.lang = arabic ? 'ar' : 'en';
+    list.translate = !arabic;
     cur.q.choices.forEach((choice, index) => {
       const isRight = answered && index === cur.q.correct;
       const isWrong = answered && index === cur.picked && !isRight;
@@ -2666,6 +2676,7 @@
         text: answer.text,
         dir: answer.arabic ? 'rtl' : 'ltr',
         lang: answer.arabic ? 'ar' : 'en',
+        translate: !answer.arabic,
       }));
       dom.streakFeedback.appendChild(document.createTextNode('.'));
     }
