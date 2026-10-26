@@ -9,7 +9,10 @@
   <link rel="icon" href="img/logo.svg" type="image/svg+xml">
   <link rel="icon" href="img/favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.50db26ae.css">
+  <!-- Web app manifest for the Android app (US-40, D-43) -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0b1026">
+  <link rel="stylesheet" href="css/style.254bac82.css">
   <link rel="stylesheet" href="css/guide.12d2b532.css">
 </head>
 <body class="guide">
@@ -20,7 +23,7 @@
 
   <!-- Privacy Policy (D-41). Keep it in step with what the game stores (game log, localStorage) and with the ads settings. -->
   <main class="guide-main">
-    <p class="guide-intro">Last updated: 25 October 2026. This page explains what data BrainRush keeps and how ads use cookies.</p>
+    <p class="guide-intro">Last updated: 26 October 2026. This page explains what data BrainRush keeps and how ads use cookies.</p>
 
     <nav class="guide-toc" aria-labelledby="toc-title">
       <h2 id="toc-title">Contents</h2>
@@ -29,6 +32,7 @@
         <li><a href="#server">On our server</a></li>
         <li><a href="#browser">In your browser</a></li>
         <li><a href="#ads">Ads and cookies</a></li>
+        <li><a href="#app">Android app</a></li>
         <li><a href="#hosting">Hosting</a></li>
         <li><a href="#changes">Changes to this policy</a></li>
         <li><a href="#contact">Contact</a></li>
@@ -63,6 +67,11 @@
       <p>BrainRush itself doesn't set any tracking or analytics cookies.</p>
     </section>
 
+    <section id="app" class="guide-section">
+      <h2>Android app</h2>
+      <p>The BrainRush app for Android opens this same website full screen in Chrome on your phone. It saves the same data as the website, as described on this page, and adds nothing of its own: no account and no tracking. The app shows no ads, so the Ads and cookies section above applies to the website only. Installing the app from Google Play is covered by Google's own privacy policy.</p>
+    </section>
+
     <section id="hosting" class="guide-section">
       <h2>Hosting</h2>
       <p>Our hosting provider (Hostinger) may keep standard technical logs, such as IP addresses and browser types, to run and protect its servers.</p>
@@ -80,5 +89,7 @@
 
     <p class="guide-back"><a class="btn btn-primary btn-large" href="index.html">Start playing</a></p>
   </main>
+  <!-- Android app mode (US-40, D-43): keeps the app flag when the app opens this page; nothing on the website -->
+  <script src="js/app.05c6d08d.js"></script>
 </body>
 </html>

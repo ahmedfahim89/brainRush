@@ -6,3 +6,12 @@ Thumbs.db
 /password.txt
 # Internal-only files (credentials and local config)
 /InternalUse/
+# Android app (US-40, D-43): signing keys stay outside the repo; build output is never committed
+android/**/*.keystore
+android/**/*.jks
+android/**/build/
+android/.gradle/
+android/local.properties
+*.apk
+*.aab
+*.idsig

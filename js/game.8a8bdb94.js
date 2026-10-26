@@ -631,6 +631,7 @@
     window.scrollTo(0, 0);
     saveState();
     showAd(name);
+    syncBack();
   }
 
   // ---------- Ads (D-41) ----------
@@ -699,6 +700,7 @@
 
   /** Show the banner when an ad screen (the Leaderboard) opens; the screen must be visible first. */
   async function showAd(name) {
+    if (isApp) return; // no ads in the Android app (D-43): the script is never loaded there
     const slot = dom.adSlots[name];
     if (!slot) return;
     const config = await loadAdConfig();
@@ -720,6 +722,116 @@
     } catch (err) {
       slot.hidden = true;
     }
+  }
+
+  // ---------- Android app (US-40, D-43) ----------
+  // js/app.js (loaded first) tells whether this tab is the Android app and already removed the
+  // header's Admin link and kept the site's links in the app window. Here: no ads, no Admin link in
+  // the setup messages, and the Android Back button closes the open popup or goes back one screen.
+  // The website is unchanged.
+
+  const isApp = window.brainrushApp === true;
+
+  // Android Back. Away from the root (the setup screen without the Streak setup open), one extra
+  // history entry of ours sits on top. Back pops it: popstate runs the screen's own way back, with
+  // its confirm, then history.forward() returns to our entry if the app is still not at the root.
+  // At the root there is no entry, so Back leaves the app. The entry is added only once the page
+  // has had a tap: Chrome's Back skips entries a page adds without one. Known limitation: a game
+  // restored at app start has no entry until the first tap, so Back before any tap leaves the app
+  // (the game stays saved).
+  const BACK_STATE = 'brainrushBack';
+  const back = { armed: false, handling: false, leaving: false };
+
+  function atBackRoot() {
+    return state.screen === 'setup' && !(state.setup && state.setup.streak);
+  }
+
+  /** After a screen change: add our history entry, or drop it at the root. */
+  function syncBack() {
+    if (!isApp || back.handling) return;
+    const away = !atBackRoot();
+    if (away && !back.armed) {
+      if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return; // on the first tap
+      window.history.pushState({ [BACK_STATE]: true }, '');
+      back.armed = true;
+    } else if (!away && back.armed) {
+      back.armed = false;
+      back.leaving = true;
+      window.history.back();
+    }
+  }
+
+  /** What Back does: the same as the screen's own way back, confirms included. */
+  function goBack() {
+    if (!dom.doubleOverlay.hidden) {
+      closeDoublePopup();
+    } else if (state.screen === 'question') {
+      if (!streakOnScreen()) confirmBackToBoard();  // "Back to Board", after a confirm
+      else if (streak.over) onStreakNext();          // lost run: on to the leaderboard, as Next
+      else onStreakEnd();                            // "End the run now?" confirm
+    } else if (state.screen === 'board') {
+      endGame();                                     // D-09 confirm while questions are left
+    } else if (state.screen === 'results') {
+      newGame();
+    } else if (state.screen === 'leaderboard') {
+      if (leaderboardResult) onLeaderboardNewGame(); // asks first if the streak was not saved
+      else onLeaderboardBack();
+    } else if (state.setup && state.setup.streak) {
+      onStreakCancel();
+    }
+  }
+
+  /**
+   * Back on a board question: a Back press is easily made by mistake and an opened question can
+   * never be reopened (D-06), so ask first. Cancel keeps the question open; its timer runs on.
+   */
+  function confirmBackToBoard() {
+    const cur = state.game && state.game.current;
+    if (!cur) return;
+    const text = Object.keys(cur.marks).length
+      ? 'Leave this question? It will be closed and cannot be opened again.'
+      : 'Leave this question? It will be closed without points and cannot be opened again.';
+    if (!window.confirm(text)) return;
+    if (state.game && state.game.current === cur) backToBoard();
+  }
+
+  function onPopState(event) {
+    if (event.state && event.state[BACK_STATE]) return; // our history.forward()
+    if (back.leaving) { // our history.back() at the root
+      back.leaving = false;
+      return;
+    }
+    if (!back.armed) return;
+    back.armed = false;
+    back.handling = true;
+    try {
+      goBack();
+    } finally {
+      back.handling = false;
+    }
+    if (!atBackRoot()) { // a confirm was cancelled, or one screen back is not the root yet
+      back.armed = true;
+      window.history.forward();
+    }
+  }
+
+  function initApp() {
+    if (!isApp) return;
+    if (window.history.state && window.history.state[BACK_STATE]) back.armed = true; // reloaded on our entry
+    window.addEventListener('popstate', onPopState);
+    document.addEventListener('click', syncBack); // a restored game screen gets its entry on the first tap
+  }
+
+  /** Offline page (US-40, D-43): sw.js shows offline.html when a page cannot load. Errors are ignored. */
+  function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    window.addEventListener('load', () => {
+      try {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      } catch (err) {
+        // not available here (e.g. a private window): the site works without it
+      }
+    });
   }
 
   // ---------- Setup: contestants (US-01, US-02, US-03) ----------
@@ -935,7 +1047,8 @@
     clear(dom.catWarning);
     dom.catWarning.appendChild(document.createTextNode(
       'No playable categories ' + String.fromCharCode(0x2014) + ' add questions in '));
-    dom.catWarning.appendChild(h('a', { href: 'admin.html', text: 'Admin' }));
+    // No link to the admin page in the Android app (US-40); the word stays so the sentence reads on
+    dom.catWarning.appendChild(isApp ? document.createTextNode('Admin') : h('a', { href: 'admin.html', text: 'Admin' }));
     dom.catWarning.appendChild(document.createTextNode(
       '. A category is playable when it has a question for every enabled point value.'));
     dom.catWarning.hidden = false;
@@ -979,7 +1092,8 @@
     clear(dom.loadMsg);
     dom.loadMsg.className = 'msg msg-error';
     dom.loadMsg.appendChild(h('span', { text: text + ' ' }));
-    if (withAdminLink) dom.loadMsg.appendChild(h('a', { href: 'admin.html', text: 'Open Admin' }));
+    // No link to the admin page in the Android app (US-40)
+    if (withAdminLink && !isApp) dom.loadMsg.appendChild(h('a', { href: 'admin.html', text: 'Open Admin' }));
     if (withRetry) {
       dom.loadMsg.appendChild(h('button', {
         type: 'button',
@@ -2139,6 +2253,7 @@
     dom.catBlock.hidden = s.streak;
     dom.streakBlock.hidden = !s.streak;
     updateStartButton();
+    syncBack(); // Android Back closes the Streak setup (US-40)
   }
 
   /** "Streak Challenge (solo)": open the challenger name field (prefilled from the player's name). */
@@ -2885,6 +3000,8 @@
       byId('mode-limit-' + key).textContent = '(max ' + MODES[key].limit + ')';
     });
     bindEvents();
+    initApp();
+    registerServiceWorker();
     const saved = loadState();
     if (saved) {
       try {

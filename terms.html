@@ -9,7 +9,10 @@
   <link rel="icon" href="img/logo.svg" type="image/svg+xml">
   <link rel="icon" href="img/favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.50db26ae.css">
+  <!-- Web app manifest for the Android app (US-40, D-43) -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0b1026">
+  <link rel="stylesheet" href="css/style.254bac82.css">
   <link rel="stylesheet" href="css/guide.12d2b532.css">
 </head>
 <body class="guide">
@@ -20,7 +23,7 @@
 
   <!-- Terms of Service (US-36, D-39). What the game stores is described in privacy.html (D-41). -->
   <main class="guide-main">
-    <p class="guide-intro">Last updated: 25 October 2026. Please read these terms before you play.</p>
+    <p class="guide-intro">Last updated: 26 October 2026. Please read these terms before you play.</p>
 
     <nav class="guide-toc" aria-labelledby="toc-title">
       <h2 id="toc-title">Contents</h2>
@@ -28,6 +31,7 @@
         <li><a href="#about">About these terms</a></li>
         <li><a href="#who">Who runs BrainRush</a></li>
         <li><a href="#use">Using the game</a></li>
+        <li><a href="#app">Android app</a></li>
         <li><a href="#fair-use">Fair use</a></li>
         <li><a href="#content">Questions and content</a></li>
         <li><a href="#data">Your data and ads</a></li>
@@ -54,6 +58,11 @@
         <li>You don't need an account to play.</li>
         <li>The <strong>Admin</strong> area is for the site owner only.</li>
       </ul>
+    </section>
+
+    <section id="app" class="guide-section">
+      <h2>Android app</h2>
+      <p>The BrainRush app for Android opens this same website full screen in Chrome. These terms apply to the app in the same way as to the website. The app is free, saves the same data as the website and shows no ads. See our <a href="privacy.html">Privacy Policy</a> for details.</p>
     </section>
 
     <section id="fair-use" class="guide-section">
@@ -99,5 +108,7 @@
 
     <p class="guide-back"><a class="btn btn-primary btn-large" href="index.html">Start playing</a></p>
   </main>
+  <!-- Android app mode (US-40, D-43): keeps the app flag when the app opens this page; nothing on the website -->
+  <script src="js/app.05c6d08d.js"></script>
 </body>
 </html>
