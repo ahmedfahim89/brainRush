@@ -1,0 +1,52 @@
+{
+  "packageId": "ninja.integration.brainrush",
+  "host": "brainrush.integration.ninja",
+  "name": "BrainRush",
+  "launcherName": "BrainRush",
+  "display": "standalone",
+  "themeColor": "#0B1026",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#0B1026",
+  "enableNotifications": false,
+  "startUrl": "/?source=twa",
+  "iconUrl": "https://brainrush.integration.ninja/img/icon-512.png",
+  "maskableIconUrl": "https://brainrush.integration.ninja/img/icon-maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "C:\\Users\\NB28970\\keys\\brainrush-upload.keystore",
+    "alias": "brainrush-upload"
+  },
+  "appVersionName": "1",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://brainrush.integration.ninja/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://brainrush.integration.ninja/",
+  "minSdkVersion": 24,
+  "orientation": "default",
+  "fingerprints": [
+    {
+      "name": "upload-key",
+      "value": "FD:1D:BC:B3:22:53:FA:1F:4F:38:C9:EB:99:9A:BF:E1:DF:E1:ED:C9:9F:BB:ED:A8:08:41:F3:48:9F:55:27:B1"
+    }
+  ],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "protocolHandlers": [],
+  "fileHandlers": [],
+  "launchHandlerClientMode": "",
+  "displayOverride": [],
+  "appVersion": "1"
+}
