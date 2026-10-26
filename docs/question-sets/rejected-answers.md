@@ -122,6 +122,9 @@ Unknown: the owner removed 19 AI suggestions on 2026-10-19 (all 5 at 500), and o
 | Captain Majid theme singer | | Arabic theme singer (sources disagree) | 2026-10-23 | cartoons-arabic-review.md (fact-check) |
 | Majed Abdullah | | Why the hero is called "Majid" (one hedged source) | 2026-10-23 | cartoons-arabic-review.md (fact-check) |
 | Venus Centre | | Damascus dubbing studio (fan sources, dates differ) | 2026-10-23 | cartoons-arabic-review.md (fact-check) |
+| Lucifer | 600 | Stepmother's cat in Disney's "Cinderella" (1950) | 2026-10-26 | auto-2026-10-26-review.md |
+| Norville | 600 | Shaggy's real first name in "Scooby-Doo, Where Are You!" | 2026-10-26 | auto-2026-10-26-review.md |
+| Bing Bong | 600 | Riley's imaginary friend in "Inside Out" (2015) | 2026-10-26 | auto-2026-10-26-review.md |
 
 ## Egyptians
 
@@ -190,6 +193,8 @@ The look-alike rows apply to the Flags category only. Some of these countries ar
 | Pho | | World dish question | 2026-10-20 | food-2-review.md |
 | Ricotta | | Cheese question | 2026-10-20 | food-2-review.md |
 | Stilton | | Cheese question | 2026-10-20 | food-2-review.md |
+| Tandoor | 400 | Clay oven used to bake naan in India and Pakistan | 2026-10-26 | auto-2026-10-26-review.md |
+| Anchovies (Worcestershire sauce) | 600 | Fermented fish in Lea and Perrins' sauce | 2026-10-26 | auto-2026-10-26-review.md |
 
 The food-2 removals were at 200-600 (one at 200, three at 300, four at 400, three at 500, four at 600), but the doc does not say which was which. Also avoid nutmeg and potato, quinoa or tomato origin questions (too close to mace and Andes).
 
