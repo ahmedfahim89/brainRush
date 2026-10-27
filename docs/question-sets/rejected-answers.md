@@ -125,6 +125,7 @@ Unknown: the owner removed 19 AI suggestions on 2026-10-19 (all 5 at 500), and o
 | Lucifer | 600 | Stepmother's cat in Disney's "Cinderella" (1950) | 2026-10-26 | auto-2026-10-26-review.md |
 | Norville | 600 | Shaggy's real first name in "Scooby-Doo, Where Are You!" | 2026-10-26 | auto-2026-10-26-review.md |
 | Bing Bong | 600 | Riley's imaginary friend in "Inside Out" (2015) | 2026-10-26 | auto-2026-10-26-review.md |
+| Jon Arbuckle | 600 | Full name of Garfield's owner (cartoonist, also owns Odie) | 2026-10-27 | auto-2026-10-27-review.md |
 
 ## Egyptians
 
@@ -195,6 +196,7 @@ The look-alike rows apply to the Flags category only. Some of these countries ar
 | Stilton | | Cheese question | 2026-10-20 | food-2-review.md |
 | Tandoor | 400 | Clay oven used to bake naan in India and Pakistan | 2026-10-26 | auto-2026-10-26-review.md |
 | Anchovies (Worcestershire sauce) | 600 | Fermented fish in Lea and Perrins' sauce | 2026-10-26 | auto-2026-10-26-review.md |
+| An opera singer (Nellie Melba) | 600 | What Nellie Melba, honoured by Escoffier's peach Melba, was famous as | 2026-10-27 | auto-2026-10-27-review.md |
 
 The food-2 removals were at 200-600 (one at 200, three at 300, four at 400, three at 500, four at 600), but the doc does not say which was which. Also avoid nutmeg and potato, quinoa or tomato origin questions (too close to mace and Andes).
 
@@ -402,3 +404,10 @@ Notes: the docs say "the Netflix and the Soviet Union questions were removed". N
 | Netflix | | General-set question (text not kept) | 2026-10-19 | general-sports-movies-technology-review.md |
 
 Notes: Gutenberg and Ada Lovelace were removed twice: the seed questions (points shown) went missing from the DB, and the reworded 2026-10-19 suggestions were removed again. Unknown: the owner removed 17 Technology suggestions on 2026-10-19, including all 5 at 500 and all 5 at 600.
+
+## Who Am I?
+
+| Answer | Points | Topic / question gist | Removed | Source |
+|---|---|---|---|---|
+| Florence Nightingale | 200 | British nurse of the Crimean War, "The Lady with the Lamp" | 2026-10-27 | auto-2026-10-27-review.md |
+| Ibn Rushd (Averroes) | 500 | 12th-century philosopher, judge and physician from Cordoba, "The Commentator" on Aristotle | 2026-10-27 | auto-2026-10-27-review.md |
