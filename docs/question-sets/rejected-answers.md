@@ -195,6 +195,16 @@ The look-alike rows apply to the Flags category only. Some of these countries ar
 | Stilton | | Cheese question | 2026-10-20 | food-2-review.md |
 | Tandoor | 400 | Clay oven used to bake naan in India and Pakistan | 2026-10-26 | auto-2026-10-26-review.md |
 | Anchovies (Worcestershire sauce) | 600 | Fermented fish in Lea and Perrins' sauce | 2026-10-26 | auto-2026-10-26-review.md |
+| Iodine | 300 | Element added to table salt to prevent goitre | 2026-10-27 | food-nutrition-review.md |
+| Capsaicin | 400 | Compound that gives chilli peppers their heat | 2026-10-27 | food-nutrition-review.md |
+| Cyanide (amygdalin) | 400 | Poison released by apple seeds, apricot kernels, bitter almonds | 2026-10-27 | food-nutrition-review.md |
+| Swordfish (mercury) | 400 | Fish pregnant women are told not to eat (toxic metal) | 2026-10-27 | food-nutrition-review.md |
+| Brazil nut (selenium) | 500 | Nut giving a whole day's selenium | 2026-10-27 | food-nutrition-review.md |
+| Solanine | 500 | Toxic compound in green or sprouting potatoes | 2026-10-27 | food-nutrition-review.md |
+| Theobromine | 500 | Why chocolate is poisonous to dogs | 2026-10-27 | food-nutrition-review.md |
+| Kakadu plum (vitamin C) | 600 | Fruit with the most vitamin C | 2026-10-27 | food-nutrition-review.md |
+| Oxalic acid (rhubarb) | 600 | Acid in rhubarb leaves, kidney stones | 2026-10-27 | food-nutrition-review.md |
+| Thiamine (beriberi) | 600 | Vitamin lost from polished white rice | 2026-10-27 | food-nutrition-review.md |
 
 The food-2 removals were at 200-600 (one at 200, three at 300, four at 400, three at 500, four at 600), but the doc does not say which was which. Also avoid nutmeg and potato, quinoa or tomato origin questions (too close to mace and Andes).
 

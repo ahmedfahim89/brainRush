@@ -1,0 +1,85 @@
+# Food & Drink: nutrition and food composition set (review)
+
+Owner request 2026-10-27: 3 questions per point value on food facts, nutrition and food composition. All 6 point values in `point_values` (100-600, all enabled) are covered.
+
+**Owner review 2026-10-27:** 10 of the 18 drafts removed (Iodine, Capsaicin, Swordfish, Cyanide, Solanine, Brazil nut, Theobromine, Kakadu plum, Oxalic acid, Thiamine; added to `rejected-answers.md`). The point values of the rest were changed: Caffeine 100 -> 200, Banana and Carrot 100 -> 300, Lactose 200 -> 300, Guava 300 -> 400, Gluten 300 -> 500. The Points column below shows the final value.
+
+File: `sql/add-food-nutrition-questions.sql`, 8 text rows, all with `question_ar`, `answer_ar`, `wrong_1`, `wrong_2`, `wrong_1_ar`, `wrong_2_ar`.
+
+| Points | Before | Added | After |
+|---|---|---|---|
+| 100 | 10 | 0 | 10 |
+| 200 | 8 | 3 | 11 |
+| 300 | 6 | 3 | 9 |
+| 400 | 5 | 1 | 6 |
+| 500 | 5 | 1 | 6 |
+| 600 | 4 | 0 | 4 |
+
+Local DB after the owner review: 828 questions before, 836 after loading the 8 rows, still 836 after a second run (idempotent). Food & Drink 38 -> 46.
+
+Spread per value (draft): each value mixed a "rich in" question, a natural substance in a food, and a mineral/vitamin or deficiency question.
+
+## Questions
+
+| Points | Question | Answer | Arabic question | Arabic answer | Wrong options (EN / AR) | Host note |
+|---|---|---|---|---|---|---|
+| 200 (was 100) | Which natural stimulant, found in coffee, tea and energy drinks, helps keep people awake? | Caffeine | أي مادة منبهة طبيعية، توجد في القهوة والشاي ومشروبات الطاقة، تساعد الناس على السهر واليقظة؟ | الكافيين | Nicotine, Taurine / النيكوتين، التورين | Reject taurine (in energy drinks only, not a stimulant in coffee or tea). |
+| 300 (was 100) | Which yellow fruit is famous for being rich in the mineral potassium? | Banana (accept bananas) | أي فاكهة صفراء مشهورة بأنها غنية بمعدن البوتاسيوم؟ | الموز | Lemon, Pineapple / الليمون، الأناناس | "Yellow" rules out avocado, which has more potassium. |
+| 300 (was 100) | Which root vegetable, rich in beta-carotene that the body turns into vitamin A, is famously said to help you see in the dark? | Carrot (accept carrots) | أي خضار جذري، غني بالبيتا كاروتين الذي يحوّله الجسم إلى فيتامين أ، يُقال إنه يساعد على الرؤية في الظلام؟ | الجزر | Beetroot, Radish / البنجر، الفجل | Reject sweet potato: rich in beta-carotene, but the "see in the dark" saying is about carrots (WWII British campaign). |
+| 200 | Which mineral, plentiful in milk, cheese and yoghurt, is the main mineral in our bones and teeth? | Calcium | أي معدن، يكثر في اللبن والجبن والزبادي، هو المعدن الأساسي في العظام والأسنان؟ | الكالسيوم | Sodium, Zinc / الصوديوم، الزنك | Reject phosphorus (also in bone, but calcium is the main and most abundant mineral). |
+| 300 (was 200) | What is the name of the natural sugar in milk that people with an intolerance to it find hard to digest? | Lactose | ما اسم السكر الطبيعي الموجود في اللبن، الذي يصعب هضمه على من يعانون من عدم تحمّله؟ | اللاكتوز | Fructose, Maltose / الفركتوز، المالتوز | Reject lactase (the enzyme) and galactose. |
+| 200 | Lack of which mineral, found in red meat, liver and lentils, is the most common nutritional cause of anaemia? | Iron | نقص أي معدن، يوجد في اللحوم الحمراء والكبدة والعدس، هو أكثر الأسباب الغذائية شيوعًا للأنيميا (فقر الدم)؟ | الحديد | Zinc, Magnesium / الزنك، المغنيسيوم | Reject vitamin B12 / folate (they cause other anaemias and are not minerals). |
+| 500 (was 300) | Which protein, found in wheat, barley and rye, must be avoided by people with coeliac disease? | Gluten | أي بروتين، يوجد في القمح والشعير والجاودار، يجب أن يتجنبه مرضى السيلياك؟ | الجلوتين | Casein, Albumin / الكازين، الألبومين | Accept gliadin only if the host is generous (it is part of gluten). |
+| 400 (was 300) | Which tropical fruit, popular in Egypt as a juice, has about four times as much vitamin C as an orange? | Guava | أي فاكهة استوائية، يحب المصريون عصيرها، تحتوي على نحو أربعة أضعاف فيتامين سي الموجود في البرتقال؟ | الجوافة | Mango, Papaya / المانجو، البابايا | USDA: guava 228 mg per 100 g, orange 53 mg. Reject kiwi (about 1.7x) and strawberry. |
+| removed (was 300) | Many countries add which element to table salt to prevent goitre, a swelling of the thyroid gland? | Iodine (accept iodide) | أي عنصر تضيفه دول كثيرة إلى ملح الطعام للوقاية من تضخم الغدة الدرقية (الجويتر)؟ | اليود | Magnesium, Phosphorus / المغنيسيوم، الفوسفور | Reject fluoride (added to salt in a few countries, but for teeth, not goitre). |
+| removed (was 400) | Which chemical compound gives chilli peppers their burning heat? | Capsaicin (accept capsaicinoids) | أي مركب كيميائي يمنح الفلفل الحار (الشطة) طعمه اللاذع الحارق؟ | الكابسيسين | Piperine, Allicin / البيبرين، الأليسين | Piperine is black pepper's compound: reject. Does not reveal the Scoville answer (Food 500). |
+| removed (was 400) | The UK's NHS tells pregnant women not to eat shark, marlin or which other large fish, because of the toxic metal it can contain? | Swordfish | تنصح هيئة الصحة البريطانية الحوامل بعدم أكل سمك القرش وسمك المارلين وأي سمكة كبيرة أخرى، بسبب المعدن السام الذي قد تحتويه؟ | سمك أبو سيف | Salmon, Cod / سمك السلمون، سمك القد | Reject tuna: the NHS only limits it (4 cans or 2 steaks a week). "Toxic metal" (mercury) is used instead of naming mercury, because "Mercury" is a Science answer. |
+| removed (was 400) | Apple seeds, apricot kernels and bitter almonds contain amygdalin, which can break down in the body to release which poison? | Cyanide (accept hydrogen cyanide, prussic acid) | تحتوي بذور التفاح ونوى المشمش واللوز المر على مادة الأميجدالين، التي قد تتحلل في الجسم فتطلق أي سم؟ | السيانيد (يُقبل: سيانيد الهيدروجين) | Arsenic, Strychnine / الزرنيخ، الإستركنين | The answer is the poison, not almonds, so the rejected "Almond (marzipan)" item is not re-added. |
+| removed (was 500) | Potatoes that have turned green or started to sprout can build up which bitter, toxic compound? | Solanine (accept chaconine, glycoalkaloids) | أي مركب مُرّ وسام قد يتراكم في البطاطس التي اخضرّ لونها أو بدأت في التزريع؟ | السولانين (يُقبل: القلويدات الجليكوسيدية) | Lectin, Tannin / اللكتين، التانين | Reject chlorophyll: it makes the potato green but is harmless. Not a potato-origin question (those are on the rejected list). |
+| removed (was 500) | Eating just one or two of which nut can give an adult a whole day's selenium? | Brazil nut (accept Brazil nuts) | أي نوع من المكسرات تكفي حبة أو حبتان منه لتزويد الشخص البالغ باحتياجه اليومي كاملًا من السيلينيوم؟ | الجوز البرازيلي (البندق البرازيلي) | Cashew, Macadamia / الكاجو، المكاديميا | One nut holds about 68-91 mcg (USDA), adult RDA 55 mcg. Content varies with soil, hence "one or two". |
+| removed (was 500) | Chocolate is poisonous to dogs mainly because of which bitter compound, named after the cacao tree? | Theobromine | الشوكولاتة سامة للكلاب أساسًا بسبب أي مركب مُرّ مأخوذ اسمه من اسم شجرة الكاكاو؟ | الثيوبرومين | Taurine, Theanine / التورين، الثيانين | Reject caffeine: it also contributes, but chocolate has 3-10 times more theobromine (Merck), and it is not named after the cacao tree (Theobroma). |
+| removed (was 600) | Which Australian bush fruit is often described as having the highest natural vitamin C content of any fruit in the world? | Kakadu plum (accept gubinge, billygoat plum) | أي فاكهة برية أسترالية تُوصف كثيرًا بأنها تحتوي على أعلى نسبة طبيعية من فيتامين سي بين فواكه العالم؟ | برقوق كاكادو (يُقبل: جوبينج) | Finger lime, Quandong / الليمون الإصبعي، الكواندونج | Reject acerola and camu camu (rivals for the title, but not Australian). "Often described" plus "Australian" keeps it defensible. |
+| removed (was 600) | Rhubarb leaves are rich in which acid, whose salts also form the most common type of kidney stone? | Oxalic acid (accept oxalate, oxalates) | أوراق نبات الراوند غنية بأي حمض، تكوّن أملاحه أيضًا أكثر أنواع حصوات الكلى شيوعًا؟ | حمض الأكساليك (يُقبل: الأكسالات) | Malic acid, Citric acid / حمض الماليك، حمض الستريك | Reject uric acid (a less common stone type). Calcium oxalate is about 80% of stones. |
+| removed (was 600) | Beriberi spread in Asia when people switched to polished white rice, which loses most of this vitamin in milling. Which vitamin is it? | Thiamine (vitamin B1, accept thiamin) | انتشر مرض البري بري في آسيا عندما تحوّل الناس إلى الأرز الأبيض المقشور، الذي يفقد معظم هذا الفيتامين أثناء التبييض. ما هذا الفيتامين؟ | الثيامين (فيتامين ب1) | Riboflavin, Niacin / الريبوفلافين، النياسين | Accept "vitamin B1"; reject "vitamin B" alone. Niacin (B3) causes pellagra. |
+
+## Duplicate and rejected-list checks
+
+- All 18 answers checked against every local DB answer (cut at the first bracket, case-insensitive): no match. Banana appears only as a wrong option of a Gen Z question.
+- Checked against `docs/question-sets/rejected-answers.md` (Food & Drink section and its note: no nutmeg, no potato/quinoa/tomato origin questions): no rejected answer is used.
+- Give-aways avoided: no question names Coca-Cola (Food 100, so "cola" became "energy drinks"), Mercury (Science 400/600, so the swordfish question says "toxic metal"), Spinach (Cartoons 100), Vitamin D or Chlorophyll (Science 400), or the Scoville scale (Food 500). Within the set, no question names another answer: the scurvy/vitamin C draft was dropped because the guava and Kakadu plum questions mention vitamin C, and the oxalic acid question avoids the word "calcium".
+
+## Dropped or reworded during drafting and fact-checking
+
+| Draft | Why |
+|---|---|
+| Scurvy: lack of which vitamin? (Vitamin C) | Guava and Kakadu plum questions name vitamin C, which would give it away. Replaced by iron/anaemia. |
+| "Which fruit contains the most vitamin C?" | Sources disagree (Kakadu plum, acerola, camu camu). Reworded as the Kakadu plum question ("often described", "Australian") and the guava question (a ratio checked against USDA data). |
+| "Rhubarb leaves are poisonous mainly because of which acid?" | Disputed: MedlinePlus lists oxalic acid and possibly anthraquinone glycosides, and some sources doubt oxalic acid causes the deaths. Reworded to "rich in which acid", which every source agrees on. |
+| "Which food is known to contain mercury?" (tuna / swordfish) | Too open (many fish). Anchored to the NHS "do not eat" list for pregnant women, where swordfish is the only remaining answer next to shark and marlin. Tuna is only limited, so it is not accepted. |
+| Chocolate and dogs, "apart from caffeine" | Would reveal the Caffeine answer (100). Reworded with "named after the cacao tree". |
+| Pellagra / niacin, B12 for vegans, honey and infant botulism, lycopene, quinine in tonic water | Spares, not needed for 3 per value. |
+
+## Fact-check sources
+
+| Points | Answer | Sources |
+|---|---|---|
+| 100 | Caffeine | [FDA/NIH ODS, Regulatory Status of Caffeine (Mattia)](https://ods.od.nih.gov/pubs/energydrinks2013/mattia.pdf); [Healthline, foods and drinks with caffeine](https://www.healthline.com/nutrition/foods-with-caffeine); [Henry Ford Health, sources of caffeine](https://www.henryford.com/blog/2024/04/hidden-sources-of-caffeine) |
+| 100 | Banana | [Harvard T.H. Chan Nutrition Source, Bananas](https://nutritionsource.hsph.harvard.edu/food-features/bananas/); [Harvard Health, foods high in potassium](https://www.health.harvard.edu/diet-and-nutrition/the-best-foods-high-in-potassium-and-why-you-need-them) |
+| 100 | Carrot | [McGill Office for Science and Society](https://www.mcgill.ca/oss/article/did-you-know-nutrition/real-connection-between-carrots-and-vision); [Healthline, are carrots good for your eyes](https://www.healthline.com/nutrition/are-carrots-good-for-your-eyes) |
+| 200 | Calcium | [NIH ODS, Calcium (consumer)](https://ods.od.nih.gov/factsheets/Calcium-Consumer/); [NIH NIAMS, Calcium and vitamin D](https://www.niams.nih.gov/health-topics/calcium-and-vitamin-d-important-bone-health); [Linus Pauling Institute, Calcium](https://lpi.oregonstate.edu/mic/minerals/calcium) |
+| 200 | Lactose | [NIDDK, Lactose intolerance: symptoms and causes](https://www.niddk.nih.gov/health-information/digestive-diseases/lactose-intolerance/symptoms-causes); [JAMA patient page, Lactose intolerance](https://jamanetwork.com/journals/jama/fullarticle/2753373) |
+| 200 | Iron | [WHO fact sheet, Anaemia](https://www.who.int/news-room/fact-sheets/detail/anaemia); [NIH ODS, Iron](https://ods.od.nih.gov/factsheets/Iron-HealthProfessional/); [Johns Hopkins, Iron-deficiency anemia](https://www.hopkinsmedicine.org/health/conditions-and-diseases/irondeficiency-anemia) |
+| 300 | Gluten | [NHS, Coeliac disease](https://www.nhs.uk/conditions/coeliac-disease/); [NHS Inform, Living well with coeliac disease](https://www.nhsinform.scot/illnesses-and-conditions/stomach-liver-and-gastrointestinal-tract/coeliac-disease/living-well-with-coeliac-disease/); [Coeliac UK, grains](https://www.coeliac.org.uk/grains/) |
+| 300 | Guava | USDA FoodData Central values (guava, common, raw 228.3 mg per 100 g, FDC 173044; oranges, raw 53.2 mg) as reported in [Wikipedia, Guava](https://en.wikipedia.org/wiki/Guava) and [Wikipedia, Orange](https://en.wikipedia.org/wiki/Orange_(fruit)); Indian Food Composition Tables (IFCT 2017: guava 214 mg, orange 42.7 mg) via [nnwa.in comparison](https://nnwa.in/foods/compare/guava-vs-orange/) |
+| 300 | Iodine | [WHO eLENA, Iodized salt for prevention of iodine deficiency disorders](https://www.who.int/tools/elena/review-summaries/salt-iodization--iodized-salt-for-the-prevention-of-iodine-deficiency-disorders); [Cochrane review, Iodised salt (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC9006116/) |
+| 400 | Capsaicin | [Britannica, Capsaicin](https://www.britannica.com/science/capsaicin); [Merriam-Webster, capsaicin](https://www.merriam-webster.com/dictionary/capsaicin) |
+| 400 | Swordfish | [NHS, Foods to avoid in pregnancy](https://www.nhs.uk/pregnancy/keeping-well/foods-to-avoid/); [NHS, Fish and shellfish](https://www.nhs.uk/live-well/eat-well/food-types/fish-and-shellfish-nutrition/) (mercury reason); [FDA, Advice about eating fish](https://www.fda.gov/food/consumers/advice-about-eating-fish) (swordfish in "Choices to Avoid") |
+| 400 | Cyanide | [NZ Ministry for Primary Industries, kernels and seeds unsafe to eat](https://www.mpi.govt.nz/food-safety-home/safe-eat/apricot-and-peach-kernels-and-apple-and-pear-seeds-are-unsafe-to-eat); [University of Bristol, Molecule of the Month: Amygdalin](https://www.chm.bris.ac.uk/motm/amygdalin/amygdalinh.htm); [ScienceDirect Topics, Amygdalin](https://www.sciencedirect.com/topics/agricultural-and-biological-sciences/amygdalin) |
+| 500 | Solanine | [Iowa State University Extension, sprouting or greening potatoes](https://blogs.extension.iastate.edu/answerline/2024/04/02/spouting-or-greening-potatoes-keep-or-toss/); [IPB University, green and sprouted potatoes](https://www.ipb.ac.id/news/index/2025/06/green-and-sprouted-potatoes-contain-toxins-this-is-the-explanation-of-ipb-university-experts/); EFSA 2020 opinion on glycoalkaloids (cited in both) |
+| 500 | Brazil nut | [HZDR (Helmholtz-Zentrum Dresden-Rossendorf), trace elements in Brazil nuts](https://www.hzdr.de/db/Cms?pOid=76285&pNid=0&pLang=en); [Healthline, Brazil nuts](https://www.healthline.com/nutrition/brazil-nuts-benefits) (USDA 68-91 mcg per nut, RDA 55 mcg); NIH ODS selenium fact sheet (blocked with HTTP 403 during this check, figures quoted via the other two) |
+| 500 | Theobromine | [Merck Veterinary Manual, Chocolate toxicosis](https://www.merckvetmanual.com/toxicology/food-hazards/chocolate-toxicosis-in-animals); [VIN Veterinary Partner, Chocolate toxicity](https://veterinarypartner.vin.com/default.aspx?pid=19239&id=4952115); [PMC, Some food toxic for pets](https://pmc.ncbi.nlm.nih.gov/articles/PMC2984110/) |
+| 600 | Kakadu plum | [University of Queensland researchers, CABI book chapter "Kakadu Plum (Terminalia ferdinandiana)"](https://www.cabidigitallibrary.org/doi/10.1079/9781789248067.0012); [Bobasa et al., Foods 2024 (PMC)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11431513/); [Healthline, Kakadu plum](https://www.healthline.com/nutrition/kakadu-plum-benefits) |
+| 600 | Oxalic acid | [MedlinePlus, Rhubarb leaves poisoning](https://medlineplus.gov/ency/article/002876.htm); [UF Health, Rhubarb leaves poisoning](https://ufhealth.org/conditions-and-treatments/rhubarb-leaves-poisoning); [Urology Care Foundation, Kidney stones](https://www.urologyhealth.org/urology-a-z/k/kidney-stones) and [National Kidney Foundation, Calcium kidney stones](https://www.kidney.org/kidney-topics/calcium-kidney-stones) (calcium oxalate most common) |
+| 600 | Thiamine | [WHO, Thiamine deficiency and its prevention and control](https://www.who.int/publications/i/item/WHO-NHD-99.13); [EBSCO Research Starters, Grijns suggests the cause of beriberi](https://www.ebsco.com/research-starters/history/grijns-suggests-cause-beriberi/); [ScienceDirect Topics, Beriberi](https://www.sciencedirect.com/topics/biochemistry-genetics-and-molecular-biology/beriberi) |
+
+No retrieved web page contained instructions aimed at the producer.
