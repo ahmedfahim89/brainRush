@@ -339,6 +339,15 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 .setup { max-width: 54rem; margin: 0 auto; }
 /* Home intro (D-42): one short muted line under "New game" that says what BrainRush is */
 .site-intro { margin: -0.3rem 0 1rem; color: var(--muted); font-size: 0.95rem; }
+
+/* Site footer (US-41): the same links on every public page. Hidden while a board game is on screen,
+   so the board and question still fit one screen (D-30). */
+.site-footer { margin-top: 2rem; padding: 1rem 1.25rem 1.5rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.9rem; text-align: center; }
+.site-footer nav a { display: inline-block; padding: 0.3rem 0.15rem; color: var(--gold); text-decoration: none; }
+@media (hover: hover) { .site-footer nav a:hover { text-decoration: underline; } }
+.site-footer p { margin: 0.4rem 0 0; }
+body[data-screen="board"] .site-footer, body[data-screen="question"] .site-footer { display: none; }
+.contact-email { font-size: 1.2rem; font-weight: 600; }
 .setup-block {
   min-width: 0;
   margin: 0 0 1.25rem;
@@ -1132,6 +1141,7 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
      Header links: vertical padding on an inline link enlarges the tap area without moving anything.
      Text links inside a sentence (the setup intro) are exempt, as WCAG 2.5.8 allows. */
   .page-header .nav-link { padding: 0.8rem 0.15rem; }
+  .site-footer nav a { min-height: 48px; padding: 0.8rem 0.3rem; } /* footer links (US-41): same 48px rule */
   .game .btn, .game input[type="text"], .game input[type="number"] { min-height: 48px; }
   .mode-option span { padding-top: 0.7rem; padding-bottom: 0.7rem; }
   .cat-label { min-height: 48px; }

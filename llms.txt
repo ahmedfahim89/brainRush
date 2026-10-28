@@ -22,5 +22,7 @@ This file lists no questions or answers, on purpose.
 ## Optional
 
 - [Categories](https://brainrush.integration.ninja/api/categories.php): JSON list of the current categories and how many questions each has
+- [About](https://brainrush.integration.ninja/about.html): what BrainRush is, who makes it and how the questions are made
+- [Contact](https://brainrush.integration.ninja/contact.html): email for corrections, ideas and data requests
 - [Terms of Service](https://brainrush.integration.ninja/terms.html): rules for using the site
 - [Privacy Policy](https://brainrush.integration.ninja/privacy.html): what the game saves, and how the Google AdSense ads on the Streak leaderboard screen use cookies
