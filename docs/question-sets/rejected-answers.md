@@ -126,6 +126,8 @@ Unknown: the owner removed 19 AI suggestions on 2026-10-19 (all 5 at 500), and o
 | Norville | 600 | Shaggy's real first name in "Scooby-Doo, Where Are You!" | 2026-10-26 | auto-2026-10-26-review.md |
 | Bing Bong | 600 | Riley's imaginary friend in "Inside Out" (2015) | 2026-10-26 | auto-2026-10-26-review.md |
 | Jon Arbuckle | 600 | Full name of Garfield's owner (cartoonist, also owns Odie) | 2026-10-27 | auto-2026-10-27-review.md |
+| George (Peppa Pig) | 200 | Peppa's little brother who carries his toy dinosaur everywhere | 2026-10-28 | auto-2026-10-28-review.md |
+| Obelix | 400 | Asterix's big best friend who fell into the magic potion, menhir delivery man | 2026-10-28 | auto-2026-10-28-review.md |
 
 ## Egyptians
 
@@ -207,6 +209,7 @@ The look-alike rows apply to the Flags category only. Some of these countries ar
 | Oxalic acid (rhubarb) | 600 | Acid in rhubarb leaves, kidney stones | 2026-10-27 | food-nutrition-review.md |
 | Thiamine (beriberi) | 600 | Vitamin lost from polished white rice | 2026-10-27 | food-nutrition-review.md |
 | An opera singer (Nellie Melba) | 600 | What Nellie Melba, honoured by Escoffier's peach Melba, was famous as | 2026-10-27 | auto-2026-10-27-review.md |
+| The Capuchins (cappuccino) | 600 | Order of friars with brown hooded habits that cappuccino is named after | 2026-10-28 | auto-2026-10-28-review.md |
 
 The food-2 removals were at 200-600 (one at 200, three at 300, four at 400, three at 500, four at 600), but the doc does not say which was which. Also avoid nutmeg and potato, quinoa or tomato origin questions (too close to mace and Andes).
 
@@ -365,7 +368,7 @@ Notes: Metropolis and Chadwick Boseman are stated in movies-2-review.md as owner
 | mRNA vaccine | 400 | COVID-19 vaccine type (Pfizer, Moderna) | 2026-10-21 | science-2-review.md (inferred) |
 | CRISPR | 500 | "Genetic scissors", 2020 Nobel Prize | 2026-10-21 | science-2-review.md (inferred) |
 | Geoffrey Hinton | 500 | Science version of the "godfather of AI" question | 2026-10-21 | science-2-review.md (inferred) |
-| Louis Pasteur | 500 | Gave his name to pasteurisation of milk | 2026-10-21 | science-2-review.md |
+| Louis Pasteur | 500 | Gave his name to pasteurisation of milk (owner approved Pasteur as Who Am I? 300 on 2026-10-28, auto-2026-10-28-review.md; still don't re-add him in Science) | 2026-10-21 | science-2-review.md |
 | Seismology | 500 | Study of earthquakes | 2026-10-21 | science-2-review.md (inferred) |
 | Speed of light | 500 | About 300,000 km per second | 2026-10-19 | general-geography-science-history-review.md (inferred) |
 | Whale shark | 500 | Animals question | 2026-10-21 | science-2-review.md |
@@ -421,3 +424,4 @@ Notes: Gutenberg and Ada Lovelace were removed twice: the seed questions (points
 |---|---|---|---|---|
 | Florence Nightingale | 200 | British nurse of the Crimean War, "The Lady with the Lamp" | 2026-10-27 | auto-2026-10-27-review.md |
 | Ibn Rushd (Averroes) | 500 | 12th-century philosopher, judge and physician from Cordoba, "The Commentator" on Aristotle | 2026-10-27 | auto-2026-10-27-review.md |
+| Amelia Earhart | 500 | American pilot, first woman to fly solo nonstop to Europe (1932), vanished in 1937 | 2026-10-28 | auto-2026-10-28-review.md |
