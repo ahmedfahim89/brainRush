@@ -245,6 +245,12 @@ The Android app is a Trusted Web Activity: it opens this site full screen in Chr
    Fingerprints are public and safe to commit. The keystore and its passwords are not: keep them outside the repository and back them up.
 5. **Later changes.** A changed `offline.html` needs a new `CACHE` version in `sw.js` (for example `brainrush-offline-v2`), or phones keep showing the old copy. A changed icon needs a new file name, like the question pictures.
 
+## 12. About and Contact pages (US-41, D-44)
+
+1. **Deploy the code** (section 8, step 3). With File Manager/FTP upload the new `about.html` and `contact.html`, the changed `index.html`, `how-to-play.html`, `terms.html`, `privacy.html`, `sitemap.xml` and `llms.txt`, and the new hashed `css/style.*.css` (delete the old one). No database change.
+2. Check that `https://brainrush.integration.ninja/about.html` and `/contact.html` open, and that the footer links work on the game's setup screen and on the guide.
+3. In Google Search Console, **Sitemaps** → open `sitemap.xml` → it is read again on its own; to speed it up, use **URL inspection** → **Request indexing** for the two new pages.
+
 ## Troubleshooting
 
 | Symptom | Likely cause / fix |
