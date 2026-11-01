@@ -6,13 +6,30 @@ It complements the Claude Code mod (`ahmedfahim89/brainrush-trivia-claude-mod`),
 
 ## Add it to Claude
 
-Connector URL: `https://brainrush.integration.ninja/api/mcp.php` (no sign-in).
+Connector URL: `https://brainrush.integration.ninja/api/mcp.php` (no sign-in). Use one of the two ways below, not both, or Claude gets the same tools twice. Menu names follow Anthropic's [Add a connector that isn't in the directory](https://claude.com/docs/connectors/custom/add-unlisted).
 
-- **Chat (claude.ai, desktop, mobile):** Settings, then Connectors, then **Add custom connector**. Enter a name (BrainRush Trivia) and the URL, then **Add**. In a chat, check that the connector is switched on in the tools menu.
-- **Cowork:** connectors added to your account should be available there too; check that it is switched on for the task.
-- **Team or Enterprise accounts** (such as a company account): an Owner may have to allow custom connectors first, or add it for the organization.
+**Option A: install the plugin.** The mod repository bundles this connector (`.mcp.json`), so the plugin brings the card to Chat and Cowork and the band to Claude Code:
 
-Then ask, for example, "Let's play BrainRush trivia". The first time, Claude asks to show the card: choose **Allow** (or **Always allow**).
+1. In claude.ai or the desktop app, go to **Customize > Plugins > Add > Add marketplace** and enter `ahmedfahim89/brainrush-trivia-claude-mod`.
+2. Install **BrainRush Trivia**.
+3. Open the plugin's **Connectors** tab and connect **brainrush-trivia**.
+
+**Option B: add only the connector by its URL.**
+
+On a Free, Pro, Max or Ultra plan:
+
+1. Go to **Customize > Connectors**.
+2. Click **Add custom connector**.
+3. Name it `BrainRush Trivia` and enter the connector URL.
+4. Leave the OAuth fields under **Advanced settings** empty, or choose **No sign-in** if the dialog asks how people authenticate.
+5. Click **Add**. (The Free plan allows one custom connector.)
+
+On a Team or Enterprise plan (such as a company account), members can't add a custom connector themselves:
+
+1. An Owner goes to **Organization settings > Connectors**, selects **Add**, then **Custom** (type **Web** if asked), enters the URL, chooses no sign-in, and clicks **Add**.
+2. Each member goes to **Customize > Connectors**, finds **BrainRush Trivia** with the **Custom** label, and clicks **Connect**.
+
+**Play:** in a chat, click **+**, select **Connectors** and check that BrainRush Trivia is on (in Cowork, check it is on for the task). Then ask, for example, "Let's play BrainRush trivia". The first time, Claude asks to show the card: choose **Allow** (or **Always allow**). To remove the connector, go to **Customize > Connectors** and click **Remove**.
 
 ## How it works
 
