@@ -23,7 +23,7 @@
 
   <!-- Privacy Policy (D-41). Keep it in step with what the game stores (game log, localStorage) and with the ads settings. -->
   <main class="guide-main">
-    <p class="guide-intro">Last updated: 26 October 2026. This page explains what data BrainRush keeps and how ads use cookies.</p>
+    <p class="guide-intro">Last updated: 1 November 2026. This page explains what data BrainRush keeps and how ads use cookies.</p>
 
     <nav class="guide-toc" aria-labelledby="toc-title">
       <h2 id="toc-title">Contents</h2>
@@ -33,6 +33,7 @@
         <li><a href="#browser">In your browser</a></li>
         <li><a href="#ads">Ads and cookies</a></li>
         <li><a href="#app">Android app</a></li>
+        <li><a href="#claude">Claude plugin and connector</a></li>
         <li><a href="#hosting">Hosting</a></li>
         <li><a href="#changes">Changes to this policy</a></li>
         <li><a href="#contact">Contact</a></li>
@@ -70,6 +71,17 @@
     <section id="app" class="guide-section">
       <h2>Android app</h2>
       <p>The BrainRush app for Android opens this same website full screen in Chrome on your phone. It saves the same data as the website, as described on this page, and adds nothing of its own: no account and no tracking. The app shows no ads, so the Ads and cookies section above applies to the website only. Installing the app from Google Play is covered by Google's own privacy policy.</p>
+    </section>
+
+    <section id="claude" class="guide-section">
+      <h2>Claude plugin and connector</h2>
+      <p>The BrainRush Trivia plugin and connector let you play BrainRush questions in Claude, Anthropic's AI assistant. Neither one has an account or a sign-in, and neither one saves anything about you on our server.</p>
+      <ul>
+        <li><strong>In Claude Code</strong>, the plugin asks our server for questions and sends the numbers of the questions you've already seen, but nothing that identifies you. Your score, that list and your on/off setting are saved by Claude Code on your own computer.</li>
+        <li><strong>In Claude's chat and Cowork</strong>, the trivia card comes from our connector. When the card opens or needs more questions, Claude's app asks our server for them and sends the numbers of the questions the card already showed. The connector receives nothing from your conversation, and we don't save these requests. The card loads its script and pictures from this website, so your browser connects to our server as it does when you visit. Your score lives only in the card while it's open.</li>
+        <li>What you write to Claude, and how Claude handles it, is covered by <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener">Anthropic's privacy policy</a>.</li>
+      </ul>
+      <p>The standard hosting logs described below apply to these requests too.</p>
     </section>
 
     <section id="hosting" class="guide-section">
