@@ -36,6 +36,11 @@ Options -Indexes
   RewriteRule ^README\.md$ - [F,L]
   RewriteRule ^password\.txt$ - [F,L]
   RewriteRule ^api/(config[^/]*|db)\.php$ - [F,L]
+
+  # --- Icons at the usual root paths ---
+  # Pages link img/ icons, but some clients (ChatGPT's connector chip) fetch /favicon.ico directly.
+  RewriteRule ^favicon\.(ico|png)$ img/favicon-32.png [L]
+  RewriteRule ^apple-touch-icon\.png$ img/apple-touch-icon.png [L]
 </IfModule>
 
 # Second line of defence (no mod_rewrite needed): never serve config/include-only
