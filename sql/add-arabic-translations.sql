@@ -31,7 +31,6 @@ INSERT INTO arabic_seed (question, question_ar, answer_ar) VALUES
 ('Which empire built the Colosseum?', 'أي إمبراطورية بنت الكولوسيوم؟', 'الإمبراطورية الرومانية'),
 ('In which year did the Berlin Wall fall?', 'في أي عام سقط جدار برلين؟', '1989'),
 ('Which Portuguese explorer was the first European to reach India by sea?', 'من هو المستكشف البرتغالي الذي كان أول أوروبي يصل إلى الهند عن طريق البحر؟', 'فاسكو دا جاما'),
-('How many players does a football (soccer) team have on the field?', 'كم عدد اللاعبين في فريق كرة القدم داخل الملعب؟', '11'),
 ('In which sport would you perform a slam dunk?', 'في أي رياضة تُؤدّى حركة التسديد من أعلى السلة (السلام دانك)؟', 'كرة السلة'),
 ('Which country won the first FIFA World Cup in 1930?', 'أي دولة فازت بأول كأس عالم لكرة القدم عام 1930؟', 'الأوروغواي'),
 ('Which German driver won five Formula 1 world titles in a row with Ferrari, from 2000 to 2004?', 'من هو السائق الألماني الذي فاز بخمس بطولات عالم متتالية في الفورمولا 1 مع فيراري من عام 2000 إلى 2004؟', 'مايكل شوماخر'),

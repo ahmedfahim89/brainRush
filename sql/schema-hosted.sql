@@ -121,7 +121,8 @@ SET @tech = (SELECT id FROM categories WHERE name = 'Technology');
 
 -- 25 questions per category, 5 per point value: the 5 original seed questions
 -- (one per value), then the 20 from docs/question-bank.md with their points
--- (Sprint 6, US-30), copied verbatim.
+-- (Sprint 6, US-30), copied verbatim. Sports has 24: the owner removed "How many
+-- players does a football (soccer) team have on the field?" (100) on 2026-11-01.
 INSERT IGNORE INTO questions (category_id, points, question, answer) VALUES
   (@geo, 100, 'What is the capital city of France?', 'Paris'),
   (@geo, 200, 'Which is the longest river in South America?', 'The Amazon'),
@@ -141,7 +142,6 @@ INSERT IGNORE INTO questions (category_id, points, question, answer) VALUES
   (@hist, 400, 'In which year did the Berlin Wall fall?', '1989'),
   (@hist, 500, 'Which Portuguese explorer was the first European to reach India by sea?', 'Vasco da Gama'),
 
-  (@spo, 100, 'How many players does a football (soccer) team have on the field?', '11'),
   (@spo, 200, 'In which sport would you perform a slam dunk?', 'Basketball'),
   (@spo, 300, 'Which country won the first FIFA World Cup in 1930?', 'Uruguay'),
   (@spo, 400, 'How many points is a touchdown worth in American football (before the extra point)?', '6'),
