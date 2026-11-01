@@ -231,7 +231,19 @@ switch ($method) {
                 'tools'     => ['listChanged' => false],
                 'resources' => ['subscribe' => false, 'listChanged' => false],
             ],
-            'serverInfo'      => ['name' => 'brainrush-trivia', 'title' => 'BrainRush Trivia', 'version' => '1.0.0'],
+            'serverInfo'      => [
+                'name'        => 'brainrush-trivia',
+                'title'       => 'BrainRush Trivia',
+                'version'     => '1.0.0',
+                'description' => 'BrainRush trivia in a multiple-choice card: tap an answer, see right or wrong, keep score.',
+                'websiteUrl'  => MCP_SITE,
+                // The app icon in clients that show one (ChatGPT's chip falls back to /favicon.ico without it).
+                'icons'       => [
+                    ['src' => MCP_SITE . '/img/icon-512.png', 'mimeType' => 'image/png', 'sizes' => ['512x512']],
+                    ['src' => MCP_SITE . '/img/icon-192.png', 'mimeType' => 'image/png', 'sizes' => ['192x192']],
+                    ['src' => MCP_SITE . '/img/logo.svg', 'mimeType' => 'image/svg+xml', 'sizes' => ['any']],
+                ],
+            ],
             'instructions'    => 'Call show_brainrush_trivia when the user wants trivia, a quiz or BrainRush. '
                 . 'It opens a card the user plays on their own; it returns no questions or answers.',
         ]);

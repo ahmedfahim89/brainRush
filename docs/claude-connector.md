@@ -31,6 +31,16 @@ On a Team or Enterprise plan (such as a company account), members can't add a cu
 
 **Play:** in a chat, click **+**, select **Connectors** and check that BrainRush Trivia is on (in Cowork, check it is on for the task). Then ask, for example, "Let's play BrainRush trivia". The first time, Claude asks to show the card: choose **Allow** (or **Always allow**). To remove the connector, go to **Customize > Connectors** and click **Remove**.
 
+## ChatGPT
+
+ChatGPT implements the same MCP Apps standard, so the same URL gives the same card there, with no change to the server or the card (checked on 1 November 2026: answering, scoring, a picture question, light and dark mode).
+
+1. Go to [chatgpt.com/plugins](https://chatgpt.com/plugins), click **+**, then **Add custom MCP server**.
+2. Name it `BrainRush Trivia` and enter the connector URL.
+3. Choose no authentication, review the warning and confirm, then **Create as a plugin**.
+
+On a Business or Enterprise workspace an admin may have to allow custom MCP servers first. To play, pick BrainRush Trivia in the composer (type `@`) and ask for a game. ChatGPT may show a "CSP off" label above the card for a custom server; the card works the same. Listing it in ChatGPT's own directory would need OpenAI's app submission and review.
+
 ## How it works
 
 `api/mcp.php` is a remote MCP server (Streamable HTTP). It is stateless: every request is one JSON-RPC message in a `POST`, answered with plain JSON. `GET` and `DELETE` get 405, as a server without sessions or server-sent events should.

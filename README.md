@@ -89,7 +89,7 @@ The Android app (US-40, D-43) is a Trusted Web Activity: a thin wrapper, kept in
 
 ## Claude connector (trivia card)
 
-`api/mcp.php` is a connector for Claude (Chat and Cowork, on the web, desktop and mobile): add `https://brainrush.integration.ninja/api/mcp.php` as a custom connector, ask Claude for BrainRush trivia, and a multiple-choice card opens in the conversation (`mcp/trivia-card.html`, questions from the Streak Challenge draw). The tool Claude calls returns no questions or answers; the card loads them itself. Setup, how it works and how to test it: [`docs/claude-connector.md`](docs/claude-connector.md).
+`api/mcp.php` is a connector for Claude (Chat and Cowork, on the web, desktop and mobile): add `https://brainrush.integration.ninja/api/mcp.php` as a custom connector, ask Claude for BrainRush trivia, and a multiple-choice card opens in the conversation (`mcp/trivia-card.html`, questions from the Streak Challenge draw). The tool Claude calls returns no questions or answers; the card loads them itself. The same URL works in ChatGPT as a custom MCP server. Setup, how it works and how to test it: [`docs/claude-connector.md`](docs/claude-connector.md).
 
 ## Security
 
