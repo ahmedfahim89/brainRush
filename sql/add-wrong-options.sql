@@ -705,9 +705,8 @@ INSERT INTO wrong_options_seed (category_name, question, image, wrong_1, wrong_2
 ('Science', 'The "funny bone" in your elbow is not a bone at all. What is it really?', '', 'A tendon', 'A ligament', 'وتر', 'رباط'),
 ('Science', 'Which metal conducts electricity better than any other metal?', '', 'Copper', 'Gold', 'النحاس', 'الذهب');
 
--- Sports (62)
+-- Sports (61)
 INSERT INTO wrong_options_seed (category_name, question, image, wrong_1, wrong_2, wrong_1_ar, wrong_2_ar) VALUES
-('Sports', 'How many players does a football (soccer) team have on the field?', '', '10', '12', '10', '12'),
 ('Sports', 'How many rings are on the Olympic flag?', '', 'Four', 'Six', 'أربع', 'ست'),
 ('Sports', 'How many minutes does a standard football (soccer) match last, not counting stoppage time?', '', '80', '100', '80', '100'),
 ('Sports', 'Which Egyptian footballer joined Liverpool in 2017 and became known as the "Egyptian King"?', '', 'Mohamed Elneny', 'Mohamed Aboutrika', 'محمد النني', 'محمد أبو تريكة'),
