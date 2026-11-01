@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<!--
+  BrainRush trivia card: the MCP App that api/mcp.php serves as ui://brainrush/trivia-card.
+  Claude draws it in a sandboxed frame on another origin; api/mcp.php fills in the site's address
+  (MCP_SITE) where the script and the pictures load from. Questions come from
+  the card-only tool brainrush_trivia_questions, through the host, never through the model.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>BrainRush trivia</title>
+<style>
+  /* Claude's style variables when the host sends them, BrainRush-neutral fallbacks otherwise. */
+  :root {
+    --br-bg: var(--color-background-primary, #ffffff);
+    --br-surface: var(--color-background-secondary, #f4f4f2);
+    --br-text: var(--color-text-primary, #1f1f1d);
+    --br-muted: var(--color-text-secondary, #5f5e5a);
+    --br-border: var(--color-border-primary, #8a8880);
+    --br-ring: var(--color-ring-primary, #3b6fd8);
+    --br-right-bg: var(--color-background-success, #e3f2e6);
+    --br-right-text: var(--color-text-success, #1d6b34);
+    --br-right-border: var(--color-border-success, #4c9a63);
+    --br-wrong-bg: var(--color-background-danger, #fbe7e5);
+    --br-wrong-text: var(--color-text-danger, #a3261c);
+    --br-wrong-border: var(--color-border-danger, #d06358);
+    --br-radius: var(--border-radius-md, 8px);
+    --br-font: var(--font-sans, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --br-bg: var(--color-background-primary, #1f1f1e);
+      --br-surface: var(--color-background-secondary, #2a2a28);
+      --br-text: var(--color-text-primary, #f1f0ec);
+      --br-muted: var(--color-text-secondary, #b4b2a9);
+      --br-border: var(--color-border-primary, #7b7972);
+      --br-ring: var(--color-ring-primary, #7ea3f0);
+      --br-right-bg: var(--color-background-success, #1d3a26);
+      --br-right-text: var(--color-text-success, #8fd3a4);
+      --br-right-border: var(--color-border-success, #4c9a63);
+      --br-wrong-bg: var(--color-background-danger, #43211e);
+      --br-wrong-text: var(--color-text-danger, #f2a69e);
+      --br-wrong-border: var(--color-border-danger, #c0574c);
+    }
+  }
+  :root[data-theme="dark"] {
+    --br-bg: var(--color-background-primary, #1f1f1e);
+    --br-surface: var(--color-background-secondary, #2a2a28);
+    --br-text: var(--color-text-primary, #f1f0ec);
+    --br-muted: var(--color-text-secondary, #b4b2a9);
+    --br-border: var(--color-border-primary, #7b7972);
+    --br-ring: var(--color-ring-primary, #7ea3f0);
+    --br-right-bg: var(--color-background-success, #1d3a26);
+    --br-right-text: var(--color-text-success, #8fd3a4);
+    --br-right-border: var(--color-border-success, #4c9a63);
+    --br-wrong-bg: var(--color-background-danger, #43211e);
+    --br-wrong-text: var(--color-text-danger, #f2a69e);
+    --br-wrong-border: var(--color-border-danger, #c0574c);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 16px;
+    background: var(--br-bg);
+    color: var(--br-text);
+    font: 15px/1.45 var(--br-font);
+  }
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 10px;
+    color: var(--br-muted);
+    font-size: 13px;
+  }
+  .brand { font-weight: 600; color: var(--br-text); }
+  .score { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  figure { margin: 0 0 12px; }
+  figure img {
+    display: block;
+    max-width: 100%;
+    max-height: 220px;
+    margin: 0 auto;
+    border-radius: var(--br-radius);
+    background: var(--br-surface);
+  }
+  figcaption { margin-top: 4px; text-align: center; color: var(--br-muted); font-size: 12px; }
+  .question { margin: 0 0 14px; font-size: 17px; font-weight: 600; }
+  .choices { display: grid; gap: 8px; }
+  button {
+    font: inherit;
+    color: var(--br-text);
+    background: var(--br-surface);
+    border: 1px solid var(--br-border);
+    border-radius: var(--br-radius);
+    padding: 10px 12px;
+    min-height: 44px;
+    cursor: pointer;
+  }
+  button:focus-visible { outline: 2px solid var(--br-ring); outline-offset: 2px; }
+  button:disabled { cursor: default; }
+  .choice { display: flex; gap: 10px; align-items: center; text-align: left; width: 100%; }
+  .choice .key { color: var(--br-muted); font-variant-numeric: tabular-nums; }
+  .choice:not(:disabled):hover { border-color: var(--br-text); }
+  .choice.right { background: var(--br-right-bg); color: var(--br-right-text); border-color: var(--br-right-border); }
+  .choice.wrong { background: var(--br-wrong-bg); color: var(--br-wrong-text); border-color: var(--br-wrong-border); }
+  .choice.dim { opacity: 0.6; }
+  .footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; min-height: 44px; }
+  .result { margin: 0; font-weight: 600; }
+  .result.right { color: var(--br-right-text); }
+  .result.wrong { color: var(--br-wrong-text); }
+  .next { font-weight: 600; }
+  .note { margin: 0; color: var(--br-muted); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <span><span class="brand">BrainRush</span> <span id="meta"></span></span>
+    <span class="score" id="score">Score 0/0</span>
+  </div>
+
+  <p class="note" id="status" role="status">Loading questions...</p>
+
+  <section id="play" hidden>
+    <figure id="figure" hidden>
+      <img id="picture" alt="">
+      <figcaption id="credit"></figcaption>
+    </figure>
+    <p class="question" id="question"></p>
+    <div class="choices" id="choices"></div>
+    <div class="footer">
+      <p class="result" id="result" aria-live="polite"></p>
+      <button class="next" id="next" type="button" hidden>Next question</button>
+    </div>
+  </section>
+
+  <button id="retry" type="button" hidden>Try again</button>
+</main>
+
+<script type="module">
+  import { App, applyDocumentTheme, applyHostStyleVariables, applyHostFonts } from "{{SITE}}/mcp/ext-apps-1.7.5.js";
+
+  const SITE = "{{SITE}}";
+  const REFILL_BELOW = 3;
+  const $ = (id) => document.getElementById(id);
+
+  const state = {
+    queue: [],      // questions loaded but not shown yet
+    shown: [],      // ids shown in this card, sent back so the server never repeats them
+    current: null,
+    isAnswered: false,
+    right: 0,
+    total: 0,
+    loading: null,  // the running load, so two never overlap
+    isDone: false,  // the bank has nothing left for this card
+  };
+
+  const app = new App({ name: "BrainRush trivia", version: "1.0.0" });
+
+  function applyContext(ctx) {
+    if (!ctx) return;
+    if (ctx.theme) applyDocumentTheme(ctx.theme);
+    if (ctx.styles?.variables) applyHostStyleVariables(ctx.styles.variables);
+    if (ctx.styles?.css?.fonts) applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  function showStatus(text, canRetry = false) {
+    $("status").textContent = text;
+    $("status").hidden = false;
+    $("play").hidden = true;
+    $("retry").hidden = !canRetry;
+  }
+
+  /** Asks the server for questions this card has not shown or queued yet. */
+  function load() {
+    if (state.loading || state.isDone) return state.loading;
+    const exclude = state.shown.concat(state.queue.map((q) => q.id));
+    state.loading = app
+      .callServerTool({ name: "brainrush_trivia_questions", arguments: { exclude } })
+      .then((res) => {
+        if (res.isError) throw new Error(res.content?.[0]?.text ?? "The questions could not be loaded.");
+        const known = new Set(exclude);
+        const fresh = (res.structuredContent?.questions ?? []).filter((q) => !known.has(q.id));
+        if (fresh.length === 0) state.isDone = true;
+        state.queue.push(...fresh);
+      })
+      .finally(() => { state.loading = null; });
+    return state.loading;
+  }
+
+  async function next() {
+    if (state.queue.length === 0) {
+      try {
+        showStatus("Loading questions...");
+        await load();
+      } catch {
+        showStatus("The questions could not be loaded.", true);
+        return;
+      }
+    }
+    const q = state.queue.shift();
+    if (!q) {
+      showStatus(state.total > 0
+        ? "That's every question for now. Final score " + state.right + "/" + state.total + "."
+        : "There are no questions to play right now.");
+      return;
+    }
+    state.current = q;
+    state.isAnswered = false;
+    state.shown.push(q.id);
+    render(q);
+    if (state.queue.length < REFILL_BELOW) load()?.catch(() => {}); // a later next() retries
+  }
+
+  function render(q) {
+    $("status").hidden = true;
+    $("retry").hidden = true;
+    $("play").hidden = false;
+    $("meta").textContent = "· " + q.category + " · " + q.points;
+
+    $("figure").hidden = !q.image;
+    if (q.image) {
+      $("picture").src = SITE + "/" + q.image;
+      $("picture").alt = "Picture for this question";
+      $("credit").textContent = q.image_credit ? "Photo: " + q.image_credit : "";
+    } else {
+      $("picture").removeAttribute("src");
+    }
+
+    $("question").textContent = q.question;
+    $("choices").replaceChildren(...q.choices.map((text, i) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "choice";
+      const key = document.createElement("span");
+      key.className = "key";
+      key.textContent = String(i + 1);
+      const label = document.createElement("span");
+      label.textContent = text;
+      button.append(key, label);
+      button.addEventListener("click", () => answer(i));
+      return button;
+    }));
+    $("result").textContent = "";
+    $("result").className = "result";
+    $("next").hidden = true;
+  }
+
+  function answer(picked) {
+    const q = state.current;
+    if (!q || state.isAnswered) return;
+    state.isAnswered = true;
+    const isRight = picked === q.correct;
+    state.total += 1;
+    if (isRight) state.right += 1;
+    $("score").textContent = "Score " + state.right + "/" + state.total;
+
+    [...$("choices").children].forEach((button, i) => {
+      button.disabled = true;
+      if (i === q.correct) button.classList.add("right");
+      else if (i === picked) button.classList.add("wrong");
+      else button.classList.add("dim");
+    });
+    $("result").textContent = isRight ? "Correct!" : "Not quite. The answer is " + q.choices[q.correct] + ".";
+    $("result").className = "result " + (isRight ? "right" : "wrong");
+    $("next").hidden = false;
+    $("next").focus();
+  }
+
+  $("next").addEventListener("click", next);
+  $("retry").addEventListener("click", next);
+  document.addEventListener("keydown", (event) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const index = Number(event.key) - 1;
+    if (!state.isAnswered && index >= 0 && index < (state.current?.choices.length ?? 0)) {
+      event.preventDefault();
+      answer(index);
+    }
+  });
+
+  // Set the handlers before connect() so the first notifications are not missed.
+  app.onhostcontextchanged = applyContext;
+  app.ontoolresult = () => { if (!state.current && !state.loading) next(); };
+
+  await app.connect();
+  applyContext(app.getHostContext());
+  if (!state.current && !state.loading) next();
+</script>
+</body>
+</html>
