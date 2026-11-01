@@ -64,6 +64,18 @@ Options -Indexes
   </FilesMatch>
 </IfModule>
 
+# --- Claude trivia card (api/mcp.php) ---
+# The card runs in Claude's sandbox on another origin and imports this script as an ES module,
+# which the browser only runs with a CORS header and a JavaScript type. Public code, so "*" is safe.
+<FilesMatch "^ext-apps-[0-9.]+\.js$">
+  <IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+  </IfModule>
+  <IfModule mod_mime.c>
+    ForceType text/javascript
+  </IfModule>
+</FilesMatch>
+
 # --- Android app (US-40, D-43) ---
 # The web app manifest gets its registered type. /.well-known/assetlinks.json (Digital Asset
 # Links: lets the Android app open this site full screen) must stay public: no rule above

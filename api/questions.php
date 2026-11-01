@@ -739,6 +739,11 @@ function delete_question(PDO $pdo, int $id): void
     json_response(['deleted' => $id]);
 }
 
+// Included for its functions only (api/mcp.php reuses streak_batch()): handle no request.
+if (defined('QUESTIONS_INCLUDE_ONLY')) {
+    return;
+}
+
 switch ($_SERVER['REQUEST_METHOD']) {
     case 'GET':
         if (($_GET['board'] ?? '') === '1') {
