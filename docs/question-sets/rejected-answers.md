@@ -49,6 +49,7 @@ How to read the tables:
 | Uncanny valley | | AI/robot concept (too obscure) | 2026-10-20 | ai-2-review.md |
 | Voice typing | | Phone feature (too unfamiliar) | 2026-10-20 | ai-2-review.md |
 | Wake word | | Word that wakes a voice assistant | 2026-10-19 | general-genz-ai-egyptians-review.md |
+| Computer vision | 500 | Field of AI that teaches computers to understand photos and video (self-driving cars spotting people and road signs) | 2026-11-01 | auto-2026-11-01-review.md |
 
 Unknown: the owner removed 19 AI suggestions on 2026-10-19 (all 5 at 500), and only the ones above are still named. The owner's ai-2 feedback also rules out whole types: film robots, product feature names, viral incidents, model or version trivia and country-policy news.
 
@@ -128,6 +129,9 @@ Unknown: the owner removed 19 AI suggestions on 2026-10-19 (all 5 at 500), and o
 | Jon Arbuckle | 600 | Full name of Garfield's owner (cartoonist, also owns Odie) | 2026-10-27 | auto-2026-10-27-review.md |
 | George (Peppa Pig) | 200 | Peppa's little brother who carries his toy dinosaur everywhere | 2026-10-28 | auto-2026-10-28-review.md |
 | Obelix | 400 | Asterix's big best friend who fell into the magic potion, menhir delivery man | 2026-10-28 | auto-2026-10-28-review.md |
+| Yogi Bear | 400 | Jellystone Park bear in a hat and tie, "smarter than the average bear", steals picnic baskets (replaced by the owner) | 2026-11-01 | auto-2026-11-01-review.md |
+| Antoine de Saint-Exupery | 600 | Writer and pilot who wrote and illustrated "The Little Prince" (1943) | 2026-11-01 | auto-2026-11-01-review.md |
+| The Hundred Acre Wood | 400 | Forest where Winnie-the-Pooh, Piglet and their friends live (Yogi Bear's replacement) | 2026-11-01 | auto-2026-11-01-review.md |
 
 ## Egyptians
 
@@ -210,6 +214,7 @@ The look-alike rows apply to the Flags category only. Some of these countries ar
 | Thiamine (beriberi) | 600 | Vitamin lost from polished white rice | 2026-10-27 | food-nutrition-review.md |
 | An opera singer (Nellie Melba) | 600 | What Nellie Melba, honoured by Escoffier's peach Melba, was famous as | 2026-10-27 | auto-2026-10-27-review.md |
 | The Capuchins (cappuccino) | 600 | Order of friars with brown hooded habits that cappuccino is named after | 2026-10-28 | auto-2026-10-28-review.md |
+| Sturgeon (caviar) | 600 | Fish whose salted roe is true caviar, mainly around the Caspian and Black Seas | 2026-11-01 | auto-2026-11-01-review.md |
 
 The food-2 removals were at 200-600 (one at 200, three at 300, four at 400, three at 500, four at 600), but the doc does not say which was which. Also avoid nutmeg and potato, quinoa or tomato origin questions (too close to mace and Andes).
 
@@ -425,3 +430,4 @@ Notes: Gutenberg and Ada Lovelace were removed twice: the seed questions (points
 | Florence Nightingale | 200 | British nurse of the Crimean War, "The Lady with the Lamp" | 2026-10-27 | auto-2026-10-27-review.md |
 | Ibn Rushd (Averroes) | 500 | 12th-century philosopher, judge and physician from Cordoba, "The Commentator" on Aristotle | 2026-10-27 | auto-2026-10-27-review.md |
 | Amelia Earhart | 500 | American pilot, first woman to fly solo nonstop to Europe (1932), vanished in 1937 | 2026-10-28 | auto-2026-10-28-review.md |
+| Sigmund Freud | 500 | Austrian doctor, founder of psychoanalysis, "The Interpretation of Dreams" | 2026-11-01 | auto-2026-11-01-review.md |
