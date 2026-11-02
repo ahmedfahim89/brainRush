@@ -113,6 +113,24 @@ CREATE TABLE IF NOT EXISTS question_reports (
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
+-- Daily Challenge (US-43, D-46): the questions of each day (the UTC date), one row per position.
+-- The first request of the day stores the set (INSERT IGNORE on the primary key, so two
+-- simultaneous first requests cannot make two sets); everyone gets the same questions.
+-- uq_daily_question keeps a question from appearing twice on one day. Deleting a question
+-- deletes its rows. Nothing about the player is stored.
+CREATE TABLE IF NOT EXISTS daily_challenge (
+  challenge_date DATE             NOT NULL,
+  position       TINYINT UNSIGNED NOT NULL,
+  question_id    INT UNSIGNED     NOT NULL,
+  created_at     DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (challenge_date, position),
+  UNIQUE KEY uq_daily_question (challenge_date, question_id),
+  KEY idx_daily_question (question_id),
+  CONSTRAINT fk_daily_question
+    FOREIGN KEY (question_id) REFERENCES questions (id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
 -- ---------------------------------------------------------------------------
 -- Seed data
 -- ---------------------------------------------------------------------------

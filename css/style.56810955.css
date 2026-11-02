@@ -1084,6 +1084,41 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 .lb-meta { color: var(--muted); font-size: 0.95rem; white-space: nowrap; }
 .lb-list .is-me .lb-meta { color: var(--text); }
 .lb-empty { padding: 0.6rem; color: var(--muted); text-align: center; }
+/* "This week" / "All time" (US-45): a small pill toggle like the Players / Teams one, above the rows */
+.lb-tabs { display: inline-flex; margin: 0 0 0.5rem; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+.lb-tab { padding: 0.25rem 1rem; color: var(--text); font-size: 0.95rem; background: transparent; border: 0; cursor: pointer; }
+.lb-tab + .lb-tab { border-left: 1px solid var(--border); }
+.lb-tab[aria-pressed="true"] { color: #1a1a1a; font-weight: 700; background: var(--gold); }
+@media (hover: hover) { .lb-tab[aria-pressed="false"]:hover { background: var(--panel-2); } }
+
+/* ---------- Sharing (US-43, US-46) ---------- */
+/* "Copied" next to the Share button; js/share.js clears it after a few seconds */
+.share-status { align-self: center; color: var(--success); font-weight: 700; }
+.share-status.is-error { color: #ffb3b3; }
+.share-status:empty { display: none; }
+
+/* ---------- Daily Challenge (US-43, D-46) ---------- */
+/* Setup entry next to the Streak button: the same gold outline */
+.btn-daily { color: var(--gold); border-color: var(--gold-dark); font-weight: 600; }
+@media (hover: hover) { .btn-daily:hover:not(:disabled) { background: #303039; } }
+/* Result: the score line, the row of squares, Share and the countdown */
+.daily { max-width: 46rem; margin: 0 auto; text-align: center; }
+.daily h2:focus { outline: none; }
+.daily-score {
+  margin: 0.4rem 0 0.6rem;
+  color: var(--gold);
+  font-size: clamp(1.6rem, 3vw, 2.6rem);
+  font-weight: 800;
+  line-height: 1.2;
+}
+.daily-squares { display: flex; justify-content: center; gap: 0.5rem; margin: 0 0 0.8rem; }
+.daily-square { width: 2.6rem; height: 2.6rem; border-radius: 6px; }
+.daily-square.is-right { background: var(--success); }
+.daily-square.is-wrong { background: var(--danger); }
+.daily-note { margin: 0 0 0.4rem; }
+.daily-next { margin: 1rem 0 0; font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.daily .msg { text-align: left; }
+.daily #daily-play { margin-top: 0.6rem; }
 
 /* Ads (D-41): AdSense banner under the Streak leaderboard buttons, well apart from them so it is never
    clicked by mistake. No reserved height: nothing sits below it, so a late ad moves nothing (D-30). */
@@ -1199,6 +1234,8 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
   .lb-list .result-row { flex-wrap: wrap; gap: 0 0.5rem; padding: 0.35rem 0.7rem; }
   .lb-list .result-name { flex-basis: calc(100% - 3rem); }
   .lb-meta { margin-left: 2.7rem; white-space: normal; }
+  .lb-tab { min-height: 48px; padding: 0.4rem 1.1rem; } /* US-40 touch targets */
+  .daily-square { width: 2.2rem; height: 2.2rem; }
 
   /* Touch targets (US-40): buttons, fields and other small controls are at least 48px on phones
      (Android guideline). The board cells keep their size, so the board still fits 375x812 (D-30).
