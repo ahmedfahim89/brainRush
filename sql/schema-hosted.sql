@@ -94,6 +94,23 @@ CREATE TABLE IF NOT EXISTS streaks (
   KEY idx_streaks_streak (streak)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
+-- Question reports (US-42, D-45): one row per report from the game, holding only the question,
+-- the reason (one of six), an optional note of up to 200 characters, the status and the time.
+-- No name, IP address or device id is stored. Deleting a question deletes its reports.
+CREATE TABLE IF NOT EXISTS question_reports (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  question_id INT UNSIGNED NOT NULL,
+  reason      ENUM('wrong_answer', 'typo', 'translation', 'outdated', 'picture', 'other') NOT NULL,
+  note        VARCHAR(200) NOT NULL DEFAULT '',
+  status      ENUM('open', 'resolved', 'dismissed') NOT NULL DEFAULT 'open',
+  created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_reports_question_status (question_id, status),
+  CONSTRAINT fk_reports_question
+    FOREIGN KEY (question_id) REFERENCES questions (id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
 -- ---------------------------------------------------------------------------
 -- Seed data
 -- ---------------------------------------------------------------------------

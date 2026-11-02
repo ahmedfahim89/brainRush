@@ -8,7 +8,7 @@
   <link rel="icon" href="img/logo.svg" type="image/svg+xml">
   <link rel="icon" href="img/favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.2a96d814.css">
+  <link rel="stylesheet" href="css/style.864c7129.css">
 </head>
 <body class="admin">
   <header class="page-header">
@@ -183,6 +183,24 @@
       </div>
     </section>
 
+    <!-- Reports (US-42, D-45): open question reports from the game, grouped by question -->
+    <section class="panel panel-wide" id="reports-panel" aria-labelledby="reports-title">
+      <h2 id="reports-title">Reports <span id="reports-count" class="hint"></span></h2>
+      <p class="hint">Problems players reported from the game, grouped by question, the most reported first. Fix the question with <strong>Edit question</strong>, then <strong>Resolve</strong> its reports; <strong>Dismiss</strong> junk. Both keep the reports in the database but take them off this list. A report holds only the reason, the note and the time.</p>
+      <div class="actions">
+        <button type="button" id="reports-reload" class="btn btn-small">Reload</button>
+      </div>
+      <p id="reports-msg" class="msg" role="status" aria-live="polite" hidden></p>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th scope="col">Question</th><th scope="col">Reports</th><th scope="col">Reasons</th><th scope="col">Notes</th><th scope="col">Actions</th></tr>
+          </thead>
+          <tbody id="reports-body"></tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- Streak leaderboard (US-34): every saved run, so junk or offensive names can be removed -->
     <section class="panel panel-wide" id="streaks-panel" aria-labelledby="streaks-title">
       <h2 id="streaks-title">Streak leaderboard</h2>
@@ -225,6 +243,6 @@
     </section>
   </main>
 
-  <script src="js/admin.bfc53960.js"></script>
+  <script src="js/admin.5bbca9b4.js"></script>
 </body>
 </html>

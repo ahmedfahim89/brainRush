@@ -50,6 +50,7 @@
   const STREAK_MAX_QUEUE = 100; // a saved queue is never longer (batches are 20)
   const STREAK_TIME_UP = -1;    // `picked` when the time ran out
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const REPORT_NOTE_MAX = 200; // REPORT_NOTE_MAX in api/reports.php (US-42, D-45)
 
   const MODES = {
     players: { limit: 6, title: 'Players', label: 'Player', one: 'player', many: 'players' },
@@ -109,6 +110,10 @@
   let leaderboardResult = null;  // the run shown on the leaderboard screen (null = opened from setup)
   let leaderboardLoads = 0;      // drops leaderboard responses that arrive after a newer request
 
+  // Report form (US-42), memory only: { questionId, sending } while it is open, else null. It never
+  // touches the saved game or run, the timer or the scores.
+  let report = null;
+
   let nextEntryKey = 1;
 
   const byId = (id) => document.getElementById(id);
@@ -151,6 +156,9 @@
     maintenanceOverlay: byId('maintenance-overlay'),
     adSlots: { leaderboard: byId('ad-leaderboard') }, // D-41: screen name -> ad slot
     main: document.querySelector('.game-main'),
+    // The page behind a popup (header, game, footer): made inert together while a popup is open.
+    pageBehind: [document.querySelector('.page-header'), document.querySelector('.game-main'), document.querySelector('.site-footer')]
+      .filter(Boolean),
     doubleOverlay: byId('double-overlay'),
     doubleText: byId('double-text'),
     doubleOk: byId('double-ok'),
@@ -198,6 +206,18 @@
     lbAgain: byId('lb-again'),
     lbNew: byId('lb-new'),
     lbBack: byId('lb-back'),
+    reportBtn: byId('report-btn'),
+    reportOverlay: byId('report-overlay'),
+    reportAbout: byId('report-about'),
+    reportForm: byId('report-form'),
+    reportReasons: Array.prototype.slice.call(document.querySelectorAll('input[name="report-reason"]')),
+    reportNote: byId('report-note'),
+    reportCount: byId('report-note-count'),
+    reportError: byId('report-error'),
+    reportSend: byId('report-send'),
+    reportCancel: byId('report-cancel'),
+    reportDone: byId('report-done'),
+    reportClose: byId('report-close'),
   };
 
   // ---------- Generic helpers ----------
@@ -625,7 +645,10 @@
 
   function showScreen(name) {
     state.screen = name;
-    if (name !== 'question') stopTimer();
+    if (name !== 'question') {
+      stopTimer();
+      closeReport(); // US-42: the report form belongs to the question screen
+    }
     ALL_SCREENS.forEach((key) => { dom.screens[key].hidden = key !== name; });
     document.body.setAttribute('data-screen', name); // CSS: one-screen board layout (FU-03)
     window.scrollTo(0, 0);
@@ -765,6 +788,8 @@
   function goBack() {
     if (!dom.doubleOverlay.hidden) {
       closeDoublePopup();
+    } else if (isReportOpen()) {
+      closeReport();                                 // US-42: the report form, as Cancel
     } else if (state.screen === 'question') {
       if (!streakOnScreen()) confirmBackToBoard();  // "Back to Board", after a confirm
       else if (streak.over) onStreakNext();          // lost run: on to the leaderboard, as Next
@@ -1646,6 +1671,14 @@
     if (isDoubleCurrent(g)) showDoublePopup();
   }
 
+  /**
+   * While a popup (double score, report form) is open, everything behind it is inert: the header
+   * links, the game and the footer can't take focus or clicks, so Tab stays in the popup.
+   */
+  function setPageInert(on) {
+    dom.pageBehind.forEach((node) => { node.inert = on; });
+  }
+
   /** D-40: announce the double-score question; its timer waits until the popup is closed. */
   function showDoublePopup() {
     const points = activeQuestion(state.game).points;
@@ -1653,14 +1686,14 @@
       '. A wrong answer costs the normal ' + MINUS + points + '.';
     pauseTimer();
     dom.doubleOverlay.hidden = false;
-    dom.main.inert = true; // keyboard focus stays on the popup
+    setPageInert(true); // keyboard focus stays on the popup
     dom.doubleOk.focus();
   }
 
   function closeDoublePopup() {
     if (dom.doubleOverlay.hidden) return;
     dom.doubleOverlay.hidden = true;
-    dom.main.inert = false;
+    setPageInert(false);
     resumeTimer();
     dom.qHeading.focus();
   }
@@ -1682,6 +1715,7 @@
     renderAnswerState();
     renderScoringRows();
     showScreen('question'); // also saves the state
+    updateReportButton(); // US-42 (needs the question screen): also for a Swap question, the one shown is reported
     startTimer(g.timerSeconds);
     dom.qHeading.focus();
   }
@@ -2571,6 +2605,7 @@
     renderStreakLang();
     renderStreakPanel();
     showScreen('question');
+    updateReportButton(); // US-42 (needs the question screen): only once the question is answered
     if (cur.picked !== null) {
       showTimerAt(run.timerSeconds, cur.leftMs || 0);
       dom.timerStatus.textContent = cur.picked === STREAK_TIME_UP ? "Time's up!" : '';
@@ -2704,6 +2739,7 @@
     if (cur.picked === STREAK_TIME_UP) dom.timerStatus.textContent = "Time's up!";
     renderStreakChoices();
     renderStreakPanel();
+    updateReportButton(); // US-42: Report appears now that it is answered
     dom.streakNext.focus(); // Enter goes on
     refillStreak(run);
   }
@@ -2719,6 +2755,10 @@
   function onKeyDown(event) {
     if (event.key === 'Escape' && !dom.doubleOverlay.hidden) {
       closeDoublePopup();
+      return;
+    }
+    if (isReportOpen()) { // the report form handles its own keys; Escape closes it
+      if (event.key === 'Escape') closeReport();
       return;
     }
     if (event.key !== 'Enter' || !streakOnScreen() || dom.streakNext.hidden || dom.streakNext.disabled) return;
@@ -2940,6 +2980,128 @@
     dom.streakBoardBtn.focus();
   }
 
+  // ---------- Report a question (US-42, D-45) ----------
+  // "Report" on an open board question (the Swap question once swapped) and on an answered Streak
+  // question opens a small form: one of six reasons and an optional note of up to 200 characters.
+  // The form lies over the question screen and leaves the timer running; the report is posted to
+  // api/reports.php and changes nothing in the game, the run, the scores or their saved state.
+
+  /** The question that Report would report now, as { id, label }, or null when there is none. */
+  function reportTarget() {
+    if (state.screen !== 'question') return null;
+    if (streakOnScreen()) {
+      const cur = streak.current;
+      if (cur.picked === null) return null; // a Streak question is reported once it is answered
+      return { id: cur.q.id, label: cur.q.category_name + ' ' + EN_DASH + ' ' + cur.q.points };
+    }
+    const g = state.game;
+    if (!g || !g.current) return null;
+    const active = activeQuestion(g);
+    // A game saved before the board sent question ids has none to report.
+    if (!Number.isInteger(active.question.id) || active.question.id < 1) return null;
+    return { id: active.question.id, label: active.catName + ' ' + EN_DASH + ' ' + active.points };
+  }
+
+  /** Show Report only when there is a question to report; the heading then leaves room for it (CSS). */
+  function updateReportButton() {
+    const shown = reportTarget() !== null;
+    dom.reportBtn.hidden = !shown;
+    dom.reportBtn.parentElement.classList.toggle('can-report', shown);
+  }
+
+  function isReportOpen() {
+    return !dom.reportOverlay.hidden;
+  }
+
+  function openReport() {
+    const target = reportTarget();
+    if (!target || isReportOpen() || !dom.doubleOverlay.hidden) return;
+    report = { questionId: target.id, sending: false };
+    dom.reportAbout.textContent = target.label;
+    dom.reportReasons.forEach((input) => { input.checked = false; });
+    dom.reportNote.value = '';
+    updateReportCount();
+    clearMessage(dom.reportError);
+    dom.reportForm.hidden = false;
+    dom.reportDone.hidden = true;
+    setReportSending(false);
+    dom.reportOverlay.hidden = false;
+    setPageInert(true); // keyboard focus stays in the form; the timer behind it keeps running
+    dom.reportReasons[0].focus();
+  }
+
+  /** Cancel, Close, Escape or Android Back. A report still being sent is not cancelled. */
+  function closeReport() {
+    if (!isReportOpen()) return;
+    dom.reportOverlay.hidden = true;
+    setPageInert(false);
+    report = null;
+    if (!dom.reportBtn.hidden) dom.reportBtn.focus();
+  }
+
+  /** "N / 200": characters as the server counts them (an emoji is one). */
+  function updateReportCount() {
+    const length = Array.from(dom.reportNote.value.trim()).length;
+    dom.reportCount.textContent = length + ' / ' + REPORT_NOTE_MAX;
+    dom.reportCount.classList.toggle('is-full', length >= REPORT_NOTE_MAX);
+  }
+
+  function setReportSending(sending) {
+    if (report) report.sending = sending;
+    dom.reportSend.disabled = sending;
+    dom.reportSend.textContent = sending ? 'Sending...' : 'Send report';
+  }
+
+  function checkedReason() {
+    const checked = dom.reportReasons.find((input) => input.checked);
+    return checked ? checked.value : '';
+  }
+
+  async function onReportSubmit(event) {
+    event.preventDefault();
+    const sent = report;
+    if (!sent || sent.sending) return;
+    clearMessage(dom.reportError);
+    const reason = checkedReason();
+    const note = dom.reportNote.value.trim();
+    if (!reason) {
+      showMessage(dom.reportError, 'Choose what is wrong with the question.', 'error');
+      dom.reportReasons[0].focus();
+      return;
+    }
+    if (Array.from(note).length > REPORT_NOTE_MAX) {
+      showMessage(dom.reportError, 'The note can be at most ' + REPORT_NOTE_MAX + ' characters.', 'error');
+      dom.reportNote.focus();
+      return;
+    }
+    setReportSending(true);
+    let failure = '';
+    try {
+      const saved = await apiPost('reports.php', { question_id: sent.questionId, reason: reason, note: note });
+      if (!isPlainObject(saved) || !Number.isInteger(saved.id)) throw new Error('The server sent an unexpected response.');
+    } catch (err) {
+      failure = errorText(err);
+    }
+    if (report !== sent) return; // closed meanwhile
+    setReportSending(false);
+    if (failure) {
+      showMessage(dom.reportError, 'The report could not be sent: ' + failure, 'error');
+      return;
+    }
+    dom.reportForm.hidden = true;
+    dom.reportDone.hidden = false;
+    dom.reportClose.focus();
+  }
+
+  function bindReportEvents() {
+    dom.reportBtn.addEventListener('click', openReport);
+    dom.reportForm.addEventListener('submit', onReportSubmit);
+    dom.reportNote.addEventListener('input', updateReportCount);
+    dom.reportReasons.forEach((input) => input.addEventListener('change', () => clearMessage(dom.reportError)));
+    dom.reportCancel.addEventListener('click', closeReport);
+    dom.reportClose.addEventListener('click', closeReport);
+  }
+
   // ---------- Startup ----------
 
   /** Fresh, empty setup with current settings (one empty entry, Players mode). */
@@ -2990,6 +3152,7 @@
     dom.doubleOk.addEventListener('click', closeDoublePopup);
     dom.newGameBtn.addEventListener('click', newGame);
     bindStreakEvents();
+    bindReportEvents();
   }
 
   /** US-17: reopen the saved screen. An open question restarts its timer at full length (D-04). */

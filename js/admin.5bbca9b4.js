@@ -1,4 +1,4 @@
-// BrainRush admin page: settings, point values, categories, questions, the streak leaderboard and the game logs.
+// BrainRush admin page: settings, point values, categories, questions, question reports, the streak leaderboard and the game logs.
 // Question bank (D-31 amended): every question has a point value, a category may have
 // several questions per value, and it is playable when every enabled point value has one.
 // All API/user text is rendered with textContent / DOM APIs (never innerHTML).
@@ -17,6 +17,16 @@
   // "3 choices" helper (US-32): wrong-option fields, as in api/questions.php.
   const WRONG_FIELDS = ['wrong_1', 'wrong_2', 'wrong_1_ar', 'wrong_2_ar'];
   const CHECK = String.fromCharCode(0x2713); // check mark
+  const EN_DASH = String.fromCharCode(0x2013); // "Category – 300"
+  // Report reasons (US-42, D-45): the API values and their labels, in the game form's order (api/reports.php).
+  const REPORT_REASONS = {
+    wrong_answer: 'Wrong answer',
+    typo: 'Typo',
+    translation: 'Translation',
+    outdated: 'Outdated',
+    picture: 'Picture problem',
+    other: 'Other',
+  };
 
   const state = {
     settings: null,    // { categories_per_game, timer_seconds, banner_enabled, banner_text, ..., ads_enabled, ads_client, ads_slot }
@@ -24,6 +34,9 @@
     categories: [],    // [{ id, name, question_count }] sorted by name
     questions: [],     // [{ id, category_id, category_name, points, question, answer, question_ar, answer_ar, image, image_credit,
                        //    wrong_1, wrong_2, wrong_1_ar, wrong_2_ar }]
+    reports: [],       // open reports per question, most reported first (US-42): [{ question: {id, category_id,
+                       //    category_name, points, question, answer, image}, count, reasons: {reason: count},
+                       //    reports: [{ id, reason, note, created_at }] newest first, last_at }]
     streaks: [],       // [{ id, name, streak, created_at }] newest first (US-34)
     logs: [],          // [{ name, size, modified }] newest first
     openLog: null,     // name of the log file shown in the viewer, or null
@@ -81,6 +94,10 @@
     qPointsFilter: byId('question-points-filter'),
     qCount: byId('question-count'),
     questionsBody: byId('questions-body'),
+    reportsReload: byId('reports-reload'),
+    reportsCount: byId('reports-count'),
+    reportsMsg: byId('reports-msg'),
+    reportsBody: byId('reports-body'),
     streaksReload: byId('streaks-reload'),
     streaksMsg: byId('streaks-msg'),
     streaksBody: byId('streaks-body'),
@@ -286,6 +303,7 @@
   async function onAuthRetry() {
     if (await checkAuth()) {
       loadSettings();
+      loadReports();
       loadStreaks();
       loadLogs();
       await loadData();
@@ -635,6 +653,7 @@
     runAction(dom.categoriesMsg, [], async () => {
       await api('categories.php?id=' + encodeURIComponent(c.id), 'DELETE');
       await refreshData();
+      loadReports(); // its questions' reports were deleted with them
       showSuccess(dom.categoriesMsg, 'Category "' + c.name + '" deleted.');
     });
   }
@@ -923,6 +942,7 @@
       await api('questions.php?id=' + encodeURIComponent(q.id), 'DELETE');
       if (state.editing && state.editing.id === q.id) resetQuestionForm();
       await refreshData();
+      loadReports(); // its reports were deleted with it (US-42)
       showSuccess(dom.questionsMsg, 'Question deleted (' + q.category_name + ' - ' + q.points + ').');
     });
   }
@@ -937,6 +957,146 @@
     if (state.editing) return;
     if (dom.qFilter.value) dom.qCategory.value = dom.qFilter.value;
     if (dom.qPointsFilter.value) dom.qPoints.value = dom.qPointsFilter.value;
+  }
+
+  // ---------- Reports (US-42, D-45) ----------
+  // Open reports from the game, grouped by question. Loaded on its own, so a database without
+  // the question_reports table (migration not run yet) only breaks this panel.
+
+  async function loadReports() {
+    dom.reportsReload.disabled = true;
+    try {
+      state.reports = ensureArray(await api('reports.php?all=1'), 'report');
+      renderReports();
+    } catch (err) {
+      // Only the error: an empty list here would read as "no reports" (BUG-7-01).
+      state.reports = [];
+      clear(dom.reportsBody);
+      dom.reportsCount.textContent = '';
+      showError(dom.reportsMsg, 'Could not load the reports: ' + errorText(err));
+    } finally {
+      dom.reportsReload.disabled = false;
+    }
+  }
+
+  function onReportsReload() {
+    clearMessage(dom.reportsMsg);
+    loadReports();
+  }
+
+  function reasonLabel(reason) {
+    return Object.prototype.hasOwnProperty.call(REPORT_REASONS, reason) ? REPORT_REASONS[reason] : String(reason);
+  }
+
+  /** "Geography – 300" (+ " – picture") over the question text and its answer. */
+  function reportQuestionCell(q) {
+    return h('td', { className: 'text-cell' }, [
+      h('div', { className: 'report-q-meta', text: q.category_name + ' ' + EN_DASH + ' ' + q.points + (q.image ? ' ' + EN_DASH + ' picture' : '') }),
+      h('div', { text: q.question }),
+      h('div', { className: 'hint', text: 'Answer: ' + q.answer }),
+    ]);
+  }
+
+  /** One line per reason, in the game form's order: "Wrong answer: 2". */
+  function reportReasonsCell(group) {
+    const items = Object.keys(REPORT_REASONS)
+      .concat(Object.keys(group.reasons).filter((r) => !Object.prototype.hasOwnProperty.call(REPORT_REASONS, r)))
+      .filter((r) => group.reasons[r] > 0)
+      .map((r) => h('li', { text: reasonLabel(r) + ': ' + group.reasons[r] }));
+    return h('td', {}, [h('ul', { className: 'cell-list' }, items)]);
+  }
+
+  /** The reports that have a note, newest first: "Typo · 2026-11-02 09:45:55" and the note. */
+  function reportNotesCell(group) {
+    const withNote = group.reports.filter((r) => r.note !== '');
+    if (!withNote.length) return h('td', { className: 'hint', text: '-' });
+    return h('td', { className: 'text-cell' }, [
+      h('ul', { className: 'cell-list' }, withNote.map((r) => h('li', {}, [
+        h('span', { className: 'hint', text: reasonLabel(r.reason) + ' ' + String.fromCharCode(0x00b7) + ' ' + r.created_at }),
+        h('div', { text: r.note, dir: 'auto' }), // an Arabic note reads right to left
+      ]))),
+    ]);
+  }
+
+  function renderReports() {
+    clear(dom.reportsBody);
+    const total = state.reports.reduce((sum, g) => sum + g.count, 0);
+    dom.reportsCount.textContent = total
+      ? '(' + plural(total, 'open report') + ' on ' + plural(state.reports.length, 'question') + ')'
+      : '';
+    if (!state.reports.length) {
+      dom.reportsBody.appendChild(h('tr', {}, [
+        h('td', { className: 'empty-row', colSpan: 5, text: 'No open reports.' }),
+      ]));
+      return;
+    }
+    state.reports.forEach((group) => {
+      const q = group.question;
+      const label = '"' + shortText(q.question) + '" (' + q.category_name + ' - ' + q.points + ')';
+      dom.reportsBody.appendChild(h('tr', {}, [
+        reportQuestionCell(q),
+        h('td', { className: 'num', text: String(group.count) }),
+        reportReasonsCell(group),
+        reportNotesCell(group),
+        h('td', { className: 'row-actions' }, [
+          h('button', {
+            type: 'button',
+            className: 'btn btn-small',
+            text: 'Edit question',
+            'aria-label': 'Edit question ' + label,
+            onclick: () => editReportedQuestion(q),
+          }),
+          h('button', {
+            type: 'button',
+            className: 'btn btn-small btn-primary',
+            text: 'Resolve',
+            'aria-label': 'Resolve the reports on question ' + label,
+            onclick: () => closeReports(group, 'resolve'),
+          }),
+          h('button', {
+            type: 'button',
+            className: 'btn btn-small btn-danger',
+            text: 'Dismiss',
+            'aria-label': 'Dismiss the reports on question ' + label,
+            onclick: () => closeReports(group, 'dismiss'),
+          }),
+        ]),
+      ]));
+    });
+  }
+
+  /** Open the question in the Questions panel's edit form, with the list filtered to its category and points. */
+  function editReportedQuestion(reported) {
+    clearMessage(dom.reportsMsg);
+    const q = state.questions.find((item) => item.id === reported.id);
+    if (!q) {
+      showError(dom.reportsMsg, 'This question is not in the question list. Reload the page and try again.');
+      return;
+    }
+    dom.qFilter.value = String(q.category_id);
+    dom.qPointsFilter.value = String(q.points);
+    startEdit(q); // renders the filtered list with the row highlighted and scrolls to the form
+  }
+
+  /** Resolve (PUT) or Dismiss (DELETE) every open report of one question, after a confirm (D-18). */
+  function closeReports(group, action) {
+    const q = group.question;
+    const what = plural(group.count, 'open report');
+    const prompt = action === 'resolve'
+      ? 'Resolve the ' + what + ' on this question?\n\n' + shortText(q.question) +
+        '\n\nDo this once the question is fixed. The reports leave this list.'
+      : 'Dismiss the ' + what + ' on this question?\n\n' + shortText(q.question) +
+        '\n\nUse this for junk or for reports that are not right. The reports leave this list.';
+    if (!window.confirm(prompt)) return;
+    runAction(dom.reportsMsg, [], async () => {
+      try {
+        await api('reports.php?question_id=' + encodeURIComponent(q.id), action === 'resolve' ? 'PUT' : 'DELETE');
+      } finally {
+        await loadReports(); // also after a 404: the reports were already closed
+      }
+      showSuccess(dom.reportsMsg, (action === 'resolve' ? 'Resolved ' : 'Dismissed ') + what + ' (' +
+        q.category_name + ' - ' + q.points + ').');
+    });
   }
 
   // ---------- Streak leaderboard (US-34) ----------
@@ -1103,6 +1263,7 @@
     dom.qFilter.addEventListener('change', onFilterChange);
     dom.qPointsFilter.addEventListener('change', onFilterChange);
     dom.authRetry.addEventListener('click', onAuthRetry);
+    dom.reportsReload.addEventListener('click', onReportsReload);
     dom.streaksReload.addEventListener('click', onStreaksReload);
     dom.logsReload.addEventListener('click', onLogsReload);
   }
@@ -1119,11 +1280,13 @@
     bindEvents();
     setFormMode();
     renderAll();
+    // Reports: the table stays empty until loaded, so a failed load shows only its error (BUG-7-01).
     renderStreaks();
     renderLogs();
     // Log in first: nothing (questions and answers included) is loaded until it succeeds.
     if (await checkAuth()) {
       loadSettings();
+      loadReports();
       loadStreaks();
       loadLogs();
       await loadData();

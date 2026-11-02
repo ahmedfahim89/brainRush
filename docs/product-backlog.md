@@ -425,6 +425,98 @@ As the site owner, I want About and Contact pages and the same footer links on e
 - **Given** the game, guide, About, Contact, Privacy and Terms pages, **then** each has a footer with How to play · About · Contact · Privacy · Terms and "© 2026 BrainRush · Ahmed Fahim". On the game page the footer links open in a new tab (like the header), and the footer is hidden on the board and question screens so they still fit one screen (D-30). On a phone the footer links are at least 48px tall (US-40).
 - **Given** both new pages, **then** they have a title, meta description and canonical URL (D-42), the app script (D-43), and are listed in `sitemap.xml` and `llms.txt`.
 
+## Epic E17 — New features (approved 2026-11-02)
+
+The owner approved all 11 on 2026-11-02 after the PO's ideation pass. They are listed in ranked order (US-42 first). The owner's open questions are tracked as FU-20 to FU-24 under "Open owner questions (new features)". None of them is a decision yet.
+
+Ranked order: US-42, US-43, US-44, US-45, US-46, US-47, US-48, US-49, US-50, US-51, US-52. Recommended next: US-42, US-43, US-44. Quick follow-ons: US-45 and US-46 (with US-43), and US-47 (after US-42).
+
+### US-42 Report a question (Should)
+As a player or host, I want to report a problem with a question from the game, so that wrong answers get fixed quickly. *(Added 2026-11-02. Size S–M. FU-20 answered 2026-11-02, D-45.)*
+- **Given** an open board question, or an answered Streak question, **when** I click "Report", **then** a small form offers a reason (wrong answer / typo / translation / outdated / picture problem / other) and an optional note of up to 200 characters. Sending it doesn't stop the timer or change the score.
+- **Given** a valid report, **then** `POST api/reports.php` returns 201 and stores the question id, reason, note and time. No names, no IP and no device id are stored. A bad id or reason, or a note over 200 characters, gives 400. There is no rate limit (D-45).
+- **Given** Admin, **then** a "Reports" panel groups open reports by question (count, reasons, notes), links to the question's edit form, and offers Resolve / Dismiss (confirm first, D-18).
+- **Given** the question-bank-manager runs, **then** its plan lists the open reports, and they are checked before new questions are added.
+- **Given** the Privacy page, **then** it describes what a report stores.
+- *Dependencies / risks:* spam (no rate limit by owner choice, D-45; the admin dismisses junk). A `question_reports` migration runs before the code, and both schema files get the table (US-29).
+
+### US-43 Daily Challenge (Should)
+As a player, I want a daily 10-question challenge that is the same for everyone, so that I can come back each day and compare with friends. *(Added 2026-11-02. Size M. Open: FU-21.)*
+- **Given** a day (server date), **when** the first player opens the Daily Challenge, **then** the server picks 10 questions at enabled point values and stores them for that date. A second request at the same moment gets the same 10, with no duplicate row.
+- **Given** a run, **then** each question shows 3 choices (as US-33) with the setup timer. A wrong answer or time's up scores 0 and the run moves on. There is no Pause and no helpers.
+- **Given** the run ends, **then** the result reads "BrainRush Daily #N: 7/10" with a row of green/red squares, and "Share" uses the phone's share sheet or copies the text plus the link.
+- **Given** a device that already played today, **then** it shows today's result and a countdown to the next challenge. This is enforced only on the device, the same accepted limitation as D-37 g.
+- *Dependencies / risks:* reuses the Streak engine (`streak_batch()`, choices). Needs a `daily_challenge` table (migration before the code, both schema files). Depends on the time zone for "today" (FU-21). The Arabic toggle must work in the run.
+
+### US-44 Final round with wagers (Should)
+As a host, I want an optional final wager round before Results, so that trailing players can still win. *(Added 2026-11-02. Size S–M. Open: FU-22.)*
+- **Given** the admin setting `final_round_enabled` is on, **when** the host ends the game (End Game or a full board), **then** the app offers "Play final round" or "Skip to results".
+- **Given** the final round, **then** the category is shown first and each contestant enters a wager from 0 to their score. A contestant at 0 or below can wager up to the smallest point value (pending FU-22). Wagers are hidden from the room.
+- **When** the question opens (a random question from the bank via `questions.php?random=1`), **then** the timer runs, and Correct adds or Wrong subtracts that contestant's wager. Every contestant is scored once.
+- **Given** a refresh mid-round, **then** the wagers and scoring are restored. The saved game version goes up (D-28).
+- *Dependencies / risks:* runs in the browser only, like D-40, apart from the new setting. Keeping wagers hidden on a shared screen means entering them one by one, masked.
+
+### US-45 Weekly streak leaderboard (Could)
+As a player, I want a weekly top 10, so that I have a fresh chance every week. *(Added 2026-11-02. Size S.)*
+- **Given** the leaderboard, **then** tabs show "This week" (Monday to Sunday, server time) and "All time". Each tab shows the best run per person under the D-37 rules.
+- **Given** a finished run, **then** the rank line shows both ranks.
+- **Given** `GET api/streaks.php?period=week`, **then** it returns the weekly top 10. Any other value gives 400.
+- *Dependencies / risks:* uses the existing `streaks.created_at`, so there is no migration. The ad slot stays as it is (D-41).
+
+### US-46 Share the game result (Could)
+As a host, I want to share the final standings, so that the group (and their friends) see the result and find BrainRush. *(Added 2026-11-02. Size S.)*
+- **Given** Results, **then** "Share" builds text such as "Team Red won BrainRush with 2300! Team Blue 1800, ..." plus the site link.
+- **Given** a device with a share sheet, **then** that sheet opens. Otherwise the text is copied and "Copied" is shown.
+- **Given** a tie, **then** the text uses the D-10 tie wording.
+- **Given** the app (US-40), **then** sharing works the same way.
+- *Dependencies / risks:* none. It shares a code module with the US-43 result.
+
+### US-47 Question difficulty stats (Could)
+As the admin, I want the success rate per question, so that I can move too-easy or too-hard questions to the right point value. *(Added 2026-11-02. Size M.)*
+- **Given** a board question closes, or a Streak question is answered, **then** the browser sends `{question_id, outcome}` (correct / wrong / nobody / timeout), and the server adds it to a per-question counter (`INSERT ... ON DUPLICATE KEY UPDATE`).
+- **Given** Admin Questions, **then** a column shows attempts and the percentage correct, and the list can be sorted by it.
+- **Given** a question with 20 or more attempts whose percentage is outside the band for its point value, **then** it is marked "Check value".
+- **Given** a bad id or outcome, **then** 400. At most 1 count per question per game.
+- *Dependencies / risks:* public writes can be faked (accepted, as D-37 g). Board outcomes depend on how the host judged. Best done after US-42, using the same admin panel pattern. Needs a migration (both schema files).
+
+### US-48 Read the question aloud (Could)
+As a host, I want the device to read the question aloud, so that everyone hears it clearly. *(Added 2026-11-02. Size S.)*
+- **Given** an open question and a voice installed for its language, **then** a speaker button reads the question, and the choices when they are shown. Clicking it again stops the reading.
+- **Given** no voice for that language (Arabic on many Windows PCs), **then** the button is hidden for that language.
+- **Given** the timer, **then** reading doesn't pause it.
+- **Given** a setting "Read questions automatically" (off by default), **when** a question opens, **then** reading starts by itself.
+- *Dependencies / risks:* voice quality varies by device. Uses the browser's built-in speech API, so there is no server work.
+
+### US-49 Arabic interface (Could)
+As an Arabic-speaking host, I want the whole game in Arabic, so that my family can play without English. *(Added 2026-11-02. Size L.)*
+- **Given** the header, **then** an EN / AR switch changes every label, message and button on Setup, Board, Question, Results and Streak, and the choice is remembered on the device.
+- **Given** AR, **then** the page is right to left, questions show in Arabic first, and the D-30 layouts still fit 1366x768 and 375x812.
+- **Given** a question without Arabic, **then** it shows in English with no error.
+- **Given** AR, **then** names and numbers still show correctly (no mixed-direction glitches).
+- *Dependencies / risks:* pulling every piece of text out of `js/game.js` (about 3000 lines) and retesting every layout. The guide, Terms and Privacy pages can follow later.
+
+### US-50 Custom category for one game (Could)
+As a host, I want to add my own questions for tonight's game, so that the board can include an inside-jokes category. *(Added 2026-11-02. Size M–L.)*
+- **Given** setup, **then** "Add my own category" opens a form with a name and one question and answer for each enabled point value, checked like the API (US-25). It counts as one of the N categories.
+- **Given** Start, **then** the custom column is merged into the board in the browser. It is never sent to the server; the game log records only "custom".
+- **Given** the category, **then** it can be saved on the device and exported/imported as a file for reuse.
+- **Given** a refresh, **then** it is restored with the game.
+- *Dependencies / risks:* browser storage size; helpers on a custom question (Swap still draws from the bank, and 3 choices is off). Nothing is stored on the server, so there is nothing to moderate.
+
+### US-51 Rewarded "second chance" in Streak (Could)
+As a streak player, I want one second chance per run, so that a single slip doesn't end a great run. *(Added 2026-11-02. Size M. Blocked: FU-23.)*
+- **Given** a wrong answer, ads on and a rewarded ad available (website only, never in the app, D-43), **then** "Watch an ad to continue" is offered once per run.
+- **Given** the ad completes, **then** the run continues with the next question. Otherwise the run ends as now.
+- **Given** a run that used a second chance, **then** its leaderboard row shows a small marker.
+- *Dependencies / risks:* blocked until H5 Games Ads approval (D-41). Website only (D-43). Consent requirements apply. Possible fairness complaints.
+
+### US-52 Phone buzzers (Could)
+As a contestant, I want to buzz in from my phone, so that the fastest player gets to answer first. *(Added 2026-11-02. Size L. Not committed until the spike in FU-24.)*
+- **Given** a started game, **then** the host screen shows a room code and QR code. A phone that opens it picks its contestant.
+- **Given** an open question, **when** phones buzz, **then** the host screen shows the buzz order within about 1 s. The host still scores.
+- **Given** a room idle for 6 h, **then** it is deleted.
+- *Dependencies / risks:* Hostinger shared hosting has no WebSockets, so it needs short polling (server load, about 0.5–1 s latency, so the order is not always fair). Needs new tables and cleanup. Do a technical spike first (FU-24).
+
 ---
 
 ## Story status
@@ -439,8 +531,10 @@ As the site owner, I want About and Contact pages and the same footer links on e
 | 6 | US-30 (with amendments to US-19, US-20, US-21, US-24, US-25; US-22 retired) | Accepted 2026-10-11 after rework. The first version was accepted, then re-opened when D-31 was amended (points per question again); the rework was re-tested with 36 PASS. Hosted migration done (FU-11, owner confirmed 2026-10-12). |
 | Helpers (outside the sprint cycle, branch `helpers`) | US-32 | Implemented 2026-10-23 (`docs/sprints/helpers-dev.md`); in test. The wrong-option content (`sql/add-wrong-options.sql`) is produced separately and reviewed by the owner. |
 | Streak Challenge (outside the sprint cycle, branch `streak-mode`) | US-33, US-34 | Accepted with follow-ups 2026-10-23 (`docs/sprints/streak-mode-test-report.md`: 61 PASS, 0 FAIL, 2 PENDING; the 3 Minor bugs fixed in fix loop 1 and checked in code by the PO). Open: FU-16 to FU-19. Needs `sql/migrate-add-streak.sql` before the code. |
+| 7 | US-42 | Accepted by the PO 2026-11-02, pending the owner's local Chrome check (FU-25) and the hosted steps (FU-26); not committed yet. Test report `docs/sprints/sprint-7-test-report.md`: 80 checks, 75 PASS, 0 FAIL, 5 PENDING (owner steps); BUG-7-01 and BUG-7-02 (Minor) fixed and re-tested. The developer's behaviour questions were decided at acceptance (sprint plan, Sprint 7 "Outcome"); D-45 is unchanged. Text follow-up: FU-27. |
+| Backlog (planned in Sprints 8-14) | US-43 to US-52 | Approved by the owner 2026-11-02. Open owner questions: FU-21 to FU-24. |
 
-US-01 to US-21 and US-23 to US-30 accepted. US-22 retired 2026-10-11 by D-31. US-31 shipped (PR #46). US-32 in test. US-35 (player guide) and US-36 (Terms of Service) added 2026-10-23. US-33 and US-34 (Streak Challenge) accepted with follow-ups 2026-10-23. US-37 (double score question) added 2026-10-25, branch `double-score`. US-38 (ads) added 2026-10-25, branch `ads`. US-39 (search and sharing) added 2026-10-25, branch `seo`. US-40 (Android app, web side first) added 2026-10-26, branch `android-twa`. US-41 (About and Contact pages) added 2026-10-28, branch `about-contact`. Open items are listed under "Follow-ups after Sprint 4", "Follow-ups after Sprint 6" and "Follow-ups after the Streak Challenge".
+US-01 to US-21 and US-23 to US-30 accepted. US-22 retired 2026-10-11 by D-31. US-31 shipped (PR #46). US-32 in test. US-35 (player guide) and US-36 (Terms of Service) added 2026-10-23. US-33 and US-34 (Streak Challenge) accepted with follow-ups 2026-10-23. US-37 (double score question) added 2026-10-25, branch `double-score`. US-38 (ads) added 2026-10-25, branch `ads`. US-39 (search and sharing) added 2026-10-25, branch `seo`. US-40 (Android app, web side first) added 2026-10-26, branch `android-twa`. US-41 (About and Contact pages) added 2026-10-28, branch `about-contact`. Open items are listed under "Follow-ups after Sprint 4", "Follow-ups after Sprint 6" and "Follow-ups after the Streak Challenge". US-42 to US-52 (Epic E17, new features) added 2026-11-02 in ranked order; their open owner questions are FU-20 to FU-24 under "Open owner questions (new features)". US-42 (Report a question, Sprint 7) accepted by the PO 2026-11-02, pending the owner's checks FU-25 and FU-26 under "Follow-ups after Sprint 7".
 
 ---
 
@@ -517,6 +611,7 @@ US-32. |
 | D-42 | Search and sharing | Owner decision 2026-10-25. No hashtags or `meta keywords` (Google ignores both). Instead: descriptive titles and meta descriptions, canonical URLs (the game's is `/`, not `/index.html`), one visible intro line on the setup screen, Open Graph/Twitter tags with a 1200×630 `img/og-image.png`, a static JSON-LD block (`WebSite` + `WebApplication`) on the game page, `noindex` on admin, `robots.txt` (blocks `/api/` only, so crawlers can read admin's `noindex`) and a hand-kept `sitemap.xml`. Google Search Console is set up by the owner. US-39. |
 | D-43 | Android app | Owner decisions 2026-10-26. BrainRush ships on Android as a **Trusted Web Activity** (TWA): a thin wrapper that opens the live site full screen in Chrome, so every web deploy updates the app and there is one codebase (Capacitor and native Kotlin were considered and not chosen). Package name **`ninja.integration.brainrush`** (permanent after the first Play upload). **No ads in the app at launch**: AdSense stays on the website only, and the Play listing says "Contains ads: No". The wrapper project lives in the **`android/`** subfolder of this repository, blocked on the web by `.htaccess` (Git deploy copies it); signing keys stay outside the repository and are git-ignored with the build output. The app is recognised by `?source=twa` (the manifest's start URL) or the `android-app://ninja.integration.brainrush` referrer, remembered per tab in `sessionStorage`. The first release adds four phone polish items: touch targets of at least 48dp, an offline page (a service worker that caches only that page, never `api/`), the Admin link hidden in the app, and Android Back handling. **Amended 2026-10-26 (owner, fix loop 1):** (a) Back on an open board question asks before closing it (a Back press is easily made by mistake, D-06); (b) in the app, links to the site's own pages open in the same window instead of a new tab, so app mode (no ads, no Admin) carries over. For this the guide, Terms and Privacy pages load one small shared script, `js/app.js` (amends D-38 and D-39 "no JS": on the website it changes nothing). (c) Accepted risk: anyone can add `?source=twa` to a website URL to hide the ads and the Admin link; it only affects ad revenue, since admin access is protected by the server (D-20). (d) Known limitation: Back before the first tap on a game restored at app start leaves the app (Chrome only lets a page add history after a user tap); the game stays saved. (e) The app hides the "New game" heading and the home intro (D-42 text for website visitors and search engines). US-40. |
 | D-44 | About and Contact | Owner decision 2026-10-28, after Google's AdSense review checklist asked for About Us and Contact Us pages. Two static pages in the guide style, `about.html` and `contact.html`, in English only. Contact is by email only (the address already public in the Terms and Privacy); no contact form, so nothing new is stored. A shared footer (How to play, About, Contact, Privacy, Terms) on every public page; not on admin or the offline page. The Admin header link stays. US-41. |
+| D-45 | Report a question (US-42) | Owner decision 2026-11-02 (FU-20). The Report form offers six reasons: wrong answer, typo, translation, outdated, picture problem (for the Flags and Landmarks photos) and other, plus an optional note of up to 200 characters. There is **no rate limit**: the API stores no IP, device id or hash of either, and the admin dismisses junk reports in the Reports panel. A report row holds only the question id, reason, note, status and time.
 
 ---
 
@@ -553,3 +648,21 @@ US-32. |
 | FU-17 | Hosted MariaDB version before the deploy: in phpMyAdmin run `SELECT VERSION();`. It must be 10.2 or later for `ROW_NUMBER() OVER` in `api/streaks.php` (D-17, D-37 k). If it is older, do not deploy; the developer replaces the query with a standard GROUP BY. | Must | Owner | Open |
 | FU-18 | Hosted deploy order and smoke check. (1) Import `sql/migrate-add-streak.sql` in phpMyAdmin **before** the code. (2) Upload `api/questions.php`, `api/streaks.php`, `api/game-log.php`, the re-hashed js/css, `index.html`, `admin.html`, `how-to-play.html`, `terms.html` and `llms.txt`; purge the CDN cache. (3) With admin credentials set in `api/config.php`: `GET api/streaks.php?all=1` and `DELETE api/streaks.php?id=1` without a login give **401** (status only, US-29); with the login, the Admin "Streak leaderboard" panel lists runs and Delete works. (4) `GET api/streaks.php` is public and returns at most 10 rows. (5) Play one streak run of 1 or more on the live site, check it appears with the right date, then delete it in Admin if it was a test. | Must | Owner | Open |
 | FU-19 | Admin page against a DB without the `streaks` table (tester PENDING): only the Streak leaderboard panel shows an error; the other panels work. Check locally on a scratch copy of the DB, or accept it as covered by FU-18 step 1 (the migration runs first). | Could | Developer | Open |
+
+## Open owner questions (new features)
+
+| ID | Item | Priority | Owner | Status |
+|---|---|---|---|---|
+| FU-20 | US-42: confirm the report reason list (wrong answer / typo / translation / outdated / other), and whether the per-device rate limit may use a hashed IP (no raw IP is stored either way). | Should | Owner | Done 2026-11-02 (D-45): six reasons, "picture problem" added; no rate limit. |
+| FU-21 | US-43: the time zone for "today" (when the daily set changes), and 10 questions or another count. | Should | Owner | Open |
+| FU-22 | US-44: the wager rule for contestants at 0 or below (draft: up to the smallest point value). | Should | Owner | Open |
+| FU-23 | US-51: blocked until H5 Games Ads approval (D-41); website only, never in the app (D-43). | Could | Owner | Open (blocked) |
+| FU-24 | US-52: a technical spike on short polling on Hostinger (latency, server load, cleanup) before the story can be committed to a sprint. | Could | Developer | Open |
+
+## Follow-ups after Sprint 7
+
+| ID | Item | Priority | Owner | Status |
+|---|---|---|---|---|
+| FU-25 | US-42 local Chrome walkthrough before the commit, then the hash check after it. (1) On a board question: Report, try Send with no reason, send a report with a note, and check that the timer kept running and the scores didn't change. Also try Cancel and Escape. (2) On an answered Streak question: Report shows and sends. (3) Admin > Reports: the report is listed; try Edit question, Resolve and Dismiss (Cancel first, then OK). (4) Tester D9: add a scratch question, report it, delete it in Admin, and check that the Reports panel refreshes without it. (5) Contrast fixes, which the tester did not cover: hover over "Start playing" on a guide page (dark text on gold) and over the Sudden Death Streak button (no visible change). (6) Commit on `sprint-7`, then check that the hook re-hashed `game.*.js`, `admin.*.js` and `style.*.css`, and that `index.html`, `admin.html` and the guide pages point at the new names (O6, FU-16). Decide whether `package.json`, `package-lock.json`, `.claude/launch.json` and `googlebbe9a71d60b82d1a.html` go into this commit. Optional: Android Back on a real phone (G18 was emulated). | Must | Owner | Open |
+| FU-26 | US-42 hosted deploy (`docs/deploy-hostinger.md` 8.4). (1) Back up the hosted DB, then import `sql/migrate-add-question-reports.sql` in phpMyAdmin **before** the code (O5). (2) Upload `api/reports.php`, the re-hashed js/css and the pages that reference them, and `privacy.html`. Then purge the CDN cache. (3) Without a login, `GET api/reports.php?all=1`, `PUT` and `DELETE api/reports.php?question_id=1` give **401** (check the status only, US-29) (O7). (4) With the login, the Admin Reports panel loads (D8). (5) Send one test report on the live site, check that it shows in Admin, then Dismiss it. | Must | Owner | Open |
+| FU-27 | Player-facing text for Report (US-42). Not required by the story; `privacy.html` already describes the data. (1) `how-to-play.html`: one line saying that a wrong or unclear question can be reported with **Report** on the question screen (on a Streak question, once it is answered). (2) `terms.html`: the line "Found a wrong answer or a missing photo credit? Please tell us at the contact address below." also mentions Report. (3) `llms.txt`: one feature line. Make no new claims about stored data; `privacy.html` stays the only place for that. Re-check the D-30 layout is not affected (static pages only). | Could | Developer | Open |
