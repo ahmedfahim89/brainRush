@@ -12,7 +12,7 @@
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0b1026">
-  <link rel="stylesheet" href="css/style.2a96d814.css">
+  <link rel="stylesheet" href="css/style.864c7129.css">
   <link rel="stylesheet" href="css/guide.12d2b532.css">
 </head>
 <body class="guide">
@@ -23,13 +23,14 @@
 
   <!-- Privacy Policy (D-41). Keep it in step with what the game stores (game log, localStorage) and with the ads settings. -->
   <main class="guide-main">
-    <p class="guide-intro">Last updated: 1 November 2026. This page explains what data BrainRush keeps and how ads use cookies.</p>
+    <p class="guide-intro">Last updated: 2 November 2026. This page explains what data BrainRush keeps and how ads use cookies.</p>
 
     <nav class="guide-toc" aria-labelledby="toc-title">
       <h2 id="toc-title">Contents</h2>
       <ol>
         <li><a href="#who">Who runs BrainRush</a></li>
         <li><a href="#server">On our server</a></li>
+        <li><a href="#reports">Question reports</a></li>
         <li><a href="#browser">In your browser</a></li>
         <li><a href="#ads">Ads and cookies</a></li>
         <li><a href="#app">Android app</a></li>
@@ -49,6 +50,12 @@
       <h2>On our server</h2>
       <p>When a game starts, we save the date and time, the player or team names (for a Streak Challenge, the challenger name you enter), and the chosen categories in a daily log file. Only the site owner can read it. We use it to see how the game is played. We never sell or share it. To have a name removed, email us.</p>
       <p>When a Streak Challenge run ends with a streak of 1 or more, we save the challenger name you entered, the streak and the date and time of the run. The public streak leaderboard shows everyone the top 10, one row per person with their best run, name and date, so use a name you're happy to show. The site owner can remove a run at any time; to have yours removed, email us.</p>
+    </section>
+
+    <!-- US-42 / D-45: keep in step with the question_reports table (question id, reason, note, status, time) -->
+    <section id="reports" class="guide-section">
+      <h2>Question reports</h2>
+      <p>When you use <strong>Report</strong> on a question, we save the number of the question, the reason you picked, your note if you wrote one (up to 200 characters) and the date and time. We don't save your name, your IP address, a device id or anything else that identifies you, so please don't put personal details in the note. Only the site owner reads reports, to fix questions. The owner marks each report as resolved or dismissed; it is deleted together with its question.</p>
     </section>
 
     <section id="browser" class="guide-section">

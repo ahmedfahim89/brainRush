@@ -48,7 +48,7 @@
   <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="css/style.2a96d814.css">
+  <link rel="stylesheet" href="css/style.864c7129.css">
 </head>
 <body class="game">
   <header class="page-header">
@@ -70,6 +70,41 @@
       <p id="double-title" class="double-title">&times;2 Double score!</p>
       <p id="double-text"></p>
       <button type="button" id="double-ok" class="btn btn-primary btn-large">Let's play</button>
+    </div>
+  </div>
+
+  <!-- Report a question (US-42, D-45): the six reasons and an optional note. Sending it never stops
+       the timer or changes the score; only the question id, reason, note and time are saved. -->
+  <div id="report-overlay" class="report-overlay" role="dialog" aria-modal="true" aria-labelledby="report-title" aria-describedby="report-about" hidden>
+    <div class="report-card">
+      <h2 id="report-title" class="report-title">Report this question</h2>
+      <p id="report-about" class="hint report-about"></p>
+      <form id="report-form" novalidate>
+        <fieldset class="report-reasons">
+          <legend>What is wrong?</legend>
+          <label class="report-reason"><input type="radio" name="report-reason" value="wrong_answer"> Wrong answer</label>
+          <label class="report-reason"><input type="radio" name="report-reason" value="typo"> Typo</label>
+          <label class="report-reason"><input type="radio" name="report-reason" value="translation"> Translation</label>
+          <label class="report-reason"><input type="radio" name="report-reason" value="outdated"> Outdated</label>
+          <label class="report-reason"><input type="radio" name="report-reason" value="picture"> Picture problem</label>
+          <label class="report-reason"><input type="radio" name="report-reason" value="other"> Other</label>
+        </fieldset>
+        <label for="report-note">Note (optional)</label>
+        <textarea id="report-note" class="report-note" rows="2" maxlength="200" dir="auto" autocomplete="off" aria-describedby="report-note-count report-privacy"></textarea>
+        <p id="report-note-count" class="hint report-count" aria-live="polite">0 / 200</p>
+        <p id="report-privacy" class="hint report-privacy">Only the question, the reason, your note and the time are saved: no name.</p>
+        <p id="report-error" class="msg msg-error" role="alert" hidden></p>
+        <div class="actions">
+          <button type="submit" id="report-send" class="btn btn-primary">Send report</button>
+          <button type="button" id="report-cancel" class="btn">Cancel</button>
+        </div>
+      </form>
+      <div id="report-done" class="report-done" hidden>
+        <p class="msg msg-success">Thank you! Your report was sent to the admin.</p>
+        <div class="actions">
+          <button type="button" id="report-close" class="btn btn-primary">Close</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -181,6 +216,8 @@
       <div class="question-layout">
         <div class="question-main">
           <h2 id="question-title" class="question-heading" tabindex="-1"></h2>
+          <!-- Report a question (US-42): on an open board question and an answered Streak question; top right, so it adds no height -->
+          <button type="button" id="report-btn" class="btn btn-small report-btn" aria-label="Report a problem with this question" aria-haspopup="dialog" hidden>Report</button>
           <!-- Picture questions only; the generic alt text must not give the answer away -->
           <img id="question-image" class="question-image" alt="Question picture" hidden>
           <!-- Photo credit of the picture (e.g. CC BY-SA attribution); empty credit = no caption -->
@@ -270,6 +307,6 @@
 
   <!-- Android app mode (US-40, D-43): loaded before game.js, which reads it -->
   <script src="js/app.05c6d08d.js"></script>
-  <script src="js/game.ccf94860.js"></script>
+  <script src="js/game.0887b978.js"></script>
 </body>
 </html>

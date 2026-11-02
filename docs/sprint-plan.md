@@ -1,12 +1,14 @@
 # BrainRush — Sprint Plan
 
-Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..US-30, decisions D-01..D-32, follow-ups FU-01..FU-15).
+Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..US-30 in Sprints 1-6, decisions D-01..D-32, follow-ups FU-01..FU-15; Epic E17 US-42..US-52 in Sprints 7-14, open owner questions FU-20..FU-24).
 
 **Overall status (2026-10-19):** Sprints 1-6 Done and shipped. Sprint 6 (Question bank) and D-32 (pick 1..N categories) were merged via PR #11 on 2026-10-11, and the hosted DB is migrated (FU-11). Follow-ups FU-10..FU-15 are all Done; no open items. Later owner requests were shipped outside the sprint cycle: Egypt questions (PR #13, #16), Arabic localization (PR #17, #19), the Gen Z set (PR #18), the AI set (PR #20), the Egyptians set (`sql/add-egyptians-questions.sql`, PR #22, 2026-10-15), the game start log (`api/game-log.php` writes one line per started game with time, player names and categories to a daily `logs/game-YYYY-MM-DD.log`, blocked from the web; PR #24, deployed 2026-10-18) and the "new questions" banner (gold strip at the top of the setup screen; Admin > Game settings turns it on or off and sets its text, stored as `banner_enabled` / `banner_text` settings, no DB migration; branch `new-questions-banner`, 2026-10-19).
 
 **Helpers (2026-10-23, outside the sprint cycle):** US-32 / D-36 (3 choices, Swap, Skip; once per contestant per game) implemented on branch `helpers` (`docs/sprints/helpers-dev.md`); game-tester verification next (max 2 fix loops), then the owner's local Chrome check before commit/PR. Needs `sql/migrate-add-wrong-options.sql` on every DB before the code; the wrong-option content (`sql/add-wrong-options.sql`) is produced in parallel and reviewed by the owner.
 
 **Streak Challenge (2026-10-23, outside the sprint cycle):** US-33 / US-34 / D-37 (solo run of 3-choice questions until the first wrong answer or time's up, plus a shared top-10 leaderboard and an admin moderation list) implemented on branch `streak-mode` from main 4582c9d (`docs/sprints/streak-mode-dev.md`); game-tester verification next (max 2 fix loops), then the owner's local Chrome check before commit/PR. Needs `sql/migrate-add-streak.sql` (creates the `streaks` table) on every DB before the code; it reuses the helper's wrong options, so `sql/migrate-add-wrong-options.sql` must be there too.
+
+**New features, Epic E17 (2026-11-02):** the owner approved US-42..US-52. They are planned as Sprints 7-14 (below, after Sprint 6), in the owner's order: Sprints 7-10 are the near-term groups (owner's "A" to "D"), Sprints 11-14 are one story each, later. Sprint 7 was built and PO-accepted on 2026-11-02, pending the owner's local test and the hosted steps (FU-25, FU-26); Sprints 8-14 are not started. Each sprint lists the owner questions (FU-20..FU-24) that must be answered before development.
 
 | Sprint | Goal | Status |
 |---|---|---|
@@ -16,6 +18,14 @@ Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..U
 | 4 | Question, timer, scoring, results, persistence | Done |
 | 5 | Polish (FU-03, FU-04, FU-05, FU-08) | Done |
 | 6 | Question bank: random questions per new game (US-30, D-31; D-32 alongside) | Done (accepted 2026-10-11 after rework); owner Chrome check, commit/PR and hosted migration (FU-11) open |
+| 7 | Report a question (US-42) | Accepted by the PO 2026-11-02, pending the owner's local Chrome check (FU-25) and the hosted steps (FU-26); not committed |
+| 8 | Daily Challenge, share, weekly leaderboard (US-43, US-46, US-45) | Planned |
+| 9 | Final round with wagers, read aloud (US-44, US-48) | Planned |
+| 10 | Question difficulty stats (US-47) | Planned |
+| 11 | Custom category for one game (US-50) | Planned (later) |
+| 12 | Arabic interface (US-49) | Planned (later) |
+| 13 | Phone buzzers (US-52), spike first | Planned (later; not committed until the FU-24 spike) |
+| 14 | Rewarded second chance in Streak (US-51) | Planned (later; blocked by FU-23) |
 
 Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops) -> product-owner accepts -> scrum-master updates status -> commit on branch `sprint-N` + PR to `main`.
 
@@ -235,6 +245,281 @@ New open follow-up FU-09 (Owner) was added by the PO (see "Follow-ups" below).
 
 ---
 
+## Epic E17 — New features (Sprints 7-14, planned 2026-11-02)
+
+The owner approved US-42..US-52 on 2026-11-02 and set this grouping and order. Full story text is in `docs/product-backlog.md` ("Epic E17"); owner questions are FU-20..FU-24 ("Open owner questions (new features)"). Sprint 7 is PO-accepted pending the owner steps (see its Status); Sprints 8-14 are **Planned** and not started. Sprint numbers continue from Sprint 6; the owner's labels were A = Sprint 7, B = Sprint 8, C = Sprint 9, D = Sprint 10, and the four "later" items are Sprints 11-14.
+
+**Rules common to Sprints 7-14** (on top of the global Definition of Done)
+
+- **Migration rule** (Sprints 7, 8, 10, and 14 if its marker is stored; Sprint 13 only if committed): the migration file is re-runnable (`CREATE TABLE IF NOT EXISTS` or equivalent), is run twice on the local DB with no error, and is run on **every** DB (hosted: phpMyAdmin) **before** the new code is deployed. The same table goes into **both** `sql/schema.sql` and `sql/schema-hosted.sql` (bodies identical after their CREATE DATABASE/USE lines), as the Streak sprint did with `sql/migrate-add-streak.sql`. `docs/deploy-hostinger.md` gets the migration step, the upload list and the new table count. A DB without the new table must only break the new feature, never the game or Admin's other panels (FU-19).
+- **Saved game** (D-28): any change to the saved board-game shape bumps the saved `version` and migrates or discards safely. Features with their own browser key (Streak `brainrush.streak`, D-37 h) leave the board save untouched.
+- **Layout** (D-30, D-35, D-36): every new UI element fits 1366x768 and the 375x812 phone layout with no horizontal scroll, and does not push the board or question screens past one screen.
+- **Public writes** (D-37 g): new public POST endpoints validate every field (400), never store names or raw IP, and accept that a determined user can fake data; admin-only reads and writes stay behind US-29 auth (401 without login).
+- **Deploy hygiene:** after the pre-commit hook re-hashes js/css, check that `index.html` and `admin.html` point at the new file names (FU-16); purge the CDN cache on deploy. New static text that mentions data stored goes into `privacy.html`.
+- **Owner questions** listed per sprint are answered and recorded in `docs/product-backlog.md` before the developer starts that sprint.
+
+---
+
+## Sprint 7 — Report a question (US-42)
+
+**Goal:** Players and hosts can report a bad question from the game, and the admin and the question-bank-manager can see and act on the reports. (Owner's Sprint A.)
+**Stories:** US-42
+**Dependencies:** Streak Challenge code (Report is also offered on an answered Streak question); Admin Questions panel (the Reports panel links to a question's edit form); US-29 auth.
+**Owner questions needed before development:** **FU-20**, answered 2026-11-02 (D-45): six reasons (wrong answer / typo / translation / outdated / picture problem / other) and no rate limit.
+
+**Developer tasks**
+1. `sql/migrate-add-question-reports.sql` (new) — `question_reports`: id, `question_id` (FK to `questions` ON DELETE CASCADE), `reason`, `note` (max 200), `status` (open / resolved / dismissed, default open), `created_at`; key on (`question_id`, `status`). Re-runnable; run on the local DB twice.
+2. `sql/schema.sql` + `sql/schema-hosted.sql` — the same table, after `questions`/`streaks`; bodies identical.
+3. `api/reports.php` (new) — POST (public): valid report -> 201 storing question id, reason, note and time (no names, no IP, no device id); bad id, reason or note over 200 characters -> 400; no rate limit (D-45); prepared statements only. GET `?all=1` (admin, grouped by question with count, reasons, notes) and PUT/DELETE for Resolve / Dismiss behind US-29 auth (401 without login).
+4. `index.html` + `js/game.js` + `css/style.css` — "Report" control on an open board question and on an answered Streak question; small form (the six D-45 reasons, optional note with a 200-character counter), confirmation text, errors inline (400). Sending never stops the timer, never changes the score, and works with Swap/Skip/3 choices and in Arabic; no change to the saved game.
+5. `admin.html` + `js/admin.js` — "Reports" panel: open reports grouped by question (count, reasons, notes), link to the question's edit form, Resolve / Dismiss with a plain-text confirm first (D-18), inline errors, text rendered with `textContent`.
+6. `.claude/agents/question-bank-manager.md` — the agent's plan step lists open reports first, and reported questions are checked before new questions are added.
+7. `privacy.html` — a short section on what a report stores (question id, reason, note and time; no name, IP or device id).
+8. `README.md` + `docs/deploy-hostinger.md` — migration step before the code, upload list (`api/reports.php`), new table count.
+9. `docs/sprints/sprint-7-dev.md`.
+
+**Tester focus:** report from a board question and from a Streak question (201, row stored, timer and score unchanged, no name or IP in the row); every reason; note of 200 and 201 characters; bad id and bad reason (400); many reports in a row are all accepted (no rate limit, D-45); `<img src=x onerror=alert(1)>` in the note renders as text in Admin; Reports panel grouping, edit link, Resolve and Dismiss with confirm and Cancel; admin endpoints 401 without login; deleting a question removes its reports; migration run twice, and Admin/game with the table missing (only reports fail); report form at 1366x768 and 375x812 and in Arabic; no console errors; Privacy text; question-bank-manager plan lists open reports.
+
+**Definition of Done (Sprint 7, on top of the global DoD)**
+- `sql/migrate-add-question-reports.sql` runs on every DB, including the hosted one, **before** the code is deployed, and `question_reports` is added to both `sql/schema.sql` and `sql/schema-hosted.sql` (migration rule above).
+- No names, IP or device id stored (checked in the DB by the tester); the six reasons and no rate limit match D-45.
+- Admin Reports panel actions all use confirm (D-18); the question-bank-manager agent instruction is updated.
+
+**Definition of Done (Sprint 7, as delivered)**
+
+| # | DoD item | Status |
+|---|---|---|
+| 1 | Spec file structure; no hard-coded board size, point values or timer | Met (S6: `REPORT_NOTE_MAX` is a named constant in PHP and JS; the six reasons are fixed by D-45) |
+| 2 | `php -l` clean on all `api/*.php` | Met (S1, incl. the new `api/reports.php`) |
+| 3 | Prepared statements only | Met (S4; PO code check: INSERT and UPDATE are prepared, the only plain query is the constant SELECT of the open reports) |
+| 4 | `textContent` / DOM APIs only | Met (S3, D2, G14: the `<img onerror>` note shows as text in the game and in Admin) |
+| 5 | No credentials committed; `api/config.php` git-ignored | Met (S5; the 401 checks used a throwaway config outside the repo) |
+| 6 | Tester report, no open Critical/Major bugs | Met: 80 checks, 75 PASS, 0 FAIL, 5 PENDING (owner steps D8, D9, O5, O6, O7). BUG-7-01 and BUG-7-02 (Minor) fixed in fix loop 1 and re-tested (RT1-RT11) (`docs/sprints/sprint-7-test-report.md`) |
+| 7 | Developer note | Met (`docs/sprints/sprint-7-dev.md`, incl. "Fix loop 1" and "Contrast fixes") |
+| 8 | PO accepted | Met 2026-11-02, pending the owner checks below |
+| + | PHP 8.0 / MariaDB 10.4 compatible (D-17) | Met (tested on PHP 8.0.30, MariaDB 10.4.32) |
+| + | Migration re-runnable, run twice locally; table in both schema files, bodies identical | Met (S8, S9) |
+| + | No name, IP or device id stored; six reasons; no rate limit (D-45) | Met (S7, A1, A9, A10; `information_schema` lists only `id, question_id, reason, note, status, created_at`) |
+| + | Reports panel actions confirm first (D-18); question-bank-manager updated; Privacy text | Met (D4, D5, O2, O1) |
+| + | Layout 1366x768 and 375x812; saved game untouched; Swap, Skip, 3 choices, Arabic | Met (G6, G10-G13, G16, M1, M2, RT8, RT9) |
+| + | A DB without the table breaks only the reports feature (FU-19 rule) | Met (A18, D6, G9, RT1) |
+| + | Contrast fixes (owner request): `.btn-primary:hover` text and the Streak button hover | Met in code (PO check: `#303039` is the 12% gold tint over `#151c3d`; `.btn-primary:hover` keeps `#1a1a1a` and outranks `a:hover`). Not in the tester's report; the owner looks at both in FU-25 |
+| + | Owner's local Chrome check, incl. the Admin delete refresh (D9) | Open (FU-25) |
+| + | Commit on `sprint-7`, re-hash check (O6, FU-16 style) and PR to `main` (owner merges) | Open (FU-25) |
+| + | Hosted migration before the code (O5), live 401 and CDN purge (O7), browser admin login (D8) | Open (FU-26) |
+
+**Status:** Accepted by the PO 2026-11-02, pending the owner's local Chrome check (FU-25) and the hosted steps (FU-26). Not committed yet.
+
+**Outcome:** US-42 accepted against all five criteria and the dependency line (migration before code, both schema files). The developer built the game form, `api/reports.php`, the Admin Reports panel, the question-bank-manager step, the Privacy section and the migration. One fix loop closed BUG-7-01 (Admin showed the load error and "No open reports." together) and BUG-7-02 (header links focusable behind the dialog; `setPageInert()` now also covers the double-score popup). The two hover colour fixes were made on the owner's request. New follow-ups: FU-25, FU-26 (owner steps) and FU-27 (player-facing text, Could).
+
+PO decisions on the developer's open questions (no story change, D-45 stands):
+1. **The Report form covers the board question while the timer runs:** keep. US-42 says sending must not stop the timer. The form is short and closes with Cancel, Escape or Back, and nothing is scored automatically at 0 (D-03).
+2. **"Picture problem" on every question:** keep. D-45 sets one list of six reasons. On a text question nobody picks it, and the Admin panel shows "picture" next to photo questions.
+3. **Resolve and Dismiss close all of a question's open reports:** keep. That is what US-42 asks for (reports grouped by question, Resolve / Dismiss per group). Closed reports are not shown anyway, so a group mixing junk and real reports loses nothing. Accepted side effect: a report filed after the panel loaded is closed with the group.
+4. **Line breaks in a note become spaces:** keep. A note is one line of up to 200 characters.
+5. **Resolved and dismissed reports stay in the DB but are not shown:** keep. US-42 lists open reports only, and `privacy.html` says a report is kept until its question is deleted, which matches. A history view or a cleanup would be a new story if the owner asks.
+6. **`how-to-play.html`, `terms.html` and `llms.txt` don't mention Report:** follow-up FU-27 (Could). US-42 and the Epic rule only require `privacy.html`, which is done. But the Terms line "Found a wrong answer ... tell us at the contact address" should now point to Report as well.
+
+---
+
+## Sprint 8 — Daily Challenge, share, weekly leaderboard (US-43, US-46, US-45)
+
+**Goal:** A shared daily 10-question run with a shareable result, sharing of the board game's final standings from the same module, and a weekly Streak top 10. (Owner's Sprint B; build in the order US-43, US-46, US-45.)
+**Stories:** US-43, US-46, US-45
+**Dependencies:** Streak engine (`streak_batch()`, `choice_text()`, 3 choices, `brainrush.streak` pattern, D-37); Results screen (US-46); `streaks.created_at` (US-45, no migration); US-40 app behaviour (sharing must work there).
+**Owner questions needed before development:** **FU-21** (time zone for "today" and the question count: 10 or another number; the count must not be hard-coded). US-46 and US-45 need none.
+
+**Developer tasks**
+1. `sql/migrate-add-daily-challenge.sql` (new) — `daily_challenge`: one row per (challenge date, position) with the `question_id` (FK to `questions`), `UNIQUE (challenge_date, position)` so two simultaneous first requests cannot create a duplicate set. Re-runnable; run locally twice.
+2. `sql/schema.sql` + `sql/schema-hosted.sql` — the same table; bodies identical.
+3. `api/daily.php` (new) — GET: for the server date (time zone per FU-21), return today's set, creating it once on the first request (`INSERT IGNORE`, then read back, so a second request gets the same questions); questions at enabled point values, 3 shuffled choices through the Streak code, challenge number N, seconds until the next set. Count and time zone come from one place (constant or setting), no scattered literals. Generic errors only.
+4. `js/share.js` (new) — one shared module: build text, call the phone share sheet if present, otherwise copy text plus site link and show "Copied". Used by US-43 and US-46; works inside the app (US-40). Page and script tags in `index.html`.
+5. `index.html` + `js/game.js` + `css/style.css` — Daily Challenge entry on Setup next to Streak; run screen: 3 choices, setup timer, wrong or time's up scores 0 and moves on, no Pause, no Reset, no helpers; refresh keeps the remaining time (saved deadline, as D-37 d); Arabic toggle works in the run.
+6. `js/game.js` — Daily result: "BrainRush Daily #N: 7/10" with a row of green/red squares and "Share"; a device that already played today sees today's result and a countdown to the next challenge (device-only lock, accepted limitation as D-37 g), stored in its own browser key so the board save is unchanged.
+7. `js/game.js` — US-46: "Share" on Results builds "Team Red won BrainRush with 2300! Team Blue 1800, ..." plus the link; tie wording follows D-10; same module and "Copied" behaviour.
+8. `api/streaks.php` — US-45: `?period=week` returns the weekly top 10 (Monday to Sunday, server time, best run per person under D-37 rules); any other `period` value -> 400; default and `all` behaviour unchanged. No schema change.
+9. `index.html` + `js/game.js` + `css/style.css` — leaderboard tabs "This week" / "All time"; the finished-run rank line shows both ranks; the ad slot stays as it is (D-41).
+10. `how-to-play.html` + `README.md` + `docs/deploy-hostinger.md` — Daily Challenge, sharing, weekly tab; migration step before the code; upload list (`api/daily.php`, `js/share.js`).
+11. `docs/sprints/sprint-8-dev.md`.
+
+**Tester focus:** two requests at once get the same set with no duplicate rows; set changes at the FU-21 boundary; 10 questions at enabled point values, 3 choices, timer, wrong/time-out scores 0, no Pause/helpers, refresh mid-question keeps the deadline; result text and squares; share sheet vs clipboard (and in the app); played-today screen with countdown; Arabic in the run; US-46 text for a single winner, a tie (D-10) and a negative-score game; `?period=week` on a Sunday/Monday boundary, `?period=bogus` -> 400, both ranks on the rank line, existing all-time tab unchanged; migration run twice and the Daily entry with the table missing (only Daily fails); 1366x768 and 375x812; no console errors.
+
+**Definition of Done (Sprint 8, on top of the global DoD)**
+- `sql/migrate-add-daily-challenge.sql` runs on every DB, including the hosted one, **before** the code is deployed, and `daily_challenge` is added to both `sql/schema.sql` and `sql/schema-hosted.sql` (migration rule above).
+- Number of questions and time zone follow the FU-21 answer and are not hard-coded in several places.
+- US-45 needs no migration (verified: no schema change in the diff).
+
+**Status:** Planned
+
+---
+
+## Sprint 9 — Final round with wagers, read aloud (US-44, US-48)
+
+**Goal:** The host can add an optional final wager round before Results, and the device can read questions aloud. (Owner's Sprint C.)
+**Stories:** US-44, US-48
+**Dependencies:** Sprint 4 (End Game, Results, scoring), D-36 `questions.php?random=1` (random bank question), `settings.php` (new `final_round_enabled` setting, no migration: a missing row means off, like `banner_enabled`); D-28 saved-game version.
+**Owner questions needed before development:** **FU-22** (wager rule for contestants at 0 or below; draft: up to the smallest point value). US-48 needs none.
+
+**Developer tasks**
+1. `api/settings.php` + `admin.html` + `js/admin.js` — `final_round_enabled` (on/off, validated, off by default) in Admin > Game settings.
+2. `index.html` + `js/game.js` — when the setting is on, End Game (and the full-board offer) offers "Play final round" or "Skip to results"; the D-09 / D-26 confirm rules stay.
+3. `js/game.js` + `css/style.css` — final round screens: category shown first, then each contestant enters a wager one by one, masked, from 0 to their score (rule for 0 or negative per FU-22, derived from the smallest point value, not a literal); wagers hidden from the room; then the question opens via `questions.php?random=1` with the timer; Correct adds and Wrong subtracts that contestant's wager; every contestant scored once; then Results. Confirm the random endpoint's payload gives the category and the choices needed; if a small server change is needed, list it in the dev note.
+4. `js/game.js` — saved game: wagers and scoring survive a refresh mid-round; saved `version` bumped with a safe migrate-or-discard of older saves (D-28).
+5. `js/speech.js` (new) or section of `js/game.js` — US-48: speaker button on the question screen using the browser speech API; reads the question, and the choices when they are shown; second click stops; hidden when no voice is installed for that language (detect voices, handle late-loaded voice lists); reading never pauses the timer; stops on Back to Board, question close and refresh.
+6. `index.html` + `js/game.js` + `css/style.css` — "Read questions automatically" setting, off by default; reading starts when a question opens. **Where it is stored is not stated in US-48:** this plan assumes an on-device preference (no migration); the PO confirms before development, and if it must be an Admin setting it goes with task 1.
+7. `README.md` + `how-to-play.html` — final round and read-aloud notes (voice quality varies; Arabic voice often missing on Windows).
+8. `docs/sprints/sprint-9-dev.md`.
+
+**Tester focus:** setting off (no change to End Game) and on (offer shown, Skip goes straight to Results); wagers 0, exactly the score, above the score (blocked), and a contestant at 0 and below (FU-22 rule); wagers masked and hidden; Correct/Wrong once per contestant; scores and Results after the round (ties D-10); refresh mid-wager and mid-question; old saved game (previous version) restored or discarded without a JS error; 6 contestants at 1366x768 and 375x812; speaker with an installed voice, with no voice (button hidden, check English and Arabic), second click stops, timer keeps running, automatic reading off by default and on when ticked; closing the question stops speech; no console errors.
+
+**Definition of Done (Sprint 9, on top of the global DoD)**
+- Saved-game version bumped and tested with an older save (D-28).
+- Wager cap uses the smallest point value from the settings (no hard-coded 100); FU-22 answer recorded in the backlog.
+- No migration needed (setting is a key/value row); verified by the tester on a DB that never had `final_round_enabled`.
+
+**Status:** Planned
+
+---
+
+## Sprint 10 — Question difficulty stats (US-47)
+
+**Goal:** Admin can see how often each question is answered correctly and spot questions at the wrong point value. (Owner's Sprint D.)
+**Stories:** US-47
+**Dependencies:** **Sprint 7 (US-42)**: reuse its admin panel pattern and `api/reports.php` conventions (public POST validation, rate limit style); Streak and board question flows.
+**Owner questions needed before development:** none from FU-20..FU-24. **PO to define before development:** the "Check value" band (the expected percentage correct for each point value). The story does not give numbers; the band must come from the enabled point values (for example by rank), not from hard-coded values (DoD 1).
+
+**Developer tasks**
+1. `sql/migrate-add-question-stats.sql` (new) — `question_stats`: `question_id` (primary key, FK to `questions` ON DELETE CASCADE) with counters for correct / wrong / nobody / timeout. Re-runnable; run locally twice.
+2. `sql/schema.sql` + `sql/schema-hosted.sql` — the same table; bodies identical.
+3. `api/question-stats.php` (new) — POST `{question_id, outcome}` (outcome: correct / wrong / nobody / timeout) adding to the counter with `INSERT ... ON DUPLICATE KEY UPDATE`; bad id or outcome -> 400; prepared statements; no names or IP.
+4. `api/questions.php` — admin list also returns attempts and percent correct (`LEFT JOIN`, no row = 0 attempts); sort option by percent correct.
+5. `js/game.js` — send one outcome when a board question closes and when a Streak question is answered, at most once per question per game (kept in game state; a save without the field simply counts none, no bump unless the developer prefers one, recorded in the dev note). A failed send never interrupts play.
+6. `admin.html` + `js/admin.js` + `css/style.css` — Questions list columns "Attempts" and "% correct", sortable; "Check value" mark when attempts are 20 or more and the percentage is outside the band for that question's point value (threshold 20 as a named constant).
+7. `README.md` + `docs/deploy-hostinger.md` — migration step before the code; upload list; new table count.
+8. `docs/sprints/sprint-10-dev.md`.
+
+**Tester focus:** each outcome from a board question and from a Streak question increments the right counter; a second send for the same question in one game is not sent; bad id and bad outcome (400); upsert under two quick requests; list shows attempts and percent, sort works, 0 attempts shows cleanly; "Check value" appears at 20 attempts only and follows the band; admin list works for a question with no stats row; stats removed with the question; send failure (API down) does not disturb play; Admin layout at >= 1024 px (D-19); migration run twice; Admin with the table missing; no console errors.
+
+**Definition of Done (Sprint 10, on top of the global DoD)**
+- `sql/migrate-add-question-stats.sql` runs on every DB, including the hosted one, **before** the code is deployed, and `question_stats` is added to both `sql/schema.sql` and `sql/schema-hosted.sql` (migration rule above).
+- The "Check value" band is written down by the PO and has no hard-coded point values.
+- Public-write limitation (fake counts) noted in the dev note and Privacy needs no change (no personal data stored).
+
+**Status:** Planned
+
+---
+
+## Sprint 11 — Custom category for one game (US-50) — later
+
+**Goal:** The host can add their own category (name plus one question and answer per enabled point value) to tonight's game, kept in the browser only. (Owner: later, its own sprint.)
+**Stories:** US-50
+**Dependencies:** Sprint 9 changes the saved-game version first, so this sprint bumps it again from that base; Setup category picker (D-32 and D-33 "Surprise me!"); helpers (D-36); US-25 board payload shape; `api/game-log.php`.
+**Owner questions needed before development:** none open (FU-20..FU-24 do not cover it). Should be re-checked with the PO when the sprint is picked up.
+
+**Developer tasks**
+1. `index.html` + `js/game.js` + `css/style.css` — "Add my own category" form on Setup: name plus one question and one answer for each enabled point value (taken from settings), checked with the same rules as the API (US-25, D-14 length and uniqueness against the chosen categories); counts as one of the N categories (D-32).
+2. `js/game.js` — at Start, merge the custom column into the board in the browser; the board endpoint is called only with real category ids, and nothing custom is ever sent to the server. Custom column coexists with "Surprise me!" picks.
+3. `api/game-log.php` + `js/game.js` — the game log records only the word "custom" for the column, never its name or text.
+4. `js/game.js` — helpers on custom questions: 3 choices off (no wrong options), Swap still draws from the bank, Skip and the double score behave as for any cell.
+5. `js/game.js` — save the category on the device (browser storage, size-checked with a clear message if full), and export/import as a file; import validates structure, length and point values, and rejects bad files without a JS error.
+6. `js/game.js` — restore the custom column with the saved game after a refresh; bump the saved `version` and migrate or discard older saves safely (D-28).
+7. `README.md` + `how-to-play.html` — custom category notes (kept on the device, nothing on the server).
+8. `docs/sprints/sprint-11-dev.md`.
+
+**Tester focus:** form validation (empty, too long, duplicate, missing a point value); custom plus real categories at the N limit; Start sends no custom data (check the network calls and the log line); helpers on the custom cell; refresh mid-game restores it; save, reload the page, reuse; export and import (valid, corrupt, oversized, `<img src=x onerror=alert(1)>` renders as text); storage full; 1366x768 and 375x812; no console errors.
+
+**Definition of Done (Sprint 11, on top of the global DoD)**
+- Nothing custom is sent to or stored on the server (verified in the API calls and the game log).
+- Saved-game version bumped and tested with an older save (D-28).
+- No migration needed.
+
+**Status:** Planned (later)
+
+---
+
+## Sprint 12 — Arabic interface (US-49) — later
+
+**Goal:** The whole game can be switched between English and Arabic, right to left, with the choice remembered. (Owner: later, its own sprint. Size L.)
+**Stories:** US-49
+**Dependencies:** Place it **after** Sprints 7-11 so all new screens and texts exist before they are translated; the existing Arabic question text and language button (earlier Arabic localization); D-30 layouts.
+**Owner questions needed before development:** none open. Who supplies and reviews the Arabic UI strings is to be agreed (owner review, as for question content) before development starts.
+
+**Developer tasks**
+1. `js/game.js` + `index.html` — inventory every visible string on Setup, Board, Question, Results, Streak, Daily, Final round, Report and error messages; list it in the dev note.
+2. `js/i18n.js` (new) — English and Arabic string tables and a lookup used by `js/game.js`; a missing Arabic string falls back to English; no text built from data with `innerHTML` (DoD 4).
+3. `js/game.js` — replace hard-coded strings with lookups in small steps (screen by screen), keeping behaviour identical in English.
+4. `index.html` + `js/game.js` — EN / AR switch in the header; choice saved on the device; `lang` and `dir` set on the page; questions show in Arabic first when AR, and a question without Arabic shows English with no error.
+5. `css/style.css` — RTL layout (logical properties or `[dir=rtl]` rules) for board, scoreboard, question screen, results, leaderboard and forms; bidi isolation for player names and numbers (no mixed-direction glitches).
+6. `css/style.css` — D-30 re-check: Setup, Board (6x6, 6 contestants), Question, Results and Streak fit 1366x768 and 375x812 in AR.
+7. `README.md` + `how-to-play.html` — language switch note. The guide, Terms and Privacy pages stay English for now (per US-49).
+8. `docs/sprints/sprint-12-dev.md`.
+
+**Tester focus:** EN/AR on every screen with no leftover English string (list from task 1); choice remembered after refresh; RTL mirroring; Latin names, Arabic names and numbers mixed in the scoreboard and Results; every D-30 layout in AR at 1366x768, 1920x1080 and 375x812; saved game and open question restored in AR; question without Arabic; helpers, Streak, Daily, final round and Report flows in AR; English regression of all flows; no console errors.
+
+**Definition of Done (Sprint 12, on top of the global DoD)**
+- A string inventory exists and every item is translated or deliberately left in English with a reason.
+- English behaviour and layouts are unchanged (regression passed).
+- No migration needed; saved game keeps its version unless the language choice is stored in it (then D-28).
+
+**Status:** Planned (later)
+
+---
+
+## Sprint 13 — Phone buzzers (US-52) — later, spike first
+
+**Goal:** Decide with evidence whether phone buzzers can work on Hostinger shared hosting (no WebSockets), and build them only if the owner commits the story after the spike. (Owner: later, its own sprint.)
+**Stories:** US-52 (**not committed** until the FU-24 spike result is accepted by the owner and the PO)
+**Dependencies:** **FU-24** (technical spike on short polling: latency, server load, cleanup). If committed: Sprint 12 first if the buzzer pages must be in Arabic; Setup/Question screens; Privacy page.
+**Owner questions needed before development:** **FU-24** (spike) and, after it, the owner's go / no-go. Nothing in Phase 2 starts before that.
+
+**Phase 1 — Spike (time-boxed, no application code merged)**
+1. `docs/sprints/sprint-13-spike.md` — prototype of a room with short polling (a throwaway script, not merged): measure buzz-to-host latency, requests per second per room, and load on the shared host for 1, 5 and 10 phones.
+2. Same note — fairness check (how often the order is wrong at about 0.5-1 s polling), cleanup options without cron (for example deleting idle rooms on request), and the tables needed.
+3. Same note — go / no-go recommendation; the PO and owner decide, and the Scrum Master then either commits Phase 2 (and updates this sprint) or moves US-52 back to the backlog.
+
+**Phase 2 — Outline only, to be refined after the spike (not committed)**
+4. `sql/migrate-add-buzzer-rooms.sql` (new) + both schema files — room and buzz tables with a last-activity time; rooms idle for 6 h are deleted.
+5. `api/rooms.php` (new) — create room (code), join (pick contestant), buzz, read buzz order; validation and rate limits; no personal data.
+6. `buzzer.html` + `js/buzzer.js` (new) — phone page; `index.html` + `js/game.js` — room code and QR on the host screen, buzz order shown within about 1 s, host still scores; a QR approach that adds no external service.
+7. `privacy.html`, `README.md`, `docs/deploy-hostinger.md`, `docs/sprints/sprint-13-dev.md`.
+
+**Tester focus:** Phase 1: the spike note's numbers can be repeated and the recommendation follows from them. Phase 2 (if committed): room code and QR, join, first buzz order within about 1 s with several phones, host scoring unchanged, 6 h cleanup, bad codes and rate limits, load on the host, phone browsers (iOS Safari, Chrome Android), no console errors.
+
+**Definition of Done (Sprint 13)**
+- Phase 1: spike note delivered and the go / no-go decision recorded in the backlog. A "no-go" closes the sprint as Done with no code.
+- Phase 2 (only if committed): global DoD, plus the migration rule above (migration before the code on every DB; both schema files updated).
+
+**Status:** Planned (later; Phase 2 not committed)
+
+---
+
+## Sprint 14 — Rewarded second chance in Streak (US-51) — later, blocked
+
+**Goal:** In a Streak run on the website, one wrong answer per run can be forgiven after the player watches a rewarded ad. (Owner: later, its own sprint.)
+**Stories:** US-51
+**Dependencies:** **FU-23** (blocked until H5 Games Ads approval, D-41); website only, never in the app (D-43, detection by `?source=twa`); AdSense consent setup; Streak and its leaderboard (D-37).
+**Owner questions needed before development:** **FU-23** answered (approval received). The sprint does not start before that. Also to confirm with the PO: the story says the leaderboard row shows a marker, which needs a stored flag on the run, so this plan includes a small migration; if the owner prefers no marker, drop tasks 1-2 and 5.
+
+**Developer tasks**
+1. `sql/migrate-add-streak-second-chance.sql` (new) — add a "used second chance" flag to `streaks` (default 0), re-runnable (no error when the column already exists); run locally twice.
+2. `sql/schema.sql` + `sql/schema-hosted.sql` — the same column in the `streaks` table; bodies identical.
+3. `js/game.js` (+ the existing ads loader, D-41) — after a wrong answer, with ads on, a rewarded ad available and not in the app, offer "Watch an ad to continue" once per run; on completion continue with the next question; otherwise the run ends as now. Timer, refresh deadline and saved run (`brainrush.streak`) keep working; never offered in the app or with ads off or in maintenance mode.
+4. `api/streaks.php` — accept the flag on POST (validated 0/1); the leaderboard returns it; the best-run query is unchanged otherwise (D-37).
+5. `index.html` + `js/game.js` + `css/style.css` — small marker on a leaderboard row for a run that used a second chance; row text still reads as text for screen readers (D-37 j).
+6. `privacy.html`, `how-to-play.html`, `README.md`, `docs/deploy-hostinger.md` — rewarded ad and consent notes; migration step before the code.
+7. `docs/sprints/sprint-14-dev.md`.
+
+**Tester focus:** offer appears once per run after a wrong answer (website, ads on); not in the app (`?source=twa`), not with ads off or maintenance mode; ad completed -> next question, ad closed or failed -> run ends; time's up case; refresh around the ad; marker on the leaderboard row; old rows without the flag; consent message behaviour in the EEA setup; migration run twice; Streak regression and 1366x768 / 375x812; no console errors.
+
+**Definition of Done (Sprint 14, on top of the global DoD)**
+- `sql/migrate-add-streak-second-chance.sql` runs on every DB, including the hosted one, **before** the code is deployed, and the column is added to both `sql/schema.sql` and `sql/schema-hosted.sql` (migration rule above).
+- Nothing in the app ever loads or shows the rewarded ad (D-43), verified in the app build.
+- H5 Games Ads approval confirmed by the owner before the hosted deploy.
+
+**Status:** Planned (later; blocked by FU-23)
+
+---
+
 ## Story coverage
 
 | Sprint | Stories |
@@ -245,6 +530,16 @@ New open follow-up FU-09 (Owner) was added by the PO (see "Follow-ups" below).
 | 4 | US-08, US-10, US-11, US-12, US-13, US-14, US-15, US-16, US-17, US-27 |
 | 5 (polish) | none (follow-ups FU-03, FU-04, FU-05, FU-08) |
 | 6 | US-30 (amends US-19, US-20, US-21, US-24, US-25; US-22 stays retired); D-32 (US-04 amended) delivered alongside |
+| 7 | US-42 (accepted 2026-11-02, pending owner checks FU-25 and FU-26) |
+| 8 | US-43, US-46, US-45 (planned) |
+| 9 | US-44, US-48 (planned) |
+| 10 | US-47 (planned) |
+| 11 | US-50 (planned, later) |
+| 12 | US-49 (planned, later) |
+| 13 | US-52 (planned, later; spike first, not committed) |
+| 14 | US-51 (planned, later; blocked by FU-23) |
+
+Epic E17 (US-42..US-52): all 11 stories appear in exactly one of Sprints 7-14. Stories US-31..US-41 were delivered outside the sprint cycle (see the status paragraphs at the top) and have no sprint here.
 
 All 30 stories appear exactly once; 29 are delivered (accepted) and US-22 is retired (D-31). The amended stories stay in the sprint that first delivered them; Sprint 6 changed their behaviour. Sprint 5 (polish) carries no stories, only follow-ups FU-03, FU-04, FU-05 and FU-08. US-29 (hosted deployment with protected admin) was built on the `hosting` branch after the Sprint 2 stories and is recorded as part of Sprint 2 (owner decision 2026-10-05). Its follow-ups were handled in Sprint 4: the `docs/deploy-hostinger.md` note is done; the hosted `/password.txt` smoke check was done by the owner on 2026-10-05 (FU-01). Notes: US-17 (persistence) is placed in Sprint 4 because its criteria cover the question and results screens; Sprint 3 builds the save/load layer as an enabler. US-27 (XSS) is accepted in Sprint 4 once all UI exists, but DoD item 4 enforces `textContent` from Sprint 2 onward. US-26 is accepted in Sprint 1 where all SQL lives; DoD item 3 keeps it enforced later.
 
