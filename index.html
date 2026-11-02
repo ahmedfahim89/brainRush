@@ -48,7 +48,7 @@
   <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="css/style.864c7129.css">
+  <link rel="stylesheet" href="css/style.56810955.css">
 </head>
 <body class="game">
   <header class="page-header">
@@ -135,6 +135,8 @@
             <!-- Streak Challenge (US-33): Players mode with exactly 1 player; next to the mode
                  toggle so it is seen without scrolling, also on small screens -->
             <button type="button" id="streak-open-btn" class="btn btn-streak" hidden>💀 Sudden Death Streak <small class="mode-limit">(solo)</small></button>
+            <!-- Daily Challenge (US-43, D-46): the same questions for everyone today, with the setup timer -->
+            <button type="button" id="daily-open-btn" class="btn btn-daily" hidden><span aria-hidden="true">📅</span> <span id="daily-open-label">Daily Challenge</span></button>
           </div>
           <p class="hint">Click a color circle to switch to the next free color.</p>
           <ol id="entry-list" class="entry-list"></ol>
@@ -256,14 +258,15 @@
           <button type="button" id="back-btn" class="btn btn-primary btn-large btn-block">Back to Board</button>
         </section>
 
-        <!-- Streak Challenge (US-33): replaces the scoring panel while a run is played -->
+        <!-- Streak Challenge (US-33) and Daily Challenge (US-43): replaces the scoring panel while a run is
+             played; game.js sets the texts of the Daily Challenge (title, "Question 2/3", hint) -->
         <section id="streak-panel" class="streak-panel" aria-labelledby="streak-panel-title" hidden>
           <h3 id="streak-panel-title" class="visually-hidden">Streak Challenge</h3>
           <div class="streak-head">
             <p id="streak-run-name" class="streak-name"></p>
-            <p class="streak-count-line">Streak <span id="streak-count" class="streak-count" aria-live="polite"></span></p>
+            <p class="streak-count-line"><span id="streak-count-label">Streak</span> <span id="streak-count" class="streak-count" aria-live="polite"></span></p>
           </div>
-          <p class="hint">Pick the right answer before the time runs out. One wrong answer ends the run.</p>
+          <p id="streak-hint" class="hint">Pick the right answer before the time runs out. One wrong answer ends the run.</p>
           <ol id="streak-choices" class="streak-choices" aria-label="Choices"></ol>
           <p id="streak-feedback" class="streak-feedback" role="status" aria-live="polite"></p>
           <button type="button" id="streak-next" class="btn btn-primary btn-large btn-block" hidden>Next question</button>
@@ -279,6 +282,9 @@
       <ol id="results-list" class="results-list"></ol>
       <div class="actions start-row">
         <button type="button" id="new-game-btn" class="btn btn-primary btn-large">New Game</button>
+        <!-- US-46: the final standings plus the site link, via js/share.28bcd18c.js -->
+        <button type="button" id="results-share" class="btn btn-large">Share</button>
+        <span id="results-share-status" class="share-status" role="status"></span>
       </div>
     </section>
 
@@ -288,7 +294,12 @@
       <p id="lb-headline" class="lb-headline" hidden></p>
       <p id="lb-rank" class="lb-rank" hidden></p>
       <div id="lb-msg" class="msg" role="alert" hidden></div>
-      <ol id="lb-list" class="results-list lb-list" aria-label="Top 10 streaks"></ol>
+      <!-- US-45: this week's top 10 (Monday to Sunday, UTC) or the all-time one -->
+      <div class="lb-tabs" role="group" aria-label="Leaderboard period">
+        <button type="button" class="lb-tab" data-period="week" aria-pressed="false">This week</button>
+        <button type="button" class="lb-tab" data-period="all" aria-pressed="true">All time</button>
+      </div>
+      <ol id="lb-list" class="results-list lb-list" aria-label="Top 10 streaks of all time"></ol>
       <div class="actions start-row">
         <button type="button" id="lb-again" class="btn btn-primary btn-large">Play again</button>
         <button type="button" id="lb-new" class="btn btn-large">New Game</button>
@@ -296,6 +307,23 @@
       </div>
       <!-- Ads (D-41): filled by game.js when the admin turned ads on; the only ad screen -->
       <aside id="ad-leaderboard" class="ad-slot" aria-label="Advertisement" hidden><span class="ad-label">Advertisement</span></aside>
+    </section>
+
+    <!-- Daily Challenge result (US-43, D-46): after the run, and whenever this device opens the
+         Daily Challenge again on the same day; the countdown runs to the next one (midnight UTC) -->
+    <section id="screen-daily" class="screen daily" aria-labelledby="daily-title" hidden>
+      <h2 id="daily-title" tabindex="-1">Daily Challenge</h2>
+      <p id="daily-score" class="daily-score"></p>
+      <p id="daily-squares" class="daily-squares" role="img"></p>
+      <p id="daily-note" class="hint daily-note"></p>
+      <div class="actions start-row">
+        <button type="button" id="daily-share" class="btn btn-primary btn-large">Share</button>
+        <button type="button" id="daily-new" class="btn btn-large">New Game</button>
+        <span id="daily-share-status" class="share-status" role="status"></span>
+      </div>
+      <p id="daily-next" class="daily-next"></p>
+      <div id="daily-msg" class="msg" role="alert" hidden></div>
+      <button type="button" id="daily-play" class="btn btn-primary btn-large" hidden>Play the new challenge</button>
     </section>
   </main>
 
@@ -307,6 +335,8 @@
 
   <!-- Android app mode (US-40, D-43): loaded before game.js, which reads it -->
   <script src="js/app.05c6d08d.js"></script>
-  <script src="js/game.0887b978.js"></script>
+  <!-- Sharing (US-43, US-46): loaded before game.js, which uses it -->
+  <script src="js/share.28bcd18c.js"></script>
+  <script src="js/game.a5e62052.js"></script>
 </body>
 </html>

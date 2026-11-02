@@ -8,7 +8,7 @@ Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..U
 
 **Streak Challenge (2026-10-23, outside the sprint cycle):** US-33 / US-34 / D-37 (solo run of 3-choice questions until the first wrong answer or time's up, plus a shared top-10 leaderboard and an admin moderation list) implemented on branch `streak-mode` from main 4582c9d (`docs/sprints/streak-mode-dev.md`); game-tester verification next (max 2 fix loops), then the owner's local Chrome check before commit/PR. Needs `sql/migrate-add-streak.sql` (creates the `streaks` table) on every DB before the code; it reuses the helper's wrong options, so `sql/migrate-add-wrong-options.sql` must be there too.
 
-**New features, Epic E17 (2026-11-02):** the owner approved US-42..US-52. They are planned as Sprints 7-14 (below, after Sprint 6), in the owner's order: Sprints 7-10 are the near-term groups (owner's "A" to "D"), Sprints 11-14 are one story each, later. Sprint 7 was built and PO-accepted on 2026-11-02, pending the owner's local test and the hosted steps (FU-25, FU-26); Sprints 8-14 are not started. Each sprint lists the owner questions (FU-20..FU-24) that must be answered before development.
+**New features, Epic E17 (2026-11-02):** the owner approved US-42..US-52. They are planned as Sprints 7-14 (below, after Sprint 6), in the owner's order: Sprints 7-10 are the near-term groups (owner's "A" to "D"), Sprints 11-14 are one story each, later. Sprints 7 and 8 were built and PO-accepted on 2026-11-02, pending the owner's local test and the hosted steps (Sprint 7: FU-25, FU-26; Sprint 8: FU-28, FU-29); Sprints 9-14 are not started. Each sprint lists the owner questions (FU-20..FU-24) that must be answered before development.
 
 | Sprint | Goal | Status |
 |---|---|---|
@@ -19,7 +19,7 @@ Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..U
 | 5 | Polish (FU-03, FU-04, FU-05, FU-08) | Done |
 | 6 | Question bank: random questions per new game (US-30, D-31; D-32 alongside) | Done (accepted 2026-10-11 after rework); owner Chrome check, commit/PR and hosted migration (FU-11) open |
 | 7 | Report a question (US-42) | Accepted by the PO 2026-11-02, pending the owner's local Chrome check (FU-25) and the hosted steps (FU-26); not committed |
-| 8 | Daily Challenge, share, weekly leaderboard (US-43, US-46, US-45) | Planned |
+| 8 | Daily Challenge, share, weekly leaderboard (US-43, US-46, US-45) | Accepted by the PO 2026-11-02, pending the owner's local Chrome check and commit (FU-28) and the hosted steps (FU-29); not committed |
 | 9 | Final round with wagers, read aloud (US-44, US-48) | Planned |
 | 10 | Question difficulty stats (US-47) | Planned |
 | 11 | Custom category for one game (US-50) | Planned (later) |
@@ -247,7 +247,7 @@ New open follow-up FU-09 (Owner) was added by the PO (see "Follow-ups" below).
 
 ## Epic E17 — New features (Sprints 7-14, planned 2026-11-02)
 
-The owner approved US-42..US-52 on 2026-11-02 and set this grouping and order. Full story text is in `docs/product-backlog.md` ("Epic E17"); owner questions are FU-20..FU-24 ("Open owner questions (new features)"). Sprint 7 is PO-accepted pending the owner steps (see its Status); Sprints 8-14 are **Planned** and not started. Sprint numbers continue from Sprint 6; the owner's labels were A = Sprint 7, B = Sprint 8, C = Sprint 9, D = Sprint 10, and the four "later" items are Sprints 11-14.
+The owner approved US-42..US-52 on 2026-11-02 and set this grouping and order. Full story text is in `docs/product-backlog.md` ("Epic E17"); owner questions are FU-20..FU-24 ("Open owner questions (new features)"). Sprints 7 and 8 are PO-accepted pending the owner steps (see their Status); Sprints 9-14 are **Planned** and not started. Sprint numbers continue from Sprint 6; the owner's labels were A = Sprint 7, B = Sprint 8, C = Sprint 9, D = Sprint 10, and the four "later" items are Sprints 11-14.
 
 **Rules common to Sprints 7-14** (on top of the global Definition of Done)
 
@@ -324,32 +324,67 @@ PO decisions on the developer's open questions (no story change, D-45 stands):
 
 ## Sprint 8 — Daily Challenge, share, weekly leaderboard (US-43, US-46, US-45)
 
-**Goal:** A shared daily 10-question run with a shareable result, sharing of the board game's final standings from the same module, and a weekly Streak top 10. (Owner's Sprint B; build in the order US-43, US-46, US-45.)
+**Goal:** A shared daily 3-question run with a shareable result, sharing of the board game's final standings from the same module, and a weekly Streak top 10. (Owner's Sprint B; build in the order US-43, US-46, US-45.)
 **Stories:** US-43, US-46, US-45
 **Dependencies:** Streak engine (`streak_batch()`, `choice_text()`, 3 choices, `brainrush.streak` pattern, D-37); Results screen (US-46); `streaks.created_at` (US-45, no migration); US-40 app behaviour (sharing must work there).
-**Owner questions needed before development:** **FU-21** (time zone for "today" and the question count: 10 or another number; the count must not be hard-coded). US-46 and US-45 need none.
+**Owner questions needed before development:** **FU-21**, answered 2026-11-02 (D-46): the day changes at midnight UTC and a challenge has 3 questions. Both are set in one place, not hard-coded across files. US-46 and US-45 need none.
 
 **Developer tasks**
 1. `sql/migrate-add-daily-challenge.sql` (new) — `daily_challenge`: one row per (challenge date, position) with the `question_id` (FK to `questions`), `UNIQUE (challenge_date, position)` so two simultaneous first requests cannot create a duplicate set. Re-runnable; run locally twice.
 2. `sql/schema.sql` + `sql/schema-hosted.sql` — the same table; bodies identical.
-3. `api/daily.php` (new) — GET: for the server date (time zone per FU-21), return today's set, creating it once on the first request (`INSERT IGNORE`, then read back, so a second request gets the same questions); questions at enabled point values, 3 shuffled choices through the Streak code, challenge number N, seconds until the next set. Count and time zone come from one place (constant or setting), no scattered literals. Generic errors only.
+3. `api/daily.php` (new) — GET: for the UTC date (D-46), return today's set, creating it once on the first request (`INSERT IGNORE`, then read back, so a second request gets the same questions); questions at enabled point values, 3 shuffled choices through the Streak code, challenge number N, seconds until the next set. Count and time zone come from one place (constant or setting), no scattered literals. Generic errors only.
 4. `js/share.js` (new) — one shared module: build text, call the phone share sheet if present, otherwise copy text plus site link and show "Copied". Used by US-43 and US-46; works inside the app (US-40). Page and script tags in `index.html`.
 5. `index.html` + `js/game.js` + `css/style.css` — Daily Challenge entry on Setup next to Streak; run screen: 3 choices, setup timer, wrong or time's up scores 0 and moves on, no Pause, no Reset, no helpers; refresh keeps the remaining time (saved deadline, as D-37 d); Arabic toggle works in the run.
-6. `js/game.js` — Daily result: "BrainRush Daily #N: 7/10" with a row of green/red squares and "Share"; a device that already played today sees today's result and a countdown to the next challenge (device-only lock, accepted limitation as D-37 g), stored in its own browser key so the board save is unchanged.
+6. `js/game.js` — Daily result: "BrainRush Daily #N: 2/3" with a row of green/red squares and "Share"; a device that already played today sees today's result and a countdown to the next challenge (device-only lock, accepted limitation as D-37 g), stored in its own browser key so the board save is unchanged.
 7. `js/game.js` — US-46: "Share" on Results builds "Team Red won BrainRush with 2300! Team Blue 1800, ..." plus the link; tie wording follows D-10; same module and "Copied" behaviour.
-8. `api/streaks.php` — US-45: `?period=week` returns the weekly top 10 (Monday to Sunday, server time, best run per person under D-37 rules); any other `period` value -> 400; default and `all` behaviour unchanged. No schema change.
+8. `api/streaks.php` — US-45: `?period=week` returns the weekly top 10 (Monday to Sunday, UTC as D-46, best run per person under D-37 rules); any other `period` value -> 400; default and `all` behaviour unchanged. No schema change.
 9. `index.html` + `js/game.js` + `css/style.css` — leaderboard tabs "This week" / "All time"; the finished-run rank line shows both ranks; the ad slot stays as it is (D-41).
 10. `how-to-play.html` + `README.md` + `docs/deploy-hostinger.md` — Daily Challenge, sharing, weekly tab; migration step before the code; upload list (`api/daily.php`, `js/share.js`).
 11. `docs/sprints/sprint-8-dev.md`.
 
-**Tester focus:** two requests at once get the same set with no duplicate rows; set changes at the FU-21 boundary; 10 questions at enabled point values, 3 choices, timer, wrong/time-out scores 0, no Pause/helpers, refresh mid-question keeps the deadline; result text and squares; share sheet vs clipboard (and in the app); played-today screen with countdown; Arabic in the run; US-46 text for a single winner, a tie (D-10) and a negative-score game; `?period=week` on a Sunday/Monday boundary, `?period=bogus` -> 400, both ranks on the rank line, existing all-time tab unchanged; migration run twice and the Daily entry with the table missing (only Daily fails); 1366x768 and 375x812; no console errors.
+**Tester focus:** two requests at once get the same set with no duplicate rows; set changes at midnight UTC (D-46); 3 questions at enabled point values, 3 choices, timer, wrong/time-out scores 0, no Pause/helpers, refresh mid-question keeps the deadline; result text and squares; share sheet vs clipboard (and in the app); played-today screen with countdown; Arabic in the run; US-46 text for a single winner, a tie (D-10) and a negative-score game; `?period=week` on a Sunday/Monday boundary, `?period=bogus` -> 400, both ranks on the rank line, existing all-time tab unchanged; migration run twice and the Daily entry with the table missing (only Daily fails); 1366x768 and 375x812; no console errors.
 
 **Definition of Done (Sprint 8, on top of the global DoD)**
 - `sql/migrate-add-daily-challenge.sql` runs on every DB, including the hosted one, **before** the code is deployed, and `daily_challenge` is added to both `sql/schema.sql` and `sql/schema-hosted.sql` (migration rule above).
-- Number of questions and time zone follow the FU-21 answer and are not hard-coded in several places.
+- 3 questions and the UTC day boundary follow D-46 and are each set in one place.
 - US-45 needs no migration (verified: no schema change in the diff).
 
-**Status:** Planned
+**Definition of Done (Sprint 8, as delivered)**
+
+| # | DoD item | Status |
+|---|---|---|
+| 1 | Spec file structure; no hard-coded board size, point values or timer | Met (S6: the count is only `DAILY_QUESTIONS` in `api/daily.php` and the zone only `GAME_TIME_ZONE` in `api/db.php`; the browser takes the number of squares and the countdown from the server's answer) |
+| 2 | `php -l` clean on all `api/*.php` | Met (S1, RT12, incl. the new `api/daily.php`) |
+| 3 | Prepared statements only | Met (S4; PO code check: the day's set, `DATEDIFF` for #N, the `INSERT IGNORE` and the week filter are prepared. The only plain queries are constant SQL, and `LIMIT` is the constant `STREAK_TOP`) |
+| 4 | `textContent` / DOM APIs only | Met (S3, RT12; squares, rows and share texts are built with `h()` / `textContent`) |
+| 5 | No credentials committed; `api/config.php` git-ignored | Met (S5) |
+| 6 | Tester report, no open Critical/Major bugs | Met: 87 checks, 83 PASS, 0 FAIL, 4 PENDING (owner steps S11, P1, P2, P3). BUG-8-01, BUG-8-02 and BUG-8-03 (Minor) fixed in fix loop 1 and re-tested (RT1-RT15) (`docs/sprints/sprint-8-test-report.md`) |
+| 7 | Developer note | Met (`docs/sprints/sprint-8-dev.md`, incl. "Fix loop 1") |
+| 8 | PO accepted | Met 2026-11-02, pending the owner checks below |
+| + | PHP 8.0 / MariaDB 10.4 compatible (D-17) | Met (tested on PHP 8.0.30, MariaDB 10.4.32) |
+| + | Migration re-runnable, run twice locally; `daily_challenge` in both schema files, bodies identical | Met (S7, S8) |
+| + | 3 questions and the UTC day boundary per D-46, each set in one place | Met (S6, A4, A13; checked with PHP in Tokyo, Honolulu and UTC and with the DB in Cairo) |
+| + | US-45 needs no migration | Met (S9: only `daily_challenge` in the SQL diff) |
+| + | One set per day under simultaneous first requests | Met (A3: 12, 16 and 2 x 10 parallel processes, 3 rows each) |
+| + | A DB without the table breaks only the Daily Challenge (FU-19 rule) | Met (A8, D15) |
+| + | Layout 1366x768 and 375x812; board save, Streak save and double score untouched | Met (D16-D18, D20, E8, L6). The Daily question scrolls vertically on the phone, the same as the Streak one |
+| + | Public writes: no new public write | Met (A7: `daily.php` is GET only; the Streak POST validation is unchanged, A11) |
+| + | Owner's local Chrome check | Open (FU-28) |
+| + | Commit on `sprint-8` with `js/share.js` staged, re-hash check (S11, FU-16 style) and PR to `main` (owner merges) | Open (FU-28) |
+| + | Real Android device: share sheet and Back (P1) | Open (FU-28, optional; emulated in D10, D19, RT10) |
+| + | Hosted migration before the code (P2), live smoke check and CDN purge (P3) | Open (FU-29) |
+
+**Status:** Accepted by the PO 2026-11-02, pending the owner's local Chrome check and commit (FU-28) and the hosted steps (FU-29). Not committed yet.
+
+**Outcome:** US-43, US-46 and US-45 accepted against all their criteria and the dependency lines (migration before code, both schema files, D-46 UTC and 3 questions, no migration for US-45, ad slot unchanged). The developer built `api/daily.php`, the `daily_challenge` table, the Daily run and result screens, `js/share.js` (used by both Share buttons), the Results Share text, `?period=week` and the leaderboard tabs with the two-rank line, plus the guide, Privacy, `llms.txt`, README and deploy-guide text. One fix loop closed BUG-8-01 (backlog said "10"), BUG-8-02 (a Sunday-night run showed Monday's date on a non-UTC DB; public dates are now UTC) and BUG-8-03 (an unfinished run from an earlier day came back after midnight; it now closes and offers the new challenge). New follow-ups: FU-28, FU-29 (owner steps) and FU-30 (fixed #N, Could). Recorded as D-47.
+
+PO decisions on the developer's choices (no story change, D-46 stands):
+1. **#N counts from the first day a database served a challenge:** keep for the launch. The live numbers are the ones players share, and they start at #1. If every question of the first day is deleted, the numbers shift, which is unlikely but avoidable, so FU-30 (Could) pins #1 to the live launch date once FU-29 has recorded it.
+2. **The leaderboard opens on "All time":** keep. US-45 sets no default. The screen opens as before, and the rank line after a run already gives the weekly rank.
+3. **The share sheet only on touch devices; desktop browsers copy and show "Copied":** keep. US-43 already says "the phone's share sheet", and "a device with a share sheet" in US-46 is read the same way (phone, tablet, the app). A host at a laptop wants text to paste into a chat, not the Windows share dialog. Both paths were tested (D10, D11).
+4. **Setup timer; the button in any mode; hidden in maintenance and the Streak setup:** keep. US-43 says "with the setup timer", so comparing runs with different timers is an accepted limitation. The Daily is not a solo-only mode, and hiding it in maintenance follows `start_game_hidden`.
+5. **Android Back asks, then ends the run with the rest at 0; no Leave on the website:** keep. This matches D-43 a. A web run is at most 3 timers long, and since the BUG-8-03 fix a run left over from an earlier day closes by itself, so no Leave control is needed.
+6. **Side effects:** all kept. The played list avoids repeats in later games. The game log covers board games. A run counts for the day it started. Borrowed choices are a last resort: all local questions have stored options, and FU-29 has an optional live count. The Admin moderation list shows the stored time, while the public board shows the UTC date.
 
 ---
 
@@ -531,7 +566,7 @@ PO decisions on the developer's open questions (no story change, D-45 stands):
 | 5 (polish) | none (follow-ups FU-03, FU-04, FU-05, FU-08) |
 | 6 | US-30 (amends US-19, US-20, US-21, US-24, US-25; US-22 stays retired); D-32 (US-04 amended) delivered alongside |
 | 7 | US-42 (accepted 2026-11-02, pending owner checks FU-25 and FU-26) |
-| 8 | US-43, US-46, US-45 (planned) |
+| 8 | US-43, US-46, US-45 (accepted 2026-11-02, pending owner checks FU-28 and FU-29) |
 | 9 | US-44, US-48 (planned) |
 | 10 | US-47 (planned) |
 | 11 | US-50 (planned, later) |

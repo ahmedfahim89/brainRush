@@ -50,7 +50,19 @@
   const STREAK_MAX_QUEUE = 100; // a saved queue is never longer (batches are 20)
   const STREAK_TIME_UP = -1;    // `picked` when the time ran out
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/; // "YYYY-MM-DD" from the API
+  const LB_PERIODS = ['week', 'all']; // leaderboard tabs (US-45): GET streaks.php?period=
   const REPORT_NOTE_MAX = 200; // REPORT_NOTE_MAX in api/reports.php (US-42, D-45)
+
+  // Daily Challenge (US-43, D-46): the server sets the day (midnight UTC), the number of questions
+  // and #N; the browser only plays them. The run and today's result are saved under their own key,
+  // so the board game's saved state (D-28) and the Streak run stay as they are.
+  const DAILY_KEY = 'brainrush.daily';
+  const DAILY_VERSION = 1;
+  const DAILY_MAX_QUESTIONS = 20;    // a set from the server or the browser is never longer
+  const DAY_MS = 24 * 60 * 60 * 1000; // the countdown to the next challenge is never longer
+  const SQUARE_RIGHT = String.fromCodePoint(0x1f7e9); // green square, in the shared result
+  const SQUARE_WRONG = String.fromCodePoint(0x1f7e5); // red square
 
   const MODES = {
     players: { limit: 6, title: 'Players', label: 'Player', one: 'player', many: 'players' },
@@ -69,7 +81,7 @@
   ];
 
   const SCREENS = ['setup', 'board', 'question', 'results']; // a saved board game may be on these
-  const ALL_SCREENS = SCREENS.concat(['leaderboard']);
+  const ALL_SCREENS = SCREENS.concat(['leaderboard', 'daily']);
 
   // Central state. `setup` is the form being filled in (memory only);
   // `game` is the running game and is saved to localStorage on every change:
@@ -109,6 +121,19 @@
   let lastStreakProfile = null;  // name, color and timer of the last run, for Play again
   let leaderboardResult = null;  // the run shown on the leaderboard screen (null = opened from setup)
   let leaderboardLoads = 0;      // drops leaderboard responses that arrive after a newer request
+  let lbPeriod = 'all';          // the leaderboard tab shown (US-45), memory only
+
+  // Daily Challenge (US-43), saved under DAILY_KEY on every change; null when none:
+  //   { version, date, number, timerSeconds, nextAt, questions: [question], results: [boolean],
+  //     current: null | { index, lang, deadline, picked, leftMs? }, done, onResult }
+  // date = the challenge's day (UTC, from the server) and number = its #N. nextAt = Date.now() ms
+  // when the next challenge starts (from the server's seconds_to_next). questions have the Streak
+  // shape (choices already cut and ordered by the server). results = right (true) or wrong (false)
+  // per answered question. current is the open question, as in the Streak run. done = finished:
+  // the device keeps today's result and shows it again instead of a new run (device-only, as
+  // D-37 g). onResult = the result screen is open, so a refresh shows it again.
+  let daily = null;
+  let dailyTicker = null;        // interval of the countdown on the result screen
 
   // Report form (US-42), memory only: { questionId, sending } while it is open, else null. It never
   // touches the saved game or run, the timer or the scores.
@@ -124,6 +149,7 @@
       question: byId('screen-question'),
       results: byId('screen-results'),
       leaderboard: byId('screen-leaderboard'),
+      daily: byId('screen-daily'),
     },
     setupForm: byId('setup-form'),
     playersBlock: byId('players-block'),
@@ -135,6 +161,8 @@
     streakOpenBtn: byId('streak-open-btn'),
     streakBtn: byId('streak-btn'),
     streakBoardBtn: byId('streak-board-btn'),
+    dailyOpenBtn: byId('daily-open-btn'),
+    dailyOpenLabel: byId('daily-open-label'),
     loadMsg: byId('setup-load-msg'),
     newBanner: byId('new-banner'),
     modeInputs: Array.prototype.slice.call(document.querySelectorAll('input[name="mode"]')),
@@ -189,8 +217,11 @@
     scoreRows: byId('score-rows'),
     backBtn: byId('back-btn'),
     streakPanel: byId('streak-panel'),
+    streakPanelTitle: byId('streak-panel-title'),
     streakName: byId('streak-run-name'), // the run's name on the question screen (#streak-name is the setup input)
+    streakCountLabel: byId('streak-count-label'),
     streakCount: byId('streak-count'),
+    streakHint: byId('streak-hint'),
     streakChoices: byId('streak-choices'),
     streakFeedback: byId('streak-feedback'),
     streakNext: byId('streak-next'),
@@ -198,7 +229,10 @@
     resultsWinner: byId('results-winner'),
     resultsList: byId('results-list'),
     newGameBtn: byId('new-game-btn'),
+    resultsShare: byId('results-share'),
+    resultsShareStatus: byId('results-share-status'),
     lbTitle: byId('leaderboard-title'),
+    lbTabs: Array.prototype.slice.call(document.querySelectorAll('.lb-tab')),
     lbHeadline: byId('lb-headline'),
     lbRank: byId('lb-rank'),
     lbMsg: byId('lb-msg'),
@@ -206,6 +240,16 @@
     lbAgain: byId('lb-again'),
     lbNew: byId('lb-new'),
     lbBack: byId('lb-back'),
+    dailyTitle: byId('daily-title'),
+    dailyScore: byId('daily-score'),
+    dailySquares: byId('daily-squares'),
+    dailyNote: byId('daily-note'),
+    dailyShare: byId('daily-share'),
+    dailyShareStatus: byId('daily-share-status'),
+    dailyNew: byId('daily-new'),
+    dailyNext: byId('daily-next'),
+    dailyMsg: byId('daily-msg'),
+    dailyPlay: byId('daily-play'),
     reportBtn: byId('report-btn'),
     reportOverlay: byId('report-overlay'),
     reportAbout: byId('report-about'),
@@ -218,6 +262,12 @@
     reportCancel: byId('report-cancel'),
     reportDone: byId('report-done'),
     reportClose: byId('report-close'),
+  };
+  // The streak panel's texts in the page; the Daily Challenge sets its own and puts these back.
+  const STREAK_PANEL_TEXT = {
+    title: dom.streakPanelTitle.textContent,
+    label: dom.streakCountLabel.textContent,
+    hint: dom.streakHint.textContent,
   };
 
   // ---------- Generic helpers ----------
@@ -649,6 +699,7 @@
       stopTimer();
       closeReport(); // US-42: the report form belongs to the question screen
     }
+    if (name !== 'daily') stopDailyCountdown();
     ALL_SCREENS.forEach((key) => { dom.screens[key].hidden = key !== name; });
     document.body.setAttribute('data-screen', name); // CSS: one-screen board layout (FU-03)
     window.scrollTo(0, 0);
@@ -791,9 +842,14 @@
     } else if (isReportOpen()) {
       closeReport();                                 // US-42: the report form, as Cancel
     } else if (state.screen === 'question') {
-      if (!streakOnScreen()) confirmBackToBoard();  // "Back to Board", after a confirm
+      if (dailyOnScreen()) {                         // Daily Challenge (US-43)
+        if (daily.current.picked !== null) onDailyNext(); // answered: on, as Next
+        else onDailyLeave();                         // "Leave today's Daily Challenge?" confirm
+      } else if (!streakOnScreen()) confirmBackToBoard(); // "Back to Board", after a confirm
       else if (streak.over) onStreakNext();          // lost run: on to the leaderboard, as Next
       else onStreakEnd();                            // "End the run now?" confirm
+    } else if (state.screen === 'daily') {
+      onDailyNewGame();                              // the Daily result: back to setup, as New Game
     } else if (state.screen === 'board') {
       endGame();                                     // D-09 confirm while questions are left
     } else if (state.screen === 'results') {
@@ -1269,6 +1325,9 @@
     dom.streakOpenBtn.hidden = !s || down || s.streak || s.mode !== 'players' || s.entries.length !== 1;
     dom.streakBtn.hidden = !s || down || !s.streak;
     dom.streakBtn.disabled = !s || s.loading || s.starting || s.loadError === 'network';
+    // Daily Challenge (US-43): any mode and number of players; it needs no category pick either.
+    dom.dailyOpenBtn.hidden = !s || down || s.streak;
+    dom.dailyOpenBtn.disabled = !s || s.loading || s.starting || s.loadError === 'network';
   }
 
   /** D-02: required, unique after trimming, case-insensitive. Marks each bad entry inline. */
@@ -1856,6 +1915,10 @@
   }
 
   function toggleLang() {
+    if (dailyOnScreen()) {
+      toggleDailyLang();
+      return;
+    }
     if (streakOnScreen()) {
       toggleStreakLang();
       return;
@@ -2275,6 +2338,44 @@
       row.style.borderLeftColor = paletteEntry(c.color).value;
       dom.resultsList.appendChild(row);
     });
+    dom.resultsShareStatus.textContent = '';
+  }
+
+  // ---------- Share (US-43, US-46) ----------
+
+  /**
+   * Share `text` plus the site link through js/share.js: the phone's share sheet, or the clipboard
+   * with "Copied" in `status`. Without the module (it failed to load) the status says so.
+   */
+  function shareText(text, status) {
+    const sharer = window.BrainRushShare;
+    if (!sharer || typeof sharer.share !== 'function') {
+      status.textContent = 'Sharing is not available right now.';
+      return;
+    }
+    sharer.share(text, status).catch(() => { status.textContent = 'Could not share the result.'; });
+  }
+
+  /**
+   * US-46: "Team Red won BrainRush with 2300! Team Blue 1800, Team Green 900." A tie uses the D-10
+   * wording: "It's a tie between Team Red and Team Blue in BrainRush with 2300 each!" and the rest.
+   * Scores use the same minus sign as the screen.
+   */
+  function resultsShareText(g) {
+    const ranked = rankedContestants(g);
+    const top = ranked[0].score;
+    const winners = ranked.filter((c) => c.score === top);
+    const others = ranked.filter((c) => c.score !== top).map((c) => c.name + ' ' + formatScore(c.score));
+    const head = winners.length === 1
+      ? winners[0].name + ' won BrainRush with ' + formatScore(top) + '!'
+      : "It's a tie between " + joinNames(winners.map((c) => c.name)) + ' in BrainRush with ' +
+        formatScore(top) + ' each!';
+    return others.length ? head + ' ' + others.join(', ') + '.' : head;
+  }
+
+  function onResultsShare() {
+    if (!state.game || state.screen !== 'results') return;
+    shareText(resultsShareText(state.game), dom.resultsShareStatus);
   }
 
   /** US-16 / D-15: clear the saved game and show an empty Setup with settings reloaded. */
@@ -2627,11 +2728,18 @@
 
   /** Question text, language button and choices in the open question's language. */
   function renderStreakLang() {
-    const cur = streak.current;
+    renderRunLang(streak.current.q, streak.current, streakAnswer);
+  }
+
+  /**
+   * A solo run's question (Streak or Daily Challenge): text, language button and choice buttons in
+   * cur.lang. `q` has the Streak question shape; onPick(index) answers it.
+   */
+  function renderRunLang(q, cur, onPick) {
     const arabic = cur.lang === 'ar';
-    renderQuestionText(arabic ? cur.q.question_ar : cur.q.question, arabic);
-    renderLangButton(isFilled(cur.q.question_ar), arabic);
-    renderStreakChoices();
+    renderQuestionText(arabic ? q.question_ar : q.question, arabic);
+    renderLangButton(isFilled(q.question_ar), arabic);
+    renderRunChoices(q, cur, onPick);
   }
 
   function toggleStreakLang() {
@@ -2643,9 +2751,12 @@
     saveStreak();
   }
 
-  /** 3 choice buttons, A/B/C in the server's order. Once answered: the right one green, a wrong pick red. */
   function renderStreakChoices() {
-    const cur = streak.current;
+    renderRunChoices(streak.current.q, streak.current, streakAnswer);
+  }
+
+  /** 3 choice buttons, A/B/C in the server's order. Once answered: the right one green, a wrong pick red. */
+  function renderRunChoices(q, cur, onPick) {
     const arabic = cur.lang === 'ar';
     const answered = cur.picked !== null;
     const list = dom.streakChoices;
@@ -2653,8 +2764,8 @@
     list.dir = arabic ? 'rtl' : 'ltr';
     list.lang = arabic ? 'ar' : 'en';
     list.translate = !arabic;
-    cur.q.choices.forEach((choice, index) => {
-      const isRight = answered && index === cur.q.correct;
+    q.choices.forEach((choice, index) => {
+      const isRight = answered && index === q.correct;
       const isWrong = answered && index === cur.picked && !isRight;
       const text = arabic ? choice.text_ar : choice.text;
       const note = isRight ? ', the right answer' : isWrong ? ', your answer' : '';
@@ -2664,7 +2775,7 @@
           className: 'choice streak-choice' + (isRight ? ' is-right' : '') + (isWrong ? ' is-wrong' : ''),
           disabled: answered,
           'aria-label': CHOICE_LETTERS[index] + ': ' + text + note,
-          onclick: () => streakAnswer(index),
+          onclick: () => onPick(index),
         }, [
           h('span', { className: 'choice-letter', text: CHOICE_LETTERS[index], 'aria-hidden': 'true' }),
           h('span', { className: 'choice-text', text: text }),
@@ -2678,6 +2789,7 @@
     const run = streak;
     const cur = run.current;
     const lost = cur.picked !== null && cur.picked !== cur.q.correct;
+    setRunPanelTexts(STREAK_PANEL_TEXT.title, STREAK_PANEL_TEXT.label, STREAK_PANEL_TEXT.hint);
     dom.streakName.textContent = run.name;
     dom.streakName.style.borderLeftColor = paletteEntry(run.color).value;
     dom.streakCount.textContent = String(run.count);
@@ -2686,17 +2798,29 @@
     } else if (!lost) {
       showStreakFeedback('Correct! Your streak is ' + run.count + '.', 'is-good');
     } else {
-      const right = cur.q.choices[cur.q.correct];
-      const arabic = cur.lang === 'ar';
-      showStreakFeedback((cur.picked === STREAK_TIME_UP ? "Time's up!" : 'Wrong!') +
-        ' The right answer was ' + CHOICE_LETTERS[cur.q.correct] + ', ', 'is-bad',
-        { text: arabic ? right.text_ar : right.text, arabic: arabic });
+      showWrongFeedback(cur.q, cur);
     }
     dom.streakNext.hidden = cur.picked === null;
     dom.streakNext.textContent = lost ? 'See results' : 'Next question';
     dom.streakNext.disabled = finishing;
     dom.streakEnd.hidden = lost;
     dom.streakEnd.disabled = finishing;
+  }
+
+  /** The panel's hidden heading, the count's label and the hint (Streak or Daily Challenge). */
+  function setRunPanelTexts(title, label, hint) {
+    dom.streakPanelTitle.textContent = title;
+    dom.streakCountLabel.textContent = label;
+    dom.streakHint.textContent = hint;
+  }
+
+  /** "Wrong! The right answer was B, Ottawa." (or "Time's up! …") in the question's shown language. */
+  function showWrongFeedback(q, cur) {
+    const right = q.choices[q.correct];
+    const arabic = cur.lang === 'ar';
+    showStreakFeedback((cur.picked === STREAK_TIME_UP ? "Time's up!" : 'Wrong!') +
+      ' The right answer was ' + CHOICE_LETTERS[q.correct] + ', ', 'is-bad',
+      { text: arabic ? right.text_ar : right.text, arabic: arabic });
   }
 
   /**
@@ -2761,11 +2885,12 @@
       if (event.key === 'Escape') closeReport();
       return;
     }
-    if (event.key !== 'Enter' || !streakOnScreen() || dom.streakNext.hidden || dom.streakNext.disabled) return;
+    const solo = streakOnScreen() || dailyOnScreen();
+    if (event.key !== 'Enter' || !solo || dom.streakNext.hidden || dom.streakNext.disabled) return;
     const target = event.target;
     if (target && target.closest && target.closest('button, a, input, select, textarea')) return;
     event.preventDefault();
-    onStreakNext();
+    onRunNext();
   }
 
   /** End run: stop now and save the streak so far (confirm first). */
@@ -2801,7 +2926,8 @@
     if (result.saving) {
       try {
         const saved = await apiPost('streaks.php', { name: run.name, streak: run.count });
-        if (!isPlainObject(saved) || !Number.isInteger(saved.rank) || !Number.isInteger(saved.best)) {
+        if (!isPlainObject(saved) || !Number.isInteger(saved.rank) || !Number.isInteger(saved.best) ||
+            !(saved.week_rank === undefined || saved.week_rank === null || Number.isInteger(saved.week_rank))) {
           throw new Error('The server sent an unexpected response.');
         }
         result.saved = saved;
@@ -2857,6 +2983,7 @@
     dom.lbAgain.hidden = !result;
     dom.lbNew.hidden = !result;
     dom.lbBack.hidden = !!result;
+    renderLeaderboardTabs();
     showScreen('leaderboard');
     dom.lbTitle.focus();
     if (!result || !result.saving) loadLeaderboardRows();
@@ -2875,8 +3002,11 @@
     if (result.saving) {
       dom.lbRank.textContent = 'Saving your streak...';
     } else if (result.saved) {
-      const best = result.saved.best > result.count ? 'Your best is still ' + result.saved.best + '. ' : '';
-      dom.lbRank.textContent = best + 'You are #' + result.saved.rank + ' on the leaderboard.';
+      // US-45: both ranks, "You are #2 this week and #7 of all time."
+      const saved = result.saved;
+      const best = saved.best > result.count ? 'Your best is still ' + saved.best + '. ' : '';
+      const week = Number.isInteger(saved.week_rank) ? '#' + saved.week_rank + ' this week and ' : '';
+      dom.lbRank.textContent = best + 'You are ' + week + '#' + saved.rank + ' of all time.';
     } else if (result.saveError) {
       dom.lbRank.hidden = true;
       clear(dom.lbMsg);
@@ -2889,23 +3019,41 @@
     }
   }
 
-  /** Fetch and show the top 10; this person's rows are highlighted. */
+  /** The "This week" / "All time" tabs (US-45): the shown one is pressed; the list's name follows it. */
+  function renderLeaderboardTabs() {
+    dom.lbTabs.forEach((tab) => tab.setAttribute('aria-pressed', String(tab.getAttribute('data-period') === lbPeriod)));
+    dom.lbList.setAttribute('aria-label', lbPeriod === 'week' ? 'Top 10 streaks this week' : 'Top 10 streaks of all time');
+  }
+
+  function onLeaderboardTab(event) {
+    const period = event.currentTarget.getAttribute('data-period');
+    if (LB_PERIODS.indexOf(period) === -1 || period === lbPeriod) return;
+    lbPeriod = period;
+    renderLeaderboardTabs();
+    clear(dom.lbList);
+    dom.lbList.appendChild(h('li', { className: 'lb-empty', text: 'Loading the leaderboard...' }));
+    const result = leaderboardResult;
+    if (!result || !result.saving) loadLeaderboardRows(); // a run being saved loads the rows once saved
+  }
+
+  /** Fetch and show the top 10 of the shown tab; this person's rows are highlighted. */
   async function loadLeaderboardRows() {
     const load = ++leaderboardLoads;
     const result = leaderboardResult;
+    const period = lbPeriod;
     let rows = null;
     let failure = '';
     try {
-      const data = await apiGet('streaks.php');
+      const data = await apiGet('streaks.php?period=' + encodeURIComponent(period));
       if (!Array.isArray(data)) throw new Error('The server sent an unexpected leaderboard.');
       rows = data.filter((r) => isPlainObject(r) && typeof r.name === 'string' &&
         Number.isInteger(r.streak) &&
-        typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date));
+        typeof r.date === 'string' && DATE_PATTERN.test(r.date));
     } catch (err) {
       failure = errorText(err);
     }
     if (load !== leaderboardLoads || state.screen !== 'leaderboard') return;
-    renderLeaderboardRows(rows, result, failure);
+    renderLeaderboardRows(rows, result, failure, period);
   }
 
   /**
@@ -2913,12 +3061,13 @@
    * The name sits left and "· 13 questions · 18 Oct 2026" right; the space text nodes between the
    * flex items are not drawn but keep the row's text (and what screen readers read) in that format.
    */
-  function renderLeaderboardRows(rows, result, failure) {
+  function renderLeaderboardRows(rows, result, failure, period) {
     clear(dom.lbList);
     if (failure || !rows.length) {
+      const empty = period === 'week' ? 'No streaks this week yet. Be the first!' : 'No streaks yet. Be the first!';
       dom.lbList.appendChild(h('li', {
         className: 'lb-empty',
-        text: failure ? 'Could not load the leaderboard: ' + failure : 'No streaks yet. Be the first!',
+        text: failure ? 'Could not load the leaderboard: ' + failure : empty,
       }));
       return;
     }
@@ -2980,6 +3129,416 @@
     dom.streakBoardBtn.focus();
   }
 
+  // ---------- Daily Challenge (US-43, D-46) ----------
+  // The same questions for everyone on a day (UTC). api/daily.php makes the set on the day's first
+  // request; the run is played like a Streak question (3 choices, the setup timer, no Pause, Reset
+  // or helpers), but a wrong answer or time's up only scores 0 and the run moves on. The result
+  // ("BrainRush Daily #N: 2/3" and a row of squares) stays on this device: opening the Daily
+  // Challenge again the same day shows it with a countdown to the next one.
+
+  function saveDaily() {
+    try {
+      if (daily) window.localStorage.setItem(DAILY_KEY, JSON.stringify(daily));
+      else window.localStorage.removeItem(DAILY_KEY);
+    } catch (err) {
+      // Storage full or disabled: the run still works, it just won't survive a refresh.
+    }
+  }
+
+  /** The saved Daily Challenge, or null when nothing valid is saved (corrupt data is removed). */
+  function loadDaily() {
+    let raw = null;
+    try {
+      raw = window.localStorage.getItem(DAILY_KEY);
+    } catch (err) {
+      return null;
+    }
+    if (raw === null) return null;
+    try {
+      const saved = JSON.parse(raw);
+      if (isValidDaily(saved)) return saved;
+    } catch (err) {
+      // invalid JSON: discard it
+    }
+    try {
+      window.localStorage.removeItem(DAILY_KEY);
+    } catch (err) {
+      // nothing to clear
+    }
+    return null;
+  }
+
+  function isValidDaily(run) {
+    const range = timerRange();
+    if (!isPlainObject(run) || run.version !== DAILY_VERSION ||
+        typeof run.date !== 'string' || !DATE_PATTERN.test(run.date) ||
+        !Number.isInteger(run.number) || run.number < 1 ||
+        !Number.isInteger(run.timerSeconds) || run.timerSeconds < range.min || run.timerSeconds > range.max ||
+        !Number.isFinite(run.nextAt) || typeof run.done !== 'boolean' || typeof run.onResult !== 'boolean' ||
+        !Array.isArray(run.questions) || run.questions.length < 1 || run.questions.length > DAILY_MAX_QUESTIONS ||
+        !run.questions.every(isValidStreakQuestion) ||
+        !Array.isArray(run.results) || run.results.length > run.questions.length ||
+        !run.results.every((r) => typeof r === 'boolean')) return false;
+    if (run.done) return run.current === null && run.results.length === run.questions.length;
+    return isValidDailyCurrent(run.current, run);
+  }
+
+  /** The open question: the next unanswered one, or the last answered one with its result recorded. */
+  function isValidDailyCurrent(cur, run) {
+    if (cur === null) return true;
+    if (!isPlainObject(cur) || !Number.isInteger(cur.index) || cur.index < 0 || cur.index >= run.questions.length) {
+      return false;
+    }
+    const q = run.questions[cur.index];
+    const answered = cur.picked !== null;
+    const langOk = cur.lang === 'en' || (cur.lang === 'ar' && isFilled(q.question_ar));
+    const pickedOk = cur.picked === null || cur.picked === STREAK_TIME_UP ||
+      (Number.isInteger(cur.picked) && cur.picked >= 0 && cur.picked < CHOICE_LETTERS.length);
+    const countOk = run.results.length === cur.index + (answered ? 1 : 0);
+    const resultOk = !answered || run.results[cur.index] === (cur.picked === q.correct);
+    return langOk && pickedOk && countOk && resultOk && Number.isFinite(cur.deadline) &&
+      (cur.leftMs === undefined || (Number.isFinite(cur.leftMs) && cur.leftMs >= 0));
+  }
+
+  /** Today's challenge from api/daily.php: { date, number, nextAt, questions }. Throws on errors. */
+  async function fetchDaily() {
+    const data = await apiGet('daily.php');
+    const ok = isPlainObject(data) && typeof data.date === 'string' && DATE_PATTERN.test(data.date) &&
+      Number.isInteger(data.number) && data.number >= 1 &&
+      Number.isInteger(data.seconds_to_next) && data.seconds_to_next >= 0 && data.seconds_to_next * 1000 <= DAY_MS &&
+      Array.isArray(data.questions) && data.questions.length >= 1 && data.questions.length <= DAILY_MAX_QUESTIONS &&
+      data.questions.every(isValidStreakQuestion);
+    if (!ok) throw new Error('The server sent an unexpected Daily Challenge.');
+    return {
+      date: data.date,
+      number: data.number,
+      nextAt: Date.now() + data.seconds_to_next * 1000,
+      questions: data.questions.map(parseStreakQuestion),
+    };
+  }
+
+  /** A Daily Challenge question is on the question screen (state.game is null during the run). */
+  function dailyOnScreen() {
+    return state.screen === 'question' && !state.game && !streakOnScreen() && !!daily && !!daily.current;
+  }
+
+  function dailyQuestion() {
+    return daily.questions[daily.current.index];
+  }
+
+  /** "Daily Challenge" on setup: today's result when this device played it, otherwise a new run. */
+  async function onDailyOpen() {
+    const s = state.setup;
+    if (!s || s.streak || dom.dailyOpenBtn.disabled) return;
+    clearMessage(dom.startMsg);
+    s.starting = true;
+    dom.dailyOpenLabel.textContent = 'Loading...';
+    updateStartButton();
+    try {
+      const challenge = await fetchDaily();
+      if (state.setup !== s || state.screen !== 'setup') return;
+      if (!showPlayedDaily(challenge)) {
+        const timerSeconds = validateTimer(); // the setup timer, as for the Streak Challenge
+        if (timerSeconds === null) {
+          showMessage(dom.startMsg, 'The Daily Challenge cannot start yet. Please fix the errors above.', 'error');
+          dom.timerInput.focus();
+          return;
+        }
+        startDaily(challenge, timerSeconds);
+      }
+    } catch (err) {
+      // Stay on setup with every input intact (as US-06).
+      showMessage(dom.startMsg, 'Could not open the Daily Challenge: ' + errorText(err), 'error');
+    } finally {
+      s.starting = false;
+      dom.dailyOpenLabel.textContent = 'Daily Challenge';
+      updateStartButton();
+    }
+  }
+
+  /**
+   * This device already has today's challenge: show its result (with a fresh countdown) or go on
+   * with its unfinished run. Returns false when today's challenge is not played here yet.
+   */
+  function showPlayedDaily(challenge) {
+    const saved = daily || loadDaily();
+    if (!saved || saved.date !== challenge.date) return false;
+    daily = saved;
+    daily.nextAt = challenge.nextAt;
+    if (daily.done) showDailyResult();
+    else restoreDaily(daily);
+    return true;
+  }
+
+  /** Start today's run: a fresh run that replaces any earlier day's result on this device. */
+  function startDaily(challenge, timerSeconds) {
+    stopTimer();
+    state.game = null;
+    clearSavedState();
+    daily = {
+      version: DAILY_VERSION,
+      date: challenge.date,
+      number: challenge.number,
+      timerSeconds: timerSeconds,
+      nextAt: challenge.nextAt,
+      questions: challenge.questions,
+      results: [],
+      current: null,
+      done: false,
+      onResult: false,
+    };
+    challenge.questions.forEach((q) => { if (q.image) new Image().src = q.image; });
+    nextDailyQuestion();
+  }
+
+  /** Open the next question with a full timer, or show the result after the last one. */
+  function nextDailyQuestion() {
+    const index = daily.results.length;
+    if (index >= daily.questions.length) {
+      finishDaily();
+      return;
+    }
+    const q = daily.questions[index];
+    daily.current = {
+      index: index,
+      lang: isFilled(q.question_ar) ? 'ar' : 'en', // Arabic first, as on the board
+      deadline: Date.now() + daily.timerSeconds * 1000,
+      picked: null,
+    };
+    markSeen(q.id); // later boards and runs avoid it too
+    saveDaily();
+    showDailyQuestion();
+  }
+
+  /** Render the open question; its timer counts to the saved deadline (also after a refresh). */
+  function showDailyQuestion() {
+    const cur = daily.current;
+    const q = dailyQuestion();
+    setStreakLayout(true);
+    dom.qHeading.textContent = q.category_name + ' ' + EN_DASH + ' ' + q.points;
+    renderQuestionImage(q);
+    renderRunLang(q, cur, dailyAnswer);
+    renderDailyPanel();
+    showScreen('question');
+    updateReportButton(); // US-42: once the question is answered
+    if (cur.picked !== null) {
+      showTimerAt(daily.timerSeconds, cur.leftMs || 0);
+      dom.timerStatus.textContent = cur.picked === STREAK_TIME_UP ? "Time's up!" : '';
+      dom.streakNext.focus();
+      return;
+    }
+    // Never more than one full timer: a deadline moved forward in storage is pulled back.
+    cur.deadline = Math.min(cur.deadline, Date.now() + daily.timerSeconds * 1000);
+    saveDaily();
+    const left = cur.deadline - Date.now();
+    if (left <= 0) { // the time ran out while the page was closed
+      showTimerAt(daily.timerSeconds, 0);
+      dailyAnswer(null);
+      return;
+    }
+    startTimer(daily.timerSeconds, left, () => dailyAnswer(null));
+    dom.qHeading.focus();
+  }
+
+  /** "Daily Challenge #12", "Question 2/3", the hint, the feedback and Next / See result (no End run). */
+  function renderDailyPanel() {
+    const cur = daily.current;
+    const q = dailyQuestion();
+    const total = daily.questions.length;
+    setRunPanelTexts('Daily Challenge', 'Question', "Today's " + plural(total, 'question') +
+      (total === 1 ? ' is' : ' are') + " the same for everyone. A wrong answer or time's up scores 0.");
+    dom.streakName.textContent = 'Daily Challenge #' + daily.number;
+    dom.streakName.style.borderLeftColor = 'var(--gold)';
+    dom.streakCount.textContent = (cur.index + 1) + '/' + total;
+    if (cur.picked === null) showStreakFeedback('', '');
+    else if (cur.picked === q.correct) showStreakFeedback('Correct!', 'is-good');
+    else showWrongFeedback(q, cur);
+    dom.streakNext.hidden = cur.picked === null;
+    dom.streakNext.disabled = false;
+    dom.streakNext.textContent = cur.index + 1 >= total ? 'See result' : 'Next question';
+    dom.streakEnd.hidden = true;
+  }
+
+  function toggleDailyLang() {
+    const cur = daily.current;
+    const q = dailyQuestion();
+    if (!isFilled(q.question_ar)) return;
+    cur.lang = cur.lang === 'ar' ? 'en' : 'ar';
+    renderRunLang(q, cur, dailyAnswer);
+    renderDailyPanel(); // the feedback names the right answer in the shown language
+    saveDaily();
+  }
+
+  /** A tapped choice, or null when the time ran out: right or wrong (0), then Next. */
+  function dailyAnswer(index) {
+    const cur = daily && daily.current;
+    if (!cur || cur.picked !== null || daily.done || !dailyOnScreen()) return;
+    const q = dailyQuestion();
+    const leftMs = cur.deadline - Date.now();
+    stopTimer();
+    cur.leftMs = Math.max(0, leftMs);
+    cur.picked = index === null || leftMs <= 0 ? STREAK_TIME_UP : index;
+    daily.results.push(cur.picked === q.correct);
+    saveDaily();
+    showTimerAt(daily.timerSeconds, cur.leftMs);
+    if (cur.picked === STREAK_TIME_UP) dom.timerStatus.textContent = "Time's up!";
+    renderRunChoices(q, cur, dailyAnswer);
+    renderDailyPanel();
+    updateReportButton(); // US-42: Report appears now that it is answered
+    dom.streakNext.focus(); // Enter goes on
+  }
+
+  function onDailyNext() {
+    if (!dailyOnScreen() || daily.current.picked === null) return;
+    if (daily.current.index + 1 >= daily.questions.length) finishDaily();
+    else nextDailyQuestion();
+  }
+
+  /** "Next question" / "See result" (and Enter) for whichever run is on the question screen. */
+  function onRunNext() {
+    if (dailyOnScreen()) onDailyNext();
+    else onStreakNext();
+  }
+
+  /** Android Back on an open question (US-40): leave after a confirm; the questions left score 0. */
+  function onDailyLeave() {
+    if (!dailyOnScreen() || daily.current.picked !== null) return;
+    if (!window.confirm("Leave today's Daily Challenge? The questions you haven't answered score 0, " +
+        'and you can play it only once today.')) return;
+    if (!dailyOnScreen() || daily.current.picked !== null) return; // the time ran out meanwhile
+    finishDaily();
+  }
+
+  /** End a run where it stands: the questions not answered yet score 0 (wrong). */
+  function closeDaily(run) {
+    while (run.results.length < run.questions.length) run.results.push(false);
+    run.done = true;
+    run.current = null;
+  }
+
+  /** The run is over: keep the result on this device and show it. */
+  function finishDaily() {
+    stopTimer();
+    closeDaily(daily);
+    showDailyResult();
+  }
+
+  /** The result screen (saved, so a refresh shows it again until New Game). */
+  function showDailyResult() {
+    daily.onResult = true;
+    saveDaily();
+    renderDailyResult();
+    showScreen('daily');
+    startDailyCountdown();
+    dom.dailyTitle.focus();
+  }
+
+  function dailyRightCount(run) {
+    return run.results.filter(Boolean).length;
+  }
+
+  /** "BrainRush Daily #12: 2/3" */
+  function dailyScoreLine(run) {
+    return 'BrainRush Daily #' + run.number + ': ' + dailyRightCount(run) + '/' + run.results.length;
+  }
+
+  function renderDailyResult() {
+    const right = dailyRightCount(daily);
+    const total = daily.results.length;
+    dom.dailyScore.textContent = dailyScoreLine(daily);
+    clear(dom.dailySquares);
+    daily.results.forEach((ok) => {
+      dom.dailySquares.appendChild(h('span', { className: 'daily-square ' + (ok ? 'is-right' : 'is-wrong') }));
+    });
+    dom.dailySquares.setAttribute('aria-label', daily.results
+      .map((ok, i) => 'Question ' + (i + 1) + (ok ? ' right' : ' wrong')).join(', '));
+    dom.dailyNote.textContent = (right === total ? 'Perfect! ' : '') +
+      'Everyone gets the same questions today. Share your result and compare with your friends.';
+    dom.dailyShareStatus.textContent = '';
+    clearMessage(dom.dailyMsg);
+    dom.dailyPlay.hidden = true;
+  }
+
+  /** The shared text: the score line and the squares (js/share.js adds the site link). */
+  function dailyShareText(run) {
+    return dailyScoreLine(run) + '\n' + run.results.map((ok) => (ok ? SQUARE_RIGHT : SQUARE_WRONG)).join('');
+  }
+
+  function onDailyShare() {
+    if (daily && daily.done && state.screen === 'daily') shareText(dailyShareText(daily), dom.dailyShareStatus);
+  }
+
+  /** "13:05:22" */
+  function formatCountdown(ms) {
+    const seconds = Math.max(0, Math.ceil(ms / 1000));
+    return [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60]
+      .map((n) => String(n).padStart(2, '0')).join(':');
+  }
+
+  function startDailyCountdown() {
+    stopDailyCountdown();
+    tickDailyCountdown();
+    dailyTicker = window.setInterval(tickDailyCountdown, 1000);
+  }
+
+  function stopDailyCountdown() {
+    if (dailyTicker !== null) window.clearInterval(dailyTicker);
+    dailyTicker = null;
+  }
+
+  /** The countdown to the next challenge (midnight UTC); at 0 the new one can be played. */
+  function tickDailyCountdown() {
+    const left = Math.min(daily.nextAt - Date.now(), DAY_MS);
+    if (left > 0) {
+      dom.dailyNext.textContent = 'Next Daily Challenge in ' + formatCountdown(left);
+      return;
+    }
+    stopDailyCountdown();
+    dom.dailyNext.textContent = 'A new Daily Challenge is ready!';
+    dom.dailyPlay.hidden = false;
+  }
+
+  /** "Play the new challenge" once the countdown is over: same timer as the last run. */
+  async function onDailyPlayNew() {
+    if (!daily || state.screen !== 'daily' || dom.dailyPlay.disabled) return;
+    clearMessage(dom.dailyMsg);
+    dom.dailyPlay.disabled = true;
+    dom.dailyPlay.textContent = 'Loading...';
+    try {
+      const challenge = await fetchDaily();
+      if (state.screen !== 'daily') return;
+      if (challenge.date === daily.date) { // this device's clock ran ahead of the server's day
+        daily.nextAt = challenge.nextAt;
+        saveDaily();
+        renderDailyResult();
+        startDailyCountdown();
+        return;
+      }
+      startDaily(challenge, daily.timerSeconds);
+    } catch (err) {
+      showMessage(dom.dailyMsg, 'Could not load the new Daily Challenge: ' + errorText(err), 'error');
+    } finally {
+      dom.dailyPlay.disabled = false;
+      dom.dailyPlay.textContent = 'Play the new challenge';
+    }
+  }
+
+  /** New Game on the result screen: back to setup; today's result stays saved on this device. */
+  function onDailyNewGame() {
+    if (daily) {
+      daily.onResult = false;
+      saveDaily();
+    }
+    newGame();
+  }
+
+  /** US-17 for the Daily Challenge: reopen the unfinished run; an open question keeps its deadline. */
+  function restoreDaily(run) {
+    daily = run;
+    if (run.current !== null) showDailyQuestion();
+    else nextDailyQuestion();
+  }
+
   // ---------- Report a question (US-42, D-45) ----------
   // "Report" on an open board question (the Swap question once swapped) and on an answered Streak
   // question opens a small form: one of six reasons and an optional note of up to 200 characters.
@@ -2993,6 +3552,11 @@
       const cur = streak.current;
       if (cur.picked === null) return null; // a Streak question is reported once it is answered
       return { id: cur.q.id, label: cur.q.category_name + ' ' + EN_DASH + ' ' + cur.q.points };
+    }
+    if (dailyOnScreen()) { // Daily Challenge (US-43): also once answered, like the Streak
+      if (daily.current.picked === null) return null;
+      const q = dailyQuestion();
+      return { id: q.id, label: q.category_name + ' ' + EN_DASH + ' ' + q.points };
     }
     const g = state.game;
     if (!g || !g.current) return null;
@@ -3128,12 +3692,21 @@
     dom.streakCancel.addEventListener('click', onStreakCancel);
     dom.streakBoardBtn.addEventListener('click', onLeaderboardOpen);
     dom.streakNameInput.addEventListener('input', () => setFieldError(dom.streakNameInput, dom.streakNameError, ''));
-    dom.streakNext.addEventListener('click', onStreakNext);
+    dom.streakNext.addEventListener('click', onRunNext);
     dom.streakEnd.addEventListener('click', onStreakEnd);
     dom.lbAgain.addEventListener('click', onPlayAgain);
     dom.lbNew.addEventListener('click', onLeaderboardNewGame);
     dom.lbBack.addEventListener('click', onLeaderboardBack);
+    dom.lbTabs.forEach((tab) => tab.addEventListener('click', onLeaderboardTab));
     document.addEventListener('keydown', onKeyDown);
+  }
+
+  function bindDailyEvents() {
+    dom.dailyOpenBtn.addEventListener('click', onDailyOpen);
+    dom.dailyShare.addEventListener('click', onDailyShare);
+    dom.dailyNew.addEventListener('click', onDailyNewGame);
+    dom.dailyPlay.addEventListener('click', onDailyPlayNew);
+    dom.resultsShare.addEventListener('click', onResultsShare);
   }
 
   function bindEvents() {
@@ -3152,6 +3725,7 @@
     dom.doubleOk.addEventListener('click', closeDoublePopup);
     dom.newGameBtn.addEventListener('click', newGame);
     bindStreakEvents();
+    bindDailyEvents();
     bindReportEvents();
   }
 
@@ -3199,7 +3773,42 @@
         saveStreak();
       }
     }
+    if (restoreSavedDaily()) return;
     startSetup();
+  }
+
+  /**
+   * A saved Daily Challenge (US-43): an unfinished run comes back on its question, and the result
+   * screen comes back while it was open on the same day. Today's result stays in memory either way,
+   * so the Daily Challenge button shows it again. Returns true when a screen was restored.
+   */
+  function restoreSavedDaily() {
+    const saved = loadDaily();
+    if (!saved) return false;
+    daily = saved;
+    try {
+      if (!saved.done && Date.now() >= saved.nextAt) {
+        // BUG-8-03: that challenge's day (UTC) is over. Close the leftover run (the questions not
+        // answered score 0) and show its result, which offers "Play the new challenge"; the server's
+        // date then decides whether a new one has really started.
+        closeDaily(saved);
+        showDailyResult();
+        return true;
+      }
+      if (!saved.done) {
+        restoreDaily(saved);
+        return true;
+      }
+      if (saved.onResult && Date.now() < saved.nextAt) {
+        showDailyResult();
+        return true;
+      }
+    } catch (err) {
+      stopTimer();
+      daily = null;
+      saveDaily();
+    }
+    return false;
   }
 
   init();

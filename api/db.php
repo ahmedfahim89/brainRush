@@ -184,6 +184,42 @@ const PLAYABLE_HAVING =
         AND COUNT(DISTINCT CASE WHEN pv.enabled = 1 THEN q.points END) =
             (SELECT COUNT(*) FROM point_values WHERE enabled = 1)';
 
+// ---------------------------------------------------------------------------
+// Game day (D-46)
+// ---------------------------------------------------------------------------
+
+// The Daily Challenge day (its date, its number and the countdown to the next one) and the weekly
+// Streak leaderboard (Monday to Sunday) follow this time zone, whatever the server's or the
+// player's time zone is (D-46). This is the only place it is set.
+const GAME_TIME_ZONE = 'UTC';
+
+/** The current time in GAME_TIME_ZONE. */
+function game_now(): DateTimeImmutable
+{
+    return new DateTimeImmutable('now', new DateTimeZone(GAME_TIME_ZONE));
+}
+
+/** "YYYY-MM-DD" of a Unix time in GAME_TIME_ZONE (e.g. the date shown for a leaderboard run). */
+function game_date(int $timestamp): string
+{
+    return (new DateTimeImmutable('@' . $timestamp))->setTimezone(new DateTimeZone(GAME_TIME_ZONE))->format('Y-m-d');
+}
+
+/** [start, end) of the game day that holds $now: midnight to the next midnight in GAME_TIME_ZONE. */
+function game_day_bounds(DateTimeImmutable $now): array
+{
+    $start = $now->setTimezone(new DateTimeZone(GAME_TIME_ZONE))->setTime(0, 0);
+    return [$start, $start->modify('+1 day')];
+}
+
+/** [start, end) of the game week that holds $now: Monday 00:00 to the next Monday 00:00 in GAME_TIME_ZONE. */
+function game_week_bounds(DateTimeImmutable $now): array
+{
+    [$today] = game_day_bounds($now);
+    $start = $today->modify('-' . ((int) $today->format('N') - 1) . ' days'); // N: 1 = Monday ... 7 = Sunday
+    return [$start, $start->modify('+7 days')];
+}
+
 /** MySQL error 1062: duplicate entry for a unique key. */
 function is_duplicate_key(PDOException $e): bool
 {
