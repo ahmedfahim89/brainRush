@@ -17,6 +17,15 @@
   const NAME_MAX = 30;
   const SURPRISE = 0;       // "Surprise me!" tile in the selected list (real category ids are positive)
   const SURPRISE_ALONE = 3; // random categories when "Surprise me!" is the only tick
+  // Kilo Meshakkal (US-53 / D-53): a built-in category with no DB row (MIX_ID in api/questions.php).
+  // Each box of its column holds a question from any category; open boxes show an emoji instead of
+  // their value, and the values run in a random order down the column.
+  const MIX = -1;
+  const MIX_NAME = 'Kilo Meshakkal';
+  const MIX_FACES = [
+    0x1f3b2, 0x1f525, 0x1f440, 0x1f92f, 0x1f37f, 0x1f480, // die, fire, eyes, exploding head, popcorn, skull
+    0x1f62d, 0x2728, 0x1f349, 0x1f9c3, 0x1f3af, 0x1f381,  // crying, sparkles, melon, juice box, target, gift
+  ].map((code) => String.fromCodePoint(code));
   const TIMER_TICK_MS = 100;
   const QUESTION_FULL_SIZE_CHARS = 150; // FU-04: longer questions get a smaller font
   const QUESTION_MIN_SCALE = 0.5;
@@ -100,7 +109,10 @@
   // Central state. `setup` is the form being filled in (memory only);
   // `game` is the running game and is saved to localStorage on every change:
   //   { mode, contestants: [{id, name, color, score, helpers: {choices, swap, skip}}], timerSeconds, points,
-  //     categories: [{id, name, questions, hidden}] (hidden = unopened "Surprise me!" pick, shown as "?"),
+  //     categories: [{id, name, questions, hidden}] (hidden = unopened "Surprise me!" pick, shown as "?");
+  //       the Kilo Meshakkal column (id MIX, US-53) also has order (its values top to bottom, a shuffled
+  //       copy of points) and faces (one emoji per box, same length); its questions have catName
+  //       (the source category),
   //     used: { "<categoryId>:<points>": { owner: contestantId | null } },
   //     double?: "<categoryId>:<points>" (D-40: the hidden double-score cell, picked at Start),
   //     finalRound?: boolean (US-44: final_round_enabled when the game started; missing = off),
@@ -481,7 +493,10 @@
     const cur = g.current;
     if (cur.swap) return { question: cur.swap.question, points: cur.swap.points, catName: cur.swap.catName };
     const category = findCategory(g, cur.catId);
-    return { question: category.questions[String(cur.points)], points: cur.points, catName: category.name };
+    const q = category.questions[String(cur.points)];
+    // US-53: a Kilo Meshakkal box names its source category, "Kilo Meshakkal: Football".
+    const catName = category.id === MIX && q.catName ? MIX_NAME + ': ' + q.catName : category.name;
+    return { question: q, points: cur.points, catName: catName };
   }
 
   /** D-40: the open question is on the game's hidden double-score cell (also after a Swap). */
@@ -658,16 +673,29 @@
       const ok = isPlainObject(c) && Number.isInteger(c.id) && !ids[c.id] &&
         typeof c.name === 'string' && isPlainObject(c.questions) &&
         (c.hidden === undefined || typeof c.hidden === 'boolean') &&
+        (c.id === MIX || (c.order === undefined && c.faces === undefined)) && // US-53: mix column only
         points.every((p) => isValidQuestion(hasOwn(c.questions, String(p)) ? c.questions[String(p)] : null));
       if (ok) ids[c.id] = true;
       return ok;
     });
   }
 
-  /** One question (board cell or Swap question); the picture, credit and wrong options are optional. */
+  /**
+   * US-53: a started game's Kilo Meshakkal column has its box order, each board value once, and one
+   * non-empty emoji per box (set at Start, so the server's board is checked without them).
+   */
+  function isValidMixColumns(g) {
+    return g.categories.every((c) => c.id !== MIX || (
+      Array.isArray(c.order) && c.order.length === g.points.length &&
+      c.order.slice().sort((a, b) => a - b).every((p, i) => p === g.points[i]) &&
+      Array.isArray(c.faces) && c.faces.length === g.points.length &&
+      c.faces.every((face) => typeof face === 'string' && face !== '')));
+  }
+
+  /** One question (board cell or Swap question); the picture, credit, wrong options and source category are optional. */
   function isValidQuestion(q) {
     return isPlainObject(q) && typeof q.question === 'string' && typeof q.answer === 'string' &&
-      isValidImage(q.image) && isOptionalText(q.image_credit) &&
+      isValidImage(q.image) && isOptionalText(q.image_credit) && isOptionalText(q.catName) &&
       WRONG_FIELDS.every((field) => isOptionalText(q[field]));
   }
 
@@ -681,9 +709,9 @@
     return value === undefined || value === null || typeof value === 'string';
   }
 
-  /** "<categoryId>:<points>" naming a real cell of this board, in canonical form. */
+  /** "<categoryId>:<points>" naming a real cell of this board, in canonical form ("-1:300" for Kilo Meshakkal, US-53). */
   function isBoardCellKey(key, g) {
-    const match = /^(\d+):(\d+)$/.exec(key);
+    const match = /^(-?\d+):(\d+)$/.exec(key);
     if (!match) return false;
     const category = findCategory(g, Number(match[1]));
     const points = Number(match[2]);
@@ -758,7 +786,7 @@
     return isValidContestants(g.contestants, MODES[g.mode]) &&
       Number.isInteger(g.timerSeconds) && g.timerSeconds >= range.min && g.timerSeconds <= range.max &&
       (g.helpersOff === undefined || typeof g.helpersOff === 'boolean') && // games saved before the setting
-      isValidBoard(g.points, g.categories) &&
+      isValidBoard(g.points, g.categories) && isValidMixColumns(g) &&
       (g.double === undefined || (typeof g.double === 'string' && isBoardCellKey(g.double, g))) && // games saved before D-40
       typeof g.finalRound === 'boolean' && isValidFinal(g.final, g) &&
       isValidUsed(g.used, g) && isValidCurrent(g.current, g);
@@ -1214,11 +1242,12 @@
       return;
     }
     if (s.playable.length) renderSurpriseTile();
-    s.playable.forEach((c) => {
-      const box = h('input', { type: 'checkbox', id: 'cat-' + c.id, checked: s.selected.indexOf(c.id) !== -1 });
+    setupTiles(s).forEach((c) => {
+      const inputId = c.id === MIX ? 'cat-mix' : 'cat-' + c.id;
+      const box = h('input', { type: 'checkbox', id: inputId, checked: s.selected.indexOf(c.id) !== -1 });
       box.addEventListener('change', () => toggleCategory(c.id, box.checked));
       dom.catList.appendChild(h('li', {}, [
-        h('label', { className: 'cat-label', htmlFor: 'cat-' + c.id, 'data-cat': String(c.id) }, [
+        h('label', { className: 'cat-label', htmlFor: inputId, 'data-cat': String(c.id) }, [
           box,
           h('span', { className: 'cat-name-text', text: c.name }),
           h('span', { className: 'cat-order', 'aria-hidden': 'true' }),
@@ -1230,6 +1259,20 @@
     }
     if (s.perGame !== null && !s.playable.length) renderNotEnough();
     renderCategorySelection();
+  }
+
+  /**
+   * US-53 / D-53: the category tiles, with Kilo Meshakkal sorted by name among the playable ones
+   * (the server sends those sorted by name). Only shown when a real category is playable, since its
+   * boxes draw from them. s.playable itself stays the real categories: the played count and the
+   * "Surprise me!" draw use it, so neither ever includes Kilo Meshakkal.
+   */
+  function setupTiles(s) {
+    if (!s.playable.length) return [];
+    const tiles = s.playable.slice();
+    const after = tiles.findIndex((c) => c.name.localeCompare(MIX_NAME, 'en', { sensitivity: 'base' }) > 0);
+    tiles.splice(after === -1 ? tiles.length : after, 0, { id: MIX, name: MIX_NAME });
+    return tiles;
   }
 
   /** "Surprise me!": alone = SURPRISE_ALONE random categories, with picks = 1 random category in its slot. */
@@ -1352,7 +1395,9 @@
       s.finalRoundOn = settings.final_round_enabled === 1; // US-44: a missing row means off
       s.playable = results[1].filter((c) => isPlainObject(c) && Number.isInteger(c.id) && typeof c.name === 'string')
         .map((c) => ({ id: c.id, name: c.name }));
-      s.selected = s.selected.filter((id) => id === SURPRISE || s.playable.some((c) => c.id === id));
+      // Kilo Meshakkal (US-53) stays ticked like Surprise, as long as its tile is shown.
+      s.selected = s.selected.filter((id) => id === SURPRISE || (id === MIX && s.playable.length > 0) ||
+        s.playable.some((c) => c.id === id));
       if (dom.timerInput.value === '' && s.timerDefault !== null) dom.timerInput.value = String(s.timerDefault);
       if (s.perGame === null) {
         s.loadError = 'settings';
@@ -1556,6 +1601,7 @@
       wrong_2: wrong ? q.wrong_2 : null,
       wrong_1_ar: wrongAr ? q.wrong_1_ar : null,
       wrong_2_ar: wrongAr ? q.wrong_2_ar : null,
+      catName: isFilled(q.category_name) ? q.category_name : null, // US-53: a Kilo Meshakkal box's source category
     };
   }
 
@@ -1573,7 +1619,9 @@
 
   /** Turn the ticked list into board category ids. "Surprise me!" alone picks SURPRISE_ALONE random
    *  categories; with other picks it becomes 1 random category not already picked, in its own slot.
-   *  Returns { ids, hidden } where hidden holds the randomly picked ids (shown as "?" on the board). */
+   *  Returns { ids, hidden } where hidden holds the randomly picked ids (shown as "?" on the board).
+   *  Kilo Meshakkal (MIX, US-53) passes through as a pick; it is not in s.playable, so the random
+   *  draw never takes it. */
   function resolveSelection(s) {
     const picked = s.selected.filter((id) => id !== SURPRISE);
     if (picked.length === s.selected.length) return { ids: picked, hidden: [] };
@@ -1662,6 +1710,7 @@
   /** D-12: the board loaded now is used for the whole game (stored in the game state). */
   function beginGame(board, timerSeconds) {
     const s = state.setup;
+    board.categories.forEach((c) => { if (c.id === MIX) dealMixColumn(c, board.points); });
     state.game = {
       mode: s.mode,
       contestants: s.entries.map((e, i) => ({
@@ -1680,6 +1729,19 @@
     renderGame();
     showScreen('board'); // also saves the state
     logGameStart(state.game);
+  }
+
+  /**
+   * US-53 / D-53: the Kilo Meshakkal column's values in a random order down the board (each value
+   * once, so the column's total stays fair; never the plain ascending order) and one emoji per box
+   * (row i shows faces[i]), without repeats while MIX_FACES lasts.
+   */
+  function dealMixColumn(column, points) {
+    const faces = shuffled(MIX_FACES);
+    let order = shuffled(points);
+    while (points.length > 1 && order.every((p, i) => p === points[i])) order = shuffled(points);
+    column.order = order;
+    column.faces = points.map((p, i) => faces[i % faces.length]);
   }
 
   /** D-40: one random cell of the board is worth double; nothing shows it until it is opened. */
@@ -1744,8 +1806,9 @@
         h('span', { className: 'board-cat-name', text: c.hidden ? '?' : c.name }),
       ]));
     });
-    g.points.forEach((p) => {
-      g.categories.forEach((c) => dom.board.appendChild(renderCell(c, p)));
+    // US-53: row i of the Kilo Meshakkal column is the box of value order[i] (its emoji is faces[i]).
+    g.points.forEach((p, i) => {
+      g.categories.forEach((c) => dom.board.appendChild(c.id === MIX ? renderCell(c, c.order[i], c.faces[i]) : renderCell(c, p)));
     });
   }
 
@@ -1754,18 +1817,25 @@
     return category.hidden ? 'Surprise category' : category.name;
   }
 
-  /** One board cell: open (clickable) or used (disabled; owner color + name, or grey, US-08). */
-  function renderCell(category, points) {
+  /**
+   * One board cell: open (clickable) or used (disabled; owner color + name, or grey, US-08). face: the
+   * emoji an open Kilo Meshakkal box shows instead of its value (US-53); its label never says the value.
+   */
+  function renderCell(category, points, face) {
     const g = state.game;
     const key = cellKey(category.id, points);
     const label = h('span', { className: 'cell-points', text: String(points) });
     if (!hasOwn(g.used, key)) {
-      return h('button', {
+      const props = {
         type: 'button',
         className: 'board-cell',
         'aria-label': categoryLabel(category) + ', ' + points + ' points',
         onclick: () => openQuestion(category.id, points),
-      }, [label]);
+      };
+      if (!face) return h('button', props, [label]);
+      props['aria-label'] = MIX_NAME + ', mystery value';
+      props.title = props['aria-label'];
+      return h('button', props, [h('span', { className: 'cell-points cell-face', text: face, 'aria-hidden': 'true' })]);
     }
     const used = g.used[key];
     const owner = used.owner === null ? null : findContestant(g, used.owner);

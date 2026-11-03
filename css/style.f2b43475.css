@@ -632,6 +632,9 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
   line-height: 1;
   white-space: nowrap;
 }
+/* Open Kilo Meshakkal box (US-53): an emoji in place of the value, at the same --label-size as the
+   numbers (one emoji is narrower than a 3-digit value); no faux bold on the color glyph */
+.cell-points.cell-face { font-weight: 400; }
 
 /* Scoreboard strip */
 .scoreboard-list {

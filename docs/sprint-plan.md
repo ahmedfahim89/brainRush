@@ -1,6 +1,6 @@
 # BrainRush — Sprint Plan
 
-Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..US-30 in Sprints 1-6, decisions D-01..D-32, follow-ups FU-01..FU-15; Epic E17 US-42..US-52 in Sprints 7-14, open owner questions FU-20..FU-24).
+Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..US-30 in Sprints 1-6, decisions D-01..D-32, follow-ups FU-01..FU-15; Epic E17 US-42..US-53 in Sprints 7-15, open owner questions FU-20..FU-24).
 
 **Overall status (2026-10-19):** Sprints 1-6 Done and shipped. Sprint 6 (Question bank) and D-32 (pick 1..N categories) were merged via PR #11 on 2026-10-11, and the hosted DB is migrated (FU-11). Follow-ups FU-10..FU-15 are all Done; no open items. Later owner requests were shipped outside the sprint cycle: Egypt questions (PR #13, #16), Arabic localization (PR #17, #19), the Gen Z set (PR #18), the AI set (PR #20), the Egyptians set (`sql/add-egyptians-questions.sql`, PR #22, 2026-10-15), the game start log (`api/game-log.php` writes one line per started game with time, player names and categories to a daily `logs/game-YYYY-MM-DD.log`, blocked from the web; PR #24, deployed 2026-10-18) and the "new questions" banner (gold strip at the top of the setup screen; Admin > Game settings turns it on or off and sets its text, stored as `banner_enabled` / `banner_text` settings, no DB migration; branch `new-questions-banner`, 2026-10-19).
 
@@ -8,7 +8,7 @@ Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..U
 
 **Streak Challenge (2026-10-23, outside the sprint cycle):** US-33 / US-34 / D-37 (solo run of 3-choice questions until the first wrong answer or time's up, plus a shared top-10 leaderboard and an admin moderation list) implemented on branch `streak-mode` from main 4582c9d (`docs/sprints/streak-mode-dev.md`); game-tester verification next (max 2 fix loops), then the owner's local Chrome check before commit/PR. Needs `sql/migrate-add-streak.sql` (creates the `streaks` table) on every DB before the code; it reuses the helper's wrong options, so `sql/migrate-add-wrong-options.sql` must be there too.
 
-**New features, Epic E17 (2026-11-02):** the owner approved US-42..US-52. They are planned as Sprints 7-14 (below, after Sprint 6), in the owner's order: Sprints 7-10 are the near-term groups (owner's "A" to "D"), Sprints 11-14 are one story each, later. Sprints 7, 8 and 9 were built and PO-accepted on 2026-11-02, pending the owner's local test and the hosted steps (Sprint 7: FU-25, FU-26; Sprint 8: FU-28, FU-29; Sprint 9: FU-31, FU-32); Sprints 10-14 are not started. Each sprint lists the owner questions (FU-20..FU-24) that must be answered before development.
+**New features, Epic E17 (2026-11-02):** the owner approved US-42..US-52. They are planned as Sprints 7-15 (below, after Sprint 6), in the owner's order: Sprints 7-9 and 11 are the near-term groups (owner's "A" to "D"), Sprints 12-15 are one story each, later. On 2026-11-03 the owner added US-53 (Kilo Meshakkal category) as Sprint 10, ahead of the owner's group D (now Sprint 11). Sprints 7, 8 and 9 were built and PO-accepted on 2026-11-02; Sprint 9 is merged (PR #89), and Sprints 7 and 8 are pending the owner's local test and the hosted steps (Sprint 7: FU-25, FU-26; Sprint 8: FU-28, FU-29; Sprint 9 hosted and device steps: FU-32). Sprint 10 is in progress; Sprints 11-15 are not started. Each sprint lists the owner questions (FU-20..FU-24) that must be answered before development.
 
 | Sprint | Goal | Status |
 |---|---|---|
@@ -20,12 +20,13 @@ Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..U
 | 6 | Question bank: random questions per new game (US-30, D-31; D-32 alongside) | Done (accepted 2026-10-11 after rework); owner Chrome check, commit/PR and hosted migration (FU-11) open |
 | 7 | Report a question (US-42) | Accepted by the PO 2026-11-02, pending the owner's local Chrome check (FU-25) and the hosted steps (FU-26); not committed |
 | 8 | Daily Challenge, share, weekly leaderboard (US-43, US-46, US-45) | Accepted by the PO 2026-11-02, pending the owner's local Chrome check and commit (FU-28) and the hosted steps (FU-29); not committed |
-| 9 | Final round with wagers (Golden Goal ⚽ tiebreaker), read aloud (US-44, US-48) | Accepted by the PO 2026-11-02, re-accepted 2026-11-03 after the D-51 change, pending the owner's local Chrome check and commit (FU-31) and the hosted and device steps (FU-32); not committed |
-| 10 | Question difficulty stats (US-47) | Planned |
-| 11 | Custom category for one game (US-50) | Planned (later) |
-| 12 | Arabic interface (US-49) | Planned (later) |
-| 13 | Phone buzzers (US-52), spike first | Planned (later; not committed until the FU-24 spike) |
-| 14 | Rewarded second chance in Streak (US-51) | Planned (later; blocked by FU-23) |
+| 9 | Final round with wagers (Golden Goal ⚽ tiebreaker), read aloud (US-44, US-48) | Accepted by the PO 2026-11-02, re-accepted 2026-11-03 after the D-51 change; Done and merged to `main` (PR #89, `c0eb4c9`); hosted and device steps (FU-32) open |
+| 10 | Kilo Meshakkal category (US-53) | Accepted by the PO 2026-11-03 (D-54; BUG-10-01 fixed), pending the owner's local Chrome check and commit (FU-36) and the hosted and device steps (FU-37); not committed |
+| 11 | Question difficulty stats (US-47) | Planned |
+| 12 | Custom category for one game (US-50) | Planned (later) |
+| 13 | Arabic interface (US-49) | Planned (later) |
+| 14 | Phone buzzers (US-52), spike first | Planned (later; not committed until the FU-24 spike) |
+| 15 | Rewarded second chance in Streak (US-51) | Planned (later; blocked by FU-23) |
 
 Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops) -> product-owner accepts -> scrum-master updates status -> commit on branch `sprint-N` + PR to `main`.
 
@@ -245,13 +246,13 @@ New open follow-up FU-09 (Owner) was added by the PO (see "Follow-ups" below).
 
 ---
 
-## Epic E17 — New features (Sprints 7-14, planned 2026-11-02)
+## Epic E17 — New features (Sprints 7-15, planned 2026-11-02)
 
-The owner approved US-42..US-52 on 2026-11-02 and set this grouping and order. Full story text is in `docs/product-backlog.md` ("Epic E17"); owner questions are FU-20..FU-24 ("Open owner questions (new features)"). Sprints 7, 8 and 9 are PO-accepted pending the owner steps (see their Status); Sprints 10-14 are **Planned** and not started. Sprint numbers continue from Sprint 6; the owner's labels were A = Sprint 7, B = Sprint 8, C = Sprint 9, D = Sprint 10, and the four "later" items are Sprints 11-14.
+The owner approved US-42..US-52 on 2026-11-02 and set this grouping and order. Full story text is in `docs/product-backlog.md` ("Epic E17"); owner questions are FU-20..FU-24 ("Open owner questions (new features)"). Sprints 7 and 8 are PO-accepted pending the owner steps (see their Status); Sprint 9 is Done and merged (PR #89). **US-53 (Kilo Meshakkal) was added on 2026-11-03 at the owner's request as Sprint 10, which is In progress**; Sprints 11-15 are **Planned** and not started. Sprint numbers continue from Sprint 6; the owner's labels were A = Sprint 7, B = Sprint 8, C = Sprint 9, D = Sprint 11 (it was Sprint 10 before US-53 was inserted), and the four "later" items are Sprints 12-15.
 
-**Rules common to Sprints 7-14** (on top of the global Definition of Done)
+**Rules common to Sprints 7-15** (on top of the global Definition of Done)
 
-- **Migration rule** (Sprints 7, 8, 10, and 14 if its marker is stored; Sprint 13 only if committed): the migration file is re-runnable (`CREATE TABLE IF NOT EXISTS` or equivalent), is run twice on the local DB with no error, and is run on **every** DB (hosted: phpMyAdmin) **before** the new code is deployed. The same table goes into **both** `sql/schema.sql` and `sql/schema-hosted.sql` (bodies identical after their CREATE DATABASE/USE lines), as the Streak sprint did with `sql/migrate-add-streak.sql`. `docs/deploy-hostinger.md` gets the migration step, the upload list and the new table count. A DB without the new table must only break the new feature, never the game or Admin's other panels (FU-19).
+- **Migration rule** (Sprints 7, 8, 11, and 15 if its marker is stored; Sprint 14 only if committed; Sprint 10 needs no migration): the migration file is re-runnable (`CREATE TABLE IF NOT EXISTS` or equivalent), is run twice on the local DB with no error, and is run on **every** DB (hosted: phpMyAdmin) **before** the new code is deployed. The same table goes into **both** `sql/schema.sql` and `sql/schema-hosted.sql` (bodies identical after their CREATE DATABASE/USE lines), as the Streak sprint did with `sql/migrate-add-streak.sql`. `docs/deploy-hostinger.md` gets the migration step, the upload list and the new table count. A DB without the new table must only break the new feature, never the game or Admin's other panels (FU-19).
 - **Saved game** (D-28): any change to the saved board-game shape bumps the saved `version` and migrates or discards safely. Features with their own browser key (Streak `brainrush.streak`, D-37 h) leave the board save untouched.
 - **Layout** (D-30, D-35, D-36): every new UI element fits 1366x768 and the 375x812 phone layout with no horizontal scroll, and does not push the board or question screens past one screen.
 - **Public writes** (D-37 g): new public POST endpoints validate every field (400), never store names or raw IP, and accept that a determined user can fake data; admin-only reads and writes stay behind US-29 auth (401 without login).
@@ -423,7 +424,7 @@ PO decisions on the developer's choices (no story change, D-46 stands):
 | 5 | No credentials committed; `api/config.php` git-ignored | Met (S5) |
 | 6 | Tester report, no open Critical/Major bugs | Met: 131 checks, 126 PASS, 0 FAIL, 5 PENDING (owner or device steps A4, T4, R14, L4, S9), no open bug. BUG-9-01 and BUG-9-02 (Minor) fixed in fix loop 1 and re-tested (RT1-RT14); the D-50 rename (RN1-RN13) and the D-51 tiebreaker (RD1-RD26) re-tested (`docs/sprints/sprint-9-test-report.md`) |
 | 7 | Developer note | Met (`docs/sprints/sprint-9-dev.md`, incl. "Fix loop 1", "Rename to Shoot Your Shot (D-50)" and "Tiebreaker change (D-51) and Golden Goal name") |
-| 8 | PO accepted | Met 2026-11-02, re-accepted 2026-11-03 against the amended US-44 (D-52), pending the owner checks below |
+| 8 | PO accepted | Met 2026-11-02, re-accepted 2026-11-03 against the amended US-44 (D-52); merged to `main` (PR #89) |
 | + | PHP 8.0 / MariaDB 10.4 compatible (D-17) | Met (tested on PHP 8.0.30, MariaDB 10.4.32) |
 | + | Saved-game version bumped and tested with older saves (D-28) | Met (V1-V6: version 4; v3, v2 and v1 saves upgrade with `finalRound:false`; 30 invalid variants are discarded to Setup with no JS error) |
 | + | Wager limit = the higher of the score and the largest enabled point value (D-48), not hard-coded | Met (F7-F10: 500 locally, 600 with 600 enabled, 400 with 500 and 600 disabled; scores 400, 0 and −200 all get the largest value) |
@@ -432,12 +433,12 @@ PO decisions on the developer's choices (no story change, D-46 stands):
 | + | US-48: speaker, hidden with no voice, second click stops, timer untouched, automatic reading off by default | Met (R1-R13; real speech with real clicks in R5 and R6) |
 | + | D-51 tiebreaker: offered only on a tie for first, everyone bets, repeat rounds with a new question, Results with the tie on Skip or when no question is left; saved version 4 extended safely | Met (RD1-RD15, RD21-RD22; PO code check: `endGame()` needs `isTiedAtTop()`, the draw excludes the board's and earlier rounds' ids, and a 409 ends the game on Results. Swap-in ids are not excluded, see FU-35) |
 | + | D-50 name: "Golden Goal ⚽" and "bet" in every player-facing text, ⚽ hidden from screen readers | Met (RD16-RD20) |
-| + | Owner's local Chrome check | Open (FU-31) |
-| + | Commit on `sprint-9` with `js/speech.js` staged, re-hash check (S9, FU-16 style) and PR to `main` (owner merges) | Open (FU-31) |
+| + | Owner's local Chrome check | Done (FU-31; Sprint 9 was merged) |
+| + | Commit on `sprint-9` with `js/speech.js` staged, re-hash check (S9, FU-16 style) and PR to `main` (owner merges) | Done: PR #89 merged (`c0eb4c9` on `main`) |
 | + | Hosted deploy and CDN purge; live 401 without a login (A4) | Open (FU-32) |
 | + | Real Android phone (T4), real Arabic voice (R14), real touch device (L4) | Open (FU-32; emulated or faked in T1-T3, R4, L2) |
 
-**Status:** Accepted by the PO 2026-11-02, pending the owner's local Chrome check and commit (FU-31) and the hosted and device steps (FU-32). Not committed yet. On 2026-11-03 the owner renamed the round for players to "Shoot Your Shot" and the amount to "bet" (D-50, wording only; a proposed scoring change was cancelled). Re-tested: 105 checks, 100 PASS, 0 FAIL, 5 PENDING. Later on 2026-11-03 the owner renamed it "Golden Goal ⚽" and made it a tiebreaker offered only on a tie for first, repeating while still tied (D-50 amended, D-51). Re-tested: 131 checks, 126 PASS, 0 FAIL, 5 PENDING, no open bug. **Re-accepted by the PO 2026-11-03** against the amended US-44 (D-52), still pending the owner's local Chrome check and commit (FU-31) and the hosted and device steps (FU-32). Not committed yet.
+**Status:** Done. Accepted by the PO 2026-11-02 and re-accepted 2026-11-03; **merged to `main` via PR #89 (`c0eb4c9`) on 2026-11-03**. The hosted and device steps (FU-32) are not recorded as done here. On 2026-11-03 the owner renamed the round for players to "Shoot Your Shot" and the amount to "bet" (D-50, wording only; a proposed scoring change was cancelled). Re-tested: 105 checks, 100 PASS, 0 FAIL, 5 PENDING. Later on 2026-11-03 the owner renamed it "Golden Goal ⚽" and made it a tiebreaker offered only on a tie for first, repeating while still tied (D-50 amended, D-51). Re-tested: 131 checks, 126 PASS, 0 FAIL, 5 PENDING, no open bug. **Re-accepted by the PO 2026-11-03** against the amended US-44 (D-52) and merged (PR #89). Still open: the hosted and device steps (FU-32).
 
 **Outcome:** US-44 is accepted against all four criteria and the dependency line: browser only apart from the setting, wagers entered one by one and masked. US-48 is accepted against all four criteria (no server work). The developer built the `final_round_enabled` setting (Admin checkbox, validated 0-1, no migration), the offer, the wager and question screens with the D-48 limit, saved-game version 4, Android Back handling, `js/speech.js` with the speaker on every question screen, and the on-device "Read questions automatically" choice. The guide, Privacy, `llms.txt`, README, spec and deploy-guide texts were updated too. One fix loop closed BUG-9-01 (the setting was read when Setup loaded, not at Start) and BUG-9-02 (phone scoring rows grew when marked). New follow-ups: FU-31 and FU-32 (owner steps) and FU-33 (final round text polish, Could). Recorded as D-49.
 
@@ -468,7 +469,47 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 
 ---
 
-## Sprint 10 — Question difficulty stats (US-47)
+## Sprint 10 — Kilo Meshakkal category (US-53)
+
+**Goal:** A built-in "Kilo Meshakkal (كيلو مشكل)" category: one board column whose boxes each hold a random question from a different category, show an emoji instead of the value, and hold the values in a random order. (Owner request 2026-11-03, D-53; technical design approved by the owner.)
+**Stories:** US-53
+**Dependencies:** Sprint 9 (merged to `main`, PR #89; branch `sprint-10` is cut from it); the US-30 board and pool code in `api/questions.php` (`PLAYABLE_HAVING`, `random_key()`, `draw_from_pool()`, `random_question()`, `board_cell()`); D-32 / D-33 Setup picker and "Surprise me!"; D-28 saved-game version (no bump needed, see DoD); `api/game-log.php`. **No DB migration.**
+**Owner questions needed before development:** none. The design is approved. Each enabled value appears once in the mystery order, so the column total stays fair; the owner can still ask for repeats.
+
+**Developer tasks**
+1. `api/questions.php` — add `MIX_NAME = 'Kilo Meshakkal'`; `parse_board_ids()` also accepts `-1`, at most once (same duplicate rule); `-2` and other ids below 1 stay 400; document it in the header comment.
+2. `api/questions.php` — `board()`: drop `-1` from the id list before the `categories` lookup and pool query; build the real columns as today and collect the drawn ids; then build the mix column and put it back at its requested position. Result: `{id: -1, name: MIX_NAME, mix: true, questions: {<p>: board_cell() + category_name}}`.
+3. `api/questions.php` — new `mix_column(PDO $pdo, array $points, array $exclude, array $seenRank): array`, modelled on `random_question()`. For each enabled point value: only playable categories with a question at that value not already on the board; prefer categories with an unseen question; then prefer categories not yet used in this column; pick with `random_key()`, then the question with `draw_from_pool()`; add `category_name`. No question left for a value gives 400 naming the value (same wording style as "missing questions") and no board. Prepared statements only.
+4. `api/game-log.php` — `read_category_names()` accepts `-1` and logs "Kilo Meshakkal"; `-1` twice and other ids below 1 stay 400.
+5. `js/game.6ef41919.js` — constants `MIX = -1` and `MIX_NAME = 'Kilo Meshakkal'` next to `SURPRISE`; after `categories.php?playable=1` loads, and only when at least one category is playable, add `{id: MIX, name: MIX_NAME}` to the Setup list, sorted by name with the others; the tile shows its name only (the "كيلو مشكل · any category" hint was removed by the owner after acceptance), calls `toggleCategory(MIX, …)` and has `data-cat="-1"`; it counts toward `categories_per_game`; leave `MIX` out of the `questions.php?played=1` progress request; keep `MIX` in `s.selected` at load, like `SURPRISE`.
+6. `js/game.6ef41919.js` — `resolveSelection()`: `MIX` passes through unchanged; Surprise's `free` list filters out `MIX`, so a hidden "?" column is always a real category. Kilo Meshakkal alone gives a 1-column board; with Surprise it gives Kilo Meshakkal + 1 hidden category.
+7. `js/game.6ef41919.js` — `parseQuestion()` keeps an optional `catName` from `category_name` (non-empty string or null) and `isValidQuestion()` allows it as optional text; `activeQuestion()` sets `catName: q.catName ? MIX_NAME + ': ' + q.catName : category.name`, so the heading reads "Kilo Meshakkal: Football – 300" and the Report label gets the real category. `logGameStart()` keeps sending `c.id`.
+8. `js/game.6ef41919.js` — `beginGame()`: for the mix column save `order` (a `shuffled()` copy of `board.points`) and `faces` (one emoji per box, no repeats, drawn from a `MIX_FACES` list). `isValidBoard()` accepts `order` and `faces` only on the `-1` column: `order` must be a permutation of `points`, `faces` the same length with non-empty strings; a mix column missing them is corrupt (Setup shown, US-17). Older saves have no `-1` column, so there is no `STORAGE_VERSION` bump.
+9. `js/game.6ef41919.js` — `renderBoard()`: in row `i` the mix column renders the cell for value `order[i]`, so `cellKey(-1, value)` stays unique and scoring, the double cell, Swap and the used state stay keyed by value. `renderCell()`: an open mix box shows its emoji instead of the number, with `aria-label` / `title` "Kilo Meshakkal, mystery value" (never the points); a used box shows owner and value as usual. Emoji and source names are set with `textContent`.
+10. `css/style.b8666cf7.css` — only the emoji box face `.cell-face` (sized like the point label) and the small Arabic hint on the Setup tile; existing tokens, no new colors; D-30 fit at 1366x768 and 375x812.
+11. `how-to-play.html` — one bullet: questions from any category, values hidden behind emoji. `llms.txt` — one line if it lists the setup options. `README.md` — one line if it describes the Setup options. `docs/spec.md` already has the rule line (about line 132); the developer only checks that it still matches.
+12. Tests and `docs/sprints/sprint-10-dev.md` — API checks (curl list in the tester focus) and a browser walkthrough; the dev note records that the ux-ui plugin's `check_no_emoji` gate flags the emoji and that this is a deliberate product choice (D-53), so the gate run records an exception.
+
+**Tester focus**
+- API (`php -S localhost:8000`): `{categories:"-1"}` returns one column, id -1, name "Kilo Meshakkal", one cell per enabled value, each with `category_name`, no duplicate ids; sources vary over several calls and are distinct within the column when there are enough categories; `"3,-1,1"` puts the mix column in the middle and none of its ids appear in columns 3 or 1; `"-1,-1"` and `"-2"` give 400; no question left for a value gives 400 naming the value; unseen questions come first; `game-log.php` with `[-1, 3]` gives 201 and the log line shows "Kilo Meshakkal"; `-1` twice and other ids below 1 give 400; `php -l` on both files.
+- Setup: tile sorted under "K" with the hint; not shown with no playable category; counts toward and locks at N, tick-order badge; alone, with real categories, and with Surprise (Surprise never picks it).
+- Board: emoji boxes with no numbers, a different emoji per box; values one of each enabled value in a shuffled order that differs between games; heading "Kilo Meshakkal: <source> – <points>"; Correct / Wrong score that value; used box shows value and owner (or grey); the label and tooltip never contain the points; Swap, Skip, 3 choices, Report (real category), double cell and Golden Goal work.
+- Persistence: refresh keeps the same emoji, order and headings; a corrupt mix column (order not a permutation, `faces` missing or the wrong length) goes to Setup with no JS error; a save from before US-53 still loads.
+- Admin: Kilo Meshakkal absent from Categories, the Questions filter and form, and the played progress; Streak and Daily untouched.
+- Layout 1366x768 and 375x812 (6x6 board, 6 contestants); a source category name with HTML renders as text; no console errors.
+
+**Definition of Done (Sprint 10, on top of the global DoD)**
+- No DB migration and no new table; Kilo Meshakkal has no row in the `categories` table (checked in the diff and in Admin).
+- The reserved id `-1` is accepted only by `parse_board_ids()` and `read_category_names()`; Surprise stays `0`.
+- Saved game: no `STORAGE_VERSION` bump; older saves load and a corrupt mix column is discarded safely (D-28).
+- The mystery value never appears in an open box's text, label or tooltip.
+- The ux-ui `check_no_emoji` exception is recorded in the dev note (deliberate, D-53).
+
+**Status:** Accepted by the PO 2026-11-03 (test report: 54 PASS, 0 FAIL, 4 PENDING; BUG-10-01 fixed after test; D-54). Pending the owner's local Chrome check and commit (FU-36) and the hosted and device steps (FU-37). Branch `sprint-10`, cut from `main` after the Sprint 9 merge (PR #89); not committed.
+
+---
+
+## Sprint 11 — Question difficulty stats (US-47)
 
 **Goal:** Admin can see how often each question is answered correctly and spot questions at the wrong point value. (Owner's Sprint D.)
 **Stories:** US-47
@@ -483,11 +524,11 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 5. `js/game.js` — send one outcome when a board question closes and when a Streak question is answered, at most once per question per game (kept in game state; a save without the field simply counts none, no bump unless the developer prefers one, recorded in the dev note). A failed send never interrupts play.
 6. `admin.html` + `js/admin.js` + `css/style.css` — Questions list columns "Attempts" and "% correct", sortable; "Check value" mark when attempts are 20 or more and the percentage is outside the band for that question's point value (threshold 20 as a named constant).
 7. `README.md` + `docs/deploy-hostinger.md` — migration step before the code; upload list; new table count.
-8. `docs/sprints/sprint-10-dev.md`.
+8. `docs/sprints/sprint-11-dev.md`.
 
 **Tester focus:** each outcome from a board question and from a Streak question increments the right counter; a second send for the same question in one game is not sent; bad id and bad outcome (400); upsert under two quick requests; list shows attempts and percent, sort works, 0 attempts shows cleanly; "Check value" appears at 20 attempts only and follows the band; admin list works for a question with no stats row; stats removed with the question; send failure (API down) does not disturb play; Admin layout at >= 1024 px (D-19); migration run twice; Admin with the table missing; no console errors.
 
-**Definition of Done (Sprint 10, on top of the global DoD)**
+**Definition of Done (Sprint 11, on top of the global DoD)**
 - `sql/migrate-add-question-stats.sql` runs on every DB, including the hosted one, **before** the code is deployed, and `question_stats` is added to both `sql/schema.sql` and `sql/schema-hosted.sql` (migration rule above).
 - The "Check value" band is written down by the PO and has no hard-coded point values.
 - Public-write limitation (fake counts) noted in the dev note and Privacy needs no change (no personal data stored).
@@ -496,11 +537,11 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 
 ---
 
-## Sprint 11 — Custom category for one game (US-50) — later
+## Sprint 12 — Custom category for one game (US-50) — later
 
 **Goal:** The host can add their own category (name plus one question and answer per enabled point value) to tonight's game, kept in the browser only. (Owner: later, its own sprint.)
 **Stories:** US-50
-**Dependencies:** Sprint 9 changes the saved-game version first, so this sprint bumps it again from that base; Setup category picker (D-32 and D-33 "Surprise me!"); helpers (D-36); US-25 board payload shape; `api/game-log.php`.
+**Dependencies:** Sprint 9 changed the saved-game version first (Sprint 10 makes no bump), so this sprint bumps it again from that base; Setup category picker (D-32 and D-33 "Surprise me!"); helpers (D-36); US-25 board payload shape; `api/game-log.php`.
 **Owner questions needed before development:** none open (FU-20..FU-24 do not cover it). Should be re-checked with the PO when the sprint is picked up.
 
 **Developer tasks**
@@ -511,11 +552,11 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 5. `js/game.js` — save the category on the device (browser storage, size-checked with a clear message if full), and export/import as a file; import validates structure, length and point values, and rejects bad files without a JS error.
 6. `js/game.js` — restore the custom column with the saved game after a refresh; bump the saved `version` and migrate or discard older saves safely (D-28).
 7. `README.md` + `how-to-play.html` — custom category notes (kept on the device, nothing on the server).
-8. `docs/sprints/sprint-11-dev.md`.
+8. `docs/sprints/sprint-12-dev.md`.
 
 **Tester focus:** form validation (empty, too long, duplicate, missing a point value); custom plus real categories at the N limit; Start sends no custom data (check the network calls and the log line); helpers on the custom cell; refresh mid-game restores it; save, reload the page, reuse; export and import (valid, corrupt, oversized, `<img src=x onerror=alert(1)>` renders as text); storage full; 1366x768 and 375x812; no console errors.
 
-**Definition of Done (Sprint 11, on top of the global DoD)**
+**Definition of Done (Sprint 12, on top of the global DoD)**
 - Nothing custom is sent to or stored on the server (verified in the API calls and the game log).
 - Saved-game version bumped and tested with an older save (D-28).
 - No migration needed.
@@ -524,11 +565,11 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 
 ---
 
-## Sprint 12 — Arabic interface (US-49) — later
+## Sprint 13 — Arabic interface (US-49) — later
 
 **Goal:** The whole game can be switched between English and Arabic, right to left, with the choice remembered. (Owner: later, its own sprint. Size L.)
 **Stories:** US-49
-**Dependencies:** Place it **after** Sprints 7-11 so all new screens and texts exist before they are translated; the existing Arabic question text and language button (earlier Arabic localization); D-30 layouts.
+**Dependencies:** Place it **after** Sprints 7-12 so all new screens and texts exist before they are translated; the existing Arabic question text and language button (earlier Arabic localization); D-30 layouts.
 **Owner questions needed before development:** none open. Who supplies and reviews the Arabic UI strings is to be agreed (owner review, as for question content) before development starts.
 
 **Developer tasks**
@@ -539,11 +580,11 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 5. `css/style.css` — RTL layout (logical properties or `[dir=rtl]` rules) for board, scoreboard, question screen, results, leaderboard and forms; bidi isolation for player names and numbers (no mixed-direction glitches).
 6. `css/style.css` — D-30 re-check: Setup, Board (6x6, 6 contestants), Question, Results and Streak fit 1366x768 and 375x812 in AR.
 7. `README.md` + `how-to-play.html` — language switch note. The guide, Terms and Privacy pages stay English for now (per US-49).
-8. `docs/sprints/sprint-12-dev.md`.
+8. `docs/sprints/sprint-13-dev.md`.
 
 **Tester focus:** EN/AR on every screen with no leftover English string (list from task 1); choice remembered after refresh; RTL mirroring; Latin names, Arabic names and numbers mixed in the scoreboard and Results; every D-30 layout in AR at 1366x768, 1920x1080 and 375x812; saved game and open question restored in AR; question without Arabic; helpers, Streak, Daily, final round and Report flows in AR; English regression of all flows; no console errors.
 
-**Definition of Done (Sprint 12, on top of the global DoD)**
+**Definition of Done (Sprint 13, on top of the global DoD)**
 - A string inventory exists and every item is translated or deliberately left in English with a reason.
 - English behaviour and layouts are unchanged (regression passed).
 - No migration needed; saved game keeps its version unless the language choice is stored in it (then D-28).
@@ -552,15 +593,15 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 
 ---
 
-## Sprint 13 — Phone buzzers (US-52) — later, spike first
+## Sprint 14 — Phone buzzers (US-52) — later, spike first
 
 **Goal:** Decide with evidence whether phone buzzers can work on Hostinger shared hosting (no WebSockets), and build them only if the owner commits the story after the spike. (Owner: later, its own sprint.)
 **Stories:** US-52 (**not committed** until the FU-24 spike result is accepted by the owner and the PO)
-**Dependencies:** **FU-24** (technical spike on short polling: latency, server load, cleanup). If committed: Sprint 12 first if the buzzer pages must be in Arabic; Setup/Question screens; Privacy page.
+**Dependencies:** **FU-24** (technical spike on short polling: latency, server load, cleanup). If committed: Sprint 13 first if the buzzer pages must be in Arabic; Setup/Question screens; Privacy page.
 **Owner questions needed before development:** **FU-24** (spike) and, after it, the owner's go / no-go. Nothing in Phase 2 starts before that.
 
 **Phase 1 — Spike (time-boxed, no application code merged)**
-1. `docs/sprints/sprint-13-spike.md` — prototype of a room with short polling (a throwaway script, not merged): measure buzz-to-host latency, requests per second per room, and load on the shared host for 1, 5 and 10 phones.
+1. `docs/sprints/sprint-14-spike.md` — prototype of a room with short polling (a throwaway script, not merged): measure buzz-to-host latency, requests per second per room, and load on the shared host for 1, 5 and 10 phones.
 2. Same note — fairness check (how often the order is wrong at about 0.5-1 s polling), cleanup options without cron (for example deleting idle rooms on request), and the tables needed.
 3. Same note — go / no-go recommendation; the PO and owner decide, and the Scrum Master then either commits Phase 2 (and updates this sprint) or moves US-52 back to the backlog.
 
@@ -568,11 +609,11 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 4. `sql/migrate-add-buzzer-rooms.sql` (new) + both schema files — room and buzz tables with a last-activity time; rooms idle for 6 h are deleted.
 5. `api/rooms.php` (new) — create room (code), join (pick contestant), buzz, read buzz order; validation and rate limits; no personal data.
 6. `buzzer.html` + `js/buzzer.js` (new) — phone page; `index.html` + `js/game.js` — room code and QR on the host screen, buzz order shown within about 1 s, host still scores; a QR approach that adds no external service.
-7. `privacy.html`, `README.md`, `docs/deploy-hostinger.md`, `docs/sprints/sprint-13-dev.md`.
+7. `privacy.html`, `README.md`, `docs/deploy-hostinger.md`, `docs/sprints/sprint-14-dev.md`.
 
 **Tester focus:** Phase 1: the spike note's numbers can be repeated and the recommendation follows from them. Phase 2 (if committed): room code and QR, join, first buzz order within about 1 s with several phones, host scoring unchanged, 6 h cleanup, bad codes and rate limits, load on the host, phone browsers (iOS Safari, Chrome Android), no console errors.
 
-**Definition of Done (Sprint 13)**
+**Definition of Done (Sprint 14)**
 - Phase 1: spike note delivered and the go / no-go decision recorded in the backlog. A "no-go" closes the sprint as Done with no code.
 - Phase 2 (only if committed): global DoD, plus the migration rule above (migration before the code on every DB; both schema files updated).
 
@@ -580,7 +621,7 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 
 ---
 
-## Sprint 14 — Rewarded second chance in Streak (US-51) — later, blocked
+## Sprint 15 — Rewarded second chance in Streak (US-51) — later, blocked
 
 **Goal:** In a Streak run on the website, one wrong answer per run can be forgiven after the player watches a rewarded ad. (Owner: later, its own sprint.)
 **Stories:** US-51
@@ -594,11 +635,11 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 4. `api/streaks.php` — accept the flag on POST (validated 0/1); the leaderboard returns it; the best-run query is unchanged otherwise (D-37).
 5. `index.html` + `js/game.js` + `css/style.css` — small marker on a leaderboard row for a run that used a second chance; row text still reads as text for screen readers (D-37 j).
 6. `privacy.html`, `how-to-play.html`, `README.md`, `docs/deploy-hostinger.md` — rewarded ad and consent notes; migration step before the code.
-7. `docs/sprints/sprint-14-dev.md`.
+7. `docs/sprints/sprint-15-dev.md`.
 
 **Tester focus:** offer appears once per run after a wrong answer (website, ads on); not in the app (`?source=twa`), not with ads off or maintenance mode; ad completed -> next question, ad closed or failed -> run ends; time's up case; refresh around the ad; marker on the leaderboard row; old rows without the flag; consent message behaviour in the EEA setup; migration run twice; Streak regression and 1366x768 / 375x812; no console errors.
 
-**Definition of Done (Sprint 14, on top of the global DoD)**
+**Definition of Done (Sprint 15, on top of the global DoD)**
 - `sql/migrate-add-streak-second-chance.sql` runs on every DB, including the hosted one, **before** the code is deployed, and the column is added to both `sql/schema.sql` and `sql/schema-hosted.sql` (migration rule above).
 - Nothing in the app ever loads or shows the rewarded ad (D-43), verified in the app build.
 - H5 Games Ads approval confirmed by the owner before the hosted deploy.
@@ -619,14 +660,15 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 | 6 | US-30 (amends US-19, US-20, US-21, US-24, US-25; US-22 stays retired); D-32 (US-04 amended) delivered alongside |
 | 7 | US-42 (accepted 2026-11-02, pending owner checks FU-25 and FU-26) |
 | 8 | US-43, US-46, US-45 (accepted 2026-11-02, pending owner checks FU-28 and FU-29) |
-| 9 | US-44, US-48 (accepted 2026-11-02, re-accepted 2026-11-03 after D-51, pending owner checks FU-31 and FU-32) |
-| 10 | US-47 (planned) |
-| 11 | US-50 (planned, later) |
-| 12 | US-49 (planned, later) |
-| 13 | US-52 (planned, later; spike first, not committed) |
-| 14 | US-51 (planned, later; blocked by FU-23) |
+| 9 | US-44, US-48 (accepted 2026-11-02, re-accepted 2026-11-03 after D-51; merged, PR #89; owner step FU-32 still open) |
+| 10 | US-53 (accepted 2026-11-03, pending owner checks FU-36 and FU-37) |
+| 11 | US-47 (planned) |
+| 12 | US-50 (planned, later) |
+| 13 | US-49 (planned, later) |
+| 14 | US-52 (planned, later; spike first, not committed) |
+| 15 | US-51 (planned, later; blocked by FU-23) |
 
-Epic E17 (US-42..US-52): all 11 stories appear in exactly one of Sprints 7-14. Stories US-31..US-41 were delivered outside the sprint cycle (see the status paragraphs at the top) and have no sprint here.
+Epic E17 (US-42..US-53): all 12 stories appear in exactly one of Sprints 7-15 (US-42..US-52 were approved on 2026-11-02; US-53 was added on 2026-11-03). Stories US-31..US-41 were delivered outside the sprint cycle (see the status paragraphs at the top) and have no sprint here.
 
 All 30 stories appear exactly once; 29 are delivered (accepted) and US-22 is retired (D-31). The amended stories stay in the sprint that first delivered them; Sprint 6 changed their behaviour. Sprint 5 (polish) carries no stories, only follow-ups FU-03, FU-04, FU-05 and FU-08. US-29 (hosted deployment with protected admin) was built on the `hosting` branch after the Sprint 2 stories and is recorded as part of Sprint 2 (owner decision 2026-10-05). Its follow-ups were handled in Sprint 4: the `docs/deploy-hostinger.md` note is done; the hosted `/password.txt` smoke check was done by the owner on 2026-10-05 (FU-01). Notes: US-17 (persistence) is placed in Sprint 4 because its criteria cover the question and results screens; Sprint 3 builds the save/load layer as an enabler. US-27 (XSS) is accepted in Sprint 4 once all UI exists, but DoD item 4 enforces `textContent` from Sprint 2 onward. US-26 is accepted in Sprint 1 where all SQL lives; DoD item 3 keeps it enforced later.
 
