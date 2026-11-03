@@ -8,7 +8,7 @@
   <link rel="icon" href="img/logo.svg" type="image/svg+xml">
   <link rel="icon" href="img/favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.ca3e62fe.css">
+  <link rel="stylesheet" href="css/style.4a59deab.css">
 </head>
 <body class="admin">
   <header class="page-header">
@@ -179,9 +179,14 @@
         <select id="question-points-filter"></select>
         <span id="question-count" class="hint"></span>
       </div>
-      <!-- Difficulty stats (US-47, D-55): attempts and % correct from the game; the band of each enabled value -->
-      <p id="question-stats-hint" class="hint"></p>
+      <!-- Difficulty stats (US-47, D-55): attempts and % correct from the game; the band of each enabled value.
+           "Reset all stats" (change request after Sprint 11) empties question_stats. -->
+      <div id="question-stats-row" class="stats-hint-row">
+        <p id="question-stats-hint" class="hint"></p>
+        <button type="button" id="question-stats-reset" class="btn btn-small btn-danger" hidden>Reset all stats</button>
+      </div>
       <p id="question-stats-msg" class="msg" role="status" aria-live="polite" hidden></p>
+      <p id="question-stats-reset-msg" class="msg" role="status" aria-live="polite" hidden></p>
       <div class="table-wrap">
         <table class="data-table">
           <thead>
@@ -252,6 +257,6 @@
     </section>
   </main>
 
-  <script src="js/admin.b5e5aba1.js"></script>
+  <script src="js/admin.15ab8dd0.js"></script>
 </body>
 </html>

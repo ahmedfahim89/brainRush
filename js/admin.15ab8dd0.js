@@ -38,6 +38,9 @@
   const MIDDOT = String.fromCharCode(0x00b7); // "100: 60–100% · 200: 50–90%"
   // Sortable stats columns: the direction of the first click (most attempts / lowest % correct first).
   const STATS_SORTS = { attempts: 'descending', percent: 'ascending' };
+  // "Reset all stats" (change request after Sprint 11): empties question_stats for every question.
+  const STATS_RESET_PROMPT = 'Reset the stats of every question? All attempts and % correct go back to 0. This cannot be undone.';
+  const STATS_RESET_EMPTY = 'Nothing to reset: no question has any attempts yet.';
 
   const state = {
     settings: null,    // { categories_per_game, timer_seconds, banner_enabled, banner_text, ..., ads_enabled, ads_client, ads_slot }
@@ -46,8 +49,10 @@
     questions: [],     // [{ id, category_id, category_name, points, question, answer, question_ar, answer_ar, image, image_credit,
                        //    wrong_1, wrong_2, wrong_1_ar, wrong_2_ar, attempts, percent_correct,
                        //    stats: {correct, wrong, nobody, timeout} }]; the stats fields are null without
-                       //    the question_stats table (US-47), percent_correct also with 0 attempts
+                       //    the question_stats table (US-47), percent_correct also with 0 attempts; an
+                       //    older api/questions.php leaves them out (undefined), handled like null
     statsSort: null,   // { key: 'attempts' | 'percent', dir: 'ascending' | 'descending' }, or null (list order)
+    statsResetting: false, // a "Reset all stats" request is running
     reports: [],       // open reports per question, most reported first (US-42): [{ question: {id, category_id,
                        //    category_name, points, question, answer, image}, count, reasons: {reason: count},
                        //    reports: [{ id, reason, note, created_at }] newest first, last_at }]
@@ -109,8 +114,11 @@
     qPointsFilter: byId('question-points-filter'),
     qCount: byId('question-count'),
     questionsBody: byId('questions-body'),
+    qStatsRow: byId('question-stats-row'),
     qStatsHint: byId('question-stats-hint'),
+    qStatsReset: byId('question-stats-reset'),
     qStatsMsg: byId('question-stats-msg'),
+    qStatsResetMsg: byId('question-stats-reset-msg'),
     sortButtons: Array.prototype.slice.call(document.querySelectorAll('.sort-btn[data-sort]')),
     reportsReload: byId('reports-reload'),
     reportsCount: byId('reports-count'),
@@ -749,6 +757,7 @@
     const bands = valueBands();
     dom.qCount.textContent = 'Showing ' + rows.length + ' of ' + state.questions.length;
     renderStatsHint(bands);
+    clearStatsResetSuccess();
     renderSortButtons();
     clear(dom.questionsBody);
     if (!rows.length) {
@@ -815,33 +824,95 @@
     return band.low + EN_DASH + band.high + '%';
   }
 
+  /**
+   * The question has its stats fields. They are null without the question_stats table, and missing
+   * (undefined) when an older api/questions.php answers (seen live during a deploy): both show "-".
+   */
+  function hasStats(q) {
+    return q.attempts != null && !!q.stats;
+  }
+
+  /** Some question has no stats fields: the table is missing (or the API is older), see hasStats(). */
+  function statsMissing() {
+    return state.questions.some((q) => !hasStats(q));
+  }
+
   /** D-55 b: marked from MIN_ATTEMPTS attempts when the shown whole % is outside its value's band. */
   function needsCheck(q, bands) {
     const band = bands[q.points];
-    return !!band && q.attempts !== null && q.attempts >= MIN_ATTEMPTS && q.percent_correct !== null &&
+    return !!band && hasStats(q) && q.attempts >= MIN_ATTEMPTS && q.percent_correct != null &&
       (q.percent_correct < band.low || q.percent_correct > band.high);
   }
 
   /** D-55 j: "Check value: 20+ attempts and % correct outside 100: 60–100% · 200: 50–90% · …". */
   function renderStatsHint(bands) {
     const values = Object.keys(bands).map(Number).sort((a, b) => a - b);
-    dom.qStatsHint.hidden = !state.points.length; // nothing loaded yet (or no point values at all)
-    dom.qStatsHint.textContent = values.length
-      ? 'Check value: ' + MIN_ATTEMPTS + '+ attempts and % correct outside ' +
-        values.map((p) => p + ': ' + bandText(bands[p])).join(' ' + MIDDOT + ' ') +
-        '. Attempts and % correct come from board and Streak games.'
-      : 'Check value: no point value is enabled, so no question is marked.';
+    dom.qStatsRow.hidden = !state.points.length; // nothing loaded yet (or no point values at all)
+    clear(dom.qStatsHint);
+    if (values.length) {
+      // Each "200: 50–90%" is a no-wrap span, so a line never breaks inside a band.
+      const parts = [document.createTextNode('Check value: ' + MIN_ATTEMPTS + '+ attempts and % correct outside ')];
+      values.forEach((p, i) => {
+        if (i) parts.push(document.createTextNode(' ' + MIDDOT + ' '));
+        parts.push(h('span', { className: 'band', text: p + ': ' + bandText(bands[p]) }));
+      });
+      parts.push(document.createTextNode('. Attempts and % correct come from board and Streak games.'));
+      parts.forEach((node) => dom.qStatsHint.appendChild(node));
+    } else {
+      dom.qStatsHint.textContent = 'Check value: no point value is enabled, so no question is marked.';
+    }
     // Without the question_stats table the list still loads; only the stats are missing (FU-19 rule).
-    if (state.questions.some((q) => q.attempts === null)) {
+    if (statsMissing()) {
       showMessage(dom.qStatsMsg, 'Attempts and % correct are not set up on this database yet: run sql/migrate-add-question-stats.sql.', 'warning');
     } else {
       clearMessage(dom.qStatsMsg);
     }
+    renderStatsReset();
+  }
+
+  /**
+   * "Reset all stats": hidden while the stats are missing (the "-" / migration-note state), disabled
+   * with a tooltip when no question has any attempts, and while a reset is running.
+   */
+  function renderStatsReset() {
+    const button = dom.qStatsReset;
+    button.hidden = statsMissing();
+    const nothing = !state.questions.some((q) => hasStats(q) && q.attempts > 0);
+    button.disabled = nothing || state.statsResetting;
+    if (nothing) {
+      button.title = STATS_RESET_EMPTY;
+    } else {
+      button.removeAttribute('title');
+    }
+  }
+
+  /**
+   * BUG-CR-01: "Stats reset: …" only confirms the reset just done, so the next render of the list
+   * (reload, add, edit, delete, filter or sort) clears it. An error stays until the next reset.
+   */
+  function clearStatsResetSuccess() {
+    if (dom.qStatsResetMsg.classList.contains('msg-success')) clearMessage(dom.qStatsResetMsg);
+  }
+
+  /** Confirm (D-18), then empty question_stats and reload the list; the button is off while it runs. */
+  async function onStatsResetClick() {
+    if (state.statsResetting || !window.confirm(STATS_RESET_PROMPT)) return;
+    state.statsResetting = true;
+    renderStatsReset();
+    await runAction(dom.qStatsResetMsg, [], async () => {
+      const result = await api('question-stats.php', 'DELETE');
+      await refreshData();
+      showSuccess(dom.qStatsResetMsg, typeof result.deleted === 'number'
+        ? 'Stats reset: ' + plural(result.deleted, 'question') + ' cleared.'
+        : 'Stats reset.');
+    });
+    state.statsResetting = false;
+    renderStatsReset();
   }
 
   /** Attempts, with the four outcomes in the tooltip ("12 correct · 5 wrong · 2 nobody · 1 time's up"). */
   function attemptsCell(q) {
-    if (q.attempts === null) return h('td', { className: 'num hint', text: '-' });
+    if (!hasStats(q)) return h('td', { className: 'num hint', text: '-' });
     const s = q.stats;
     const detail = [s.correct + ' correct', s.wrong + ' wrong', s.nobody + ' nobody', s.timeout + " time's up"]
       .join(' ' + MIDDOT + ' ');
@@ -850,7 +921,7 @@
 
   /** % correct ("-" with no attempts) and the "Check value" mark, its tooltip naming the band. */
   function percentCell(q, bands) {
-    if (q.percent_correct === null) return h('td', { className: 'num hint', text: '-' });
+    if (!hasStats(q) || q.percent_correct == null) return h('td', { className: 'num hint', text: '-' });
     const children = [h('span', { text: q.percent_correct + '%' })];
     if (needsCheck(q, bands)) {
       const tip = 'Expected ' + bandText(bands[q.points]) + ' for ' + q.points;
@@ -866,7 +937,7 @@
     if (!sort) return rows;
     const field = sort.key === 'attempts' ? 'attempts' : 'percent_correct';
     const sign = sort.dir === 'ascending' ? 1 : -1;
-    const noValue = (q) => q[field] === null || (field === 'attempts' && q.attempts === 0);
+    const noValue = (q) => !hasStats(q) || q[field] == null || (field === 'attempts' && q.attempts === 0);
     return rows.slice().sort((a, b) => {
       if (noValue(a) || noValue(b)) return Number(noValue(a)) - Number(noValue(b));
       return sign * (a[field] - b[field]);
@@ -1396,6 +1467,7 @@
     dom.qFilter.addEventListener('change', onFilterChange);
     dom.qPointsFilter.addEventListener('change', onFilterChange);
     dom.sortButtons.forEach((button) => button.addEventListener('click', onSortClick));
+    dom.qStatsReset.addEventListener('click', onStatsResetClick);
     dom.authRetry.addEventListener('click', onAuthRetry);
     dom.reportsReload.addEventListener('click', onReportsReload);
     dom.streaksReload.addEventListener('click', onStreaksReload);

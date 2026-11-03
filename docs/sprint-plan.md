@@ -535,6 +535,8 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 
 **Status:** Accepted by the PO 2026-11-03 (test report: 72 checks, 68 PASS, 0 FAIL, 4 PENDING after the re-test; first run 62 PASS, 1 FAIL; BUG-11-01 (Minor, Admin Questions table 5 px too wide at 1024 px) fixed in fix loop 1 and re-tested; D-56). Pending the owner's local Chrome check and commit (FU-39) and the hosted migration, deploy and device steps (FU-40). Branch `sprint-11`, cut from `main` after the Sprint 10 merge (PR #90); not committed.
 
+**Change request "Reset all stats" (owner, 2026-11-03):** Accepted by the PO 2026-11-03 (test report `docs/sprints/cr-reset-stats-test-report.md`: 59 checks, 56 PASS, 0 FAIL, 3 PENDING after the re-test; BUG-CR-01 (Minor, the success line never cleared) fixed and re-tested; D-57). Pending the owner's local Chrome check and commit (FU-45) and the hosted deploy (FU-46, no migration). Branch `cr-reset-stats`, cut from `main` after the Sprint 11 merge (PR #92); not committed.
+
 ---
 
 ## Sprint 12 — Custom category for one game (US-50) — later
