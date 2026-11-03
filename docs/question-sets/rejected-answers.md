@@ -132,6 +132,8 @@ Unknown: the owner removed 19 AI suggestions on 2026-10-19 (all 5 at 500), and o
 | Yogi Bear | 400 | Jellystone Park bear in a hat and tie, "smarter than the average bear", steals picnic baskets (replaced by the owner) | 2026-11-01 | auto-2026-11-01-review.md |
 | Antoine de Saint-Exupery | 600 | Writer and pilot who wrote and illustrated "The Little Prince" (1943) | 2026-11-01 | auto-2026-11-01-review.md |
 | The Hundred Acre Wood | 400 | Forest where Winnie-the-Pooh, Piglet and their friends live (Yogi Bear's replacement) | 2026-11-01 | auto-2026-11-01-review.md |
+| The Omnitrix | 400 | Watch-like alien device that lets Ben Tennyson turn into aliens in "Ben 10" (2005) | 2026-11-03 | auto-2026-11-03-review.md |
+| Huey, Dewey and Louie | 400 | Scrooge McDuck's three grand-nephews in "DuckTales" (1987) | 2026-11-03 | auto-2026-11-03-review.md |
 
 ## Egyptians
 
@@ -311,6 +313,7 @@ Unknown: the owner removed 12 History suggestions on 2026-10-19, and only the fi
 | Mausoleum at Halicarnassus | 600 | Text: tomb of Mausolus, one of the Seven Wonders | 2026-10-22 | landmarks-review.md |
 | Qasr al-Farid | 600 | Picture: Nabataean tomb, Hegra | 2026-10-22 | landmarks-review.md |
 | Ziggurat of Ur | 600 | Picture: Mesopotamian temple, Iraq | 2026-10-22 | landmarks-review.md |
+| Potala Palace | 500 | Picture: palace of the Dalai Lamas, Lhasa | 2026-11-03 | auto-2026-11-03-review.md |
 
 Points for the owner removals are worked out from the draft counts and the order of the doc's lists (the doc gives no per-row value for them).
 
@@ -431,3 +434,6 @@ Notes: Gutenberg and Ada Lovelace were removed twice: the seed questions (points
 | Ibn Rushd (Averroes) | 500 | 12th-century philosopher, judge and physician from Cordoba, "The Commentator" on Aristotle | 2026-10-27 | auto-2026-10-27-review.md |
 | Amelia Earhart | 500 | American pilot, first woman to fly solo nonstop to Europe (1932), vanished in 1937 | 2026-10-28 | auto-2026-10-28-review.md |
 | Sigmund Freud | 500 | Austrian doctor, founder of psychoanalysis, "The Interpretation of Dreams" | 2026-11-01 | auto-2026-11-01-review.md |
+| Hippocrates | 200 | Ancient physician from Kos, "Father of Medicine", the Hippocratic Oath | 2026-11-03 | auto-2026-11-03-review.md |
+| Ibn Khaldun | 400 | 14th-century historian born in Tunis, the "Muqaddimah", judge under the Mamluks | 2026-11-03 | auto-2026-11-03-review.md |
+| Roald Amundsen | 500 | Polar explorer, first to the South Pole (December 1911) ahead of Scott | 2026-11-03 | auto-2026-11-03-review.md |
