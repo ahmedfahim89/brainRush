@@ -129,6 +129,7 @@ Screens toggled by JS (single page, state held in a JS object, also saved to `lo
    - Each player/team auto-assigned a distinct color from a 6-color palette (shown as a swatch, clickable to change).
    - Category picker: checklist of playable categories, select at least 1 and up to `categories_per_game` (loaded from settings). Changed 2026-10-11 (D-32): was "exactly `categories_per_game`".
    - "Surprise me!" tile first in the picker (D-33): alone it picks 3 random playable categories; with other picks it adds 1 random category in its slot. Random columns show "?" on the board until one of their questions is opened.
+   - "Kilo Meshakkal" tile (added 2026-11-03, US-53 / D-53; built in, reserved id `-1`, no `categories` row, not in Admin): listed by name with the playable categories (name only, no hint), counts toward `categories_per_game`, never picked by Surprise. Its board column gives each box a random question from any playable category at that value (different categories where possible, none already on the board, unseen first); open boxes show an emoji instead of the value and the values run in a random order down the column (an exception to "ascending" in the Board section); the heading reads "Kilo Meshakkal: <source category> – <points>"; the order and emoji are saved with the game. The game log names it "Kilo Meshakkal".
    - Timer seconds field pre-filled from settings (`timer_seconds`), host can override for this game.
    - "Start Game" → fetch board questions.
 2. **Board**

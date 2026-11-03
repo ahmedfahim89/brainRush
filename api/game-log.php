@@ -7,7 +7,8 @@
 //   <YYYY-MM-DD HH:MM, server time> | players: <name>, <name> | categories: <name>, <name>
 //   <YYYY-MM-DD HH:MM, server time> | teams: <name>, <name> | categories: <name>, <name>
 //   <YYYY-MM-DD HH:MM, server time> | streak: <name> | categories: all
-// Category names come from the database, so the log never holds client-made category text.
+// Category names come from the database, so the log never holds client-made category text. The
+// built-in Kilo Meshakkal column (US-53 / D-53) is id -1 and is logged under its fixed name.
 // Public on purpose (every game start calls it); read_json_body() forces a CORS preflight.
 require_once __DIR__ . '/db.php';
 
@@ -15,6 +16,9 @@ const GAME_LOG_DIR = __DIR__ . '/../logs';
 const GAME_LOG_MAX_BY_MODE = ['players' => 6, 'teams' => 4, 'streak' => 1]; // MODES limits in js/game.js
 const GAME_LOG_NAME_MAX = 30;      // NAME_MAX in js/game.js (D-22); also the challenger name
 const GAME_LOG_MAX_CATEGORIES = 10; // categories_per_game upper bound
+// Kilo Meshakkal (US-53 / D-53): MIX_ID / MIX_NAME in api/questions.php, MIX / MIX_NAME in js/game.js.
+const GAME_LOG_MIX_ID = -1;
+const GAME_LOG_MIX_NAME = 'Kilo Meshakkal';
 
 /** One log field: control characters (newlines, tabs) become spaces, so a name cannot forge a line. */
 function log_text(string $text): string
@@ -47,7 +51,7 @@ function read_players($value, string $mode): array
     return array_map(fn($name) => log_text(require_text($name, 'Player name', GAME_LOG_NAME_MAX)), array_values($value));
 }
 
-/** Names of the chosen categories, in the order chosen; 400 for unknown ids. */
+/** Names of the chosen categories, in the order chosen; 400 for unknown ids. -1 = Kilo Meshakkal, at most once. */
 function read_category_names(PDO $pdo, $value): array
 {
     if (!is_array($value) || !$value || count($value) > GAME_LOG_MAX_CATEGORIES) {
@@ -56,15 +60,22 @@ function read_category_names(PDO $pdo, $value): array
     $ids = [];
     foreach ($value as $raw) {
         $id = parse_int($raw);
-        if ($id === null || $id < 1) {
-            bad_request('categories must hold positive integer ids');
+        if ($id === null || ($id < 1 && $id !== GAME_LOG_MIX_ID)) {
+            bad_request('categories must hold positive integer ids (or ' . GAME_LOG_MIX_ID . ' for ' . GAME_LOG_MIX_NAME . ')');
+        }
+        if ($id === GAME_LOG_MIX_ID && in_array($id, $ids, true)) {
+            bad_request(GAME_LOG_MIX_NAME . ' is listed more than once');
         }
         $ids[] = $id;
     }
-    $placeholders = implode(',', array_fill(0, count($ids), '?'));
-    $stmt = $pdo->prepare("SELECT id, name FROM categories WHERE id IN ($placeholders)");
-    $stmt->execute($ids);
-    $names = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    $names = [GAME_LOG_MIX_ID => GAME_LOG_MIX_NAME];
+    $realIds = array_values(array_filter($ids, fn(int $id): bool => $id !== GAME_LOG_MIX_ID));
+    if ($realIds) {
+        $placeholders = implode(',', array_fill(0, count($realIds), '?'));
+        $stmt = $pdo->prepare("SELECT id, name FROM categories WHERE id IN ($placeholders)");
+        $stmt->execute($realIds);
+        $names += $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    }
     return array_map(function (int $id) use ($names): string {
         if (!isset($names[$id])) {
             bad_request("Category $id does not exist");

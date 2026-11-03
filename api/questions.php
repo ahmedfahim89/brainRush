@@ -27,6 +27,10 @@
 // random question per cell (category x point value) (US-30). The game sends the ids this
 // browser already played (`seen`, oldest first): a cell draws from its unseen questions,
 // and once all of them were played it takes the one played longest ago.
+//
+// Kilo Meshakkal (US-53 / D-53): the board's `categories` may also list MIX_ID (-1) once. It is a
+// built-in column with no row in `categories`: each of its cells is a random question from any
+// playable category at that value (see mix_column()), and carries its source `category_name`.
 require_once __DIR__ . '/db.php';
 
 const QUESTION_TEXT_MAX = 5000;
@@ -45,6 +49,11 @@ const WRONG_OPTION_MAX = 255;
 
 // Streak Challenge (US-33): questions per batch; the game asks for more when it runs low.
 const STREAK_BATCH = 20;
+
+// Kilo Meshakkal (US-53 / D-53): reserved board id (real ids are positive, Surprise is 0 in the game)
+// and its column name. MIX / MIX_NAME in js/game.js; also in api/game-log.php.
+const MIX_ID = -1;
+const MIX_NAME = 'Kilo Meshakkal';
 
 /**
  * A text as the game shows it as a choice (choiceText() in js/game.js): cut at its first
@@ -140,7 +149,10 @@ function list_questions(PDO $pdo): array
     return array_map('question_row', $stmt->fetchAll());
 }
 
-/** Parse "3,1,2" into a list of distinct positive ids (order kept); 400 otherwise. */
+/**
+ * Parse "3,1,2" into a list of distinct ids (order kept): positive ids, plus MIX_ID (-1) for the
+ * Kilo Meshakkal column (US-53); 400 otherwise.
+ */
 function parse_board_ids($raw): array
 {
     if (!is_string($raw) || trim($raw) === '') {
@@ -149,8 +161,8 @@ function parse_board_ids($raw): array
     $ids = [];
     foreach (explode(',', $raw) as $part) {
         $part = trim($part);
-        if (!preg_match('/^\d{1,10}$/', $part) || (int) $part < 1) {
-            bad_request('categories must be a comma-separated list of positive integer ids');
+        if (!preg_match('/^-?\d{1,10}$/', $part) || ((int) $part < 1 && (int) $part !== MIX_ID)) {
+            bad_request('categories must be a comma-separated list of positive integer ids (or ' . MIX_ID . ' for ' . MIX_NAME . ')');
         }
         $id = (int) $part;
         if (in_array($id, $ids, true)) {
@@ -187,10 +199,15 @@ function parse_seen_ids($raw, string $label = 'seen'): array
 /**
  * { played, total }: total = questions a board can draw from these categories (enabled point
  * values only); played = how many of those are in $seen. Questions that were deleted, or whose
- * point value or category is no longer on the board, do not count.
+ * point value or category is no longer on the board, do not count. MIX_ID (US-53) has no questions
+ * of its own, so it adds nothing.
  */
 function played_count(PDO $pdo, array $ids, array $seen): array
 {
+    $ids = array_values(array_filter($ids, fn(int $id): bool => $id !== MIX_ID));
+    if (!$ids) {
+        return ['played' => 0, 'total' => 0];
+    }
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
     $stmt = $pdo->prepare(
         "SELECT q.id FROM questions q
@@ -230,12 +247,35 @@ function random_key(array $items)
  * Every cell (category x point value) gets one random question from that cell's unseen
  * questions (US-30); when all of them are in $seen (oldest first), the one seen longest
  * ago. Cells hold different questions, so a board never repeats one.
+ * MIX_ID in $ids is the Kilo Meshakkal column (US-53), built last from what the other columns
+ * left (mix_column()) and put back at its requested position.
  */
 function board(PDO $pdo, array $ids, array $seen = []): array
 {
     // Position in the seen list: a lower rank was played longer ago.
     $seenRank = array_flip($seen);
 
+    // Disabled point values are not board rows; their questions are simply not drawn.
+    $points = array_map('intval', $pdo->query('SELECT points FROM point_values WHERE enabled = 1 ORDER BY points ASC')->fetchAll(PDO::FETCH_COLUMN));
+
+    $mixAt = array_search(MIX_ID, $ids, true);
+    $realIds = array_values(array_filter($ids, fn(int $id): bool => $id !== MIX_ID));
+    $categories = $realIds ? category_columns($pdo, $realIds, $points, $seenRank) : [];
+    if ($mixAt !== false) {
+        $onBoard = [];
+        foreach ($categories as $c) {
+            foreach ((array) $c['questions'] as $q) {
+                $onBoard[] = $q['id'];
+            }
+        }
+        array_splice($categories, $mixAt, 0, [mix_column($pdo, $points, $onBoard, $seenRank)]);
+    }
+    return ['points' => $points, 'categories' => $categories];
+}
+
+/** The board columns of real categories ($ids non-empty, requested order); 400 for unknown ids or missing cells. */
+function category_columns(PDO $pdo, array $ids, array $points, array $seenRank): array
+{
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
 
     $stmt = $pdo->prepare("SELECT id, name FROM categories WHERE id IN ($placeholders)");
@@ -245,9 +285,6 @@ function board(PDO $pdo, array $ids, array $seen = []): array
     if ($unknown) {
         bad_request('Unknown category id(s): ' . implode(', ', $unknown));
     }
-
-    // Disabled point values are not board rows; their questions are simply not drawn.
-    $points = array_map('intval', $pdo->query('SELECT points FROM point_values WHERE enabled = 1 ORDER BY points ASC')->fetchAll(PDO::FETCH_COLUMN));
 
     $stmt = $pdo->prepare(
         'SELECT ' . CELL_COLUMNS . " FROM questions WHERE category_id IN ($placeholders) ORDER BY id ASC"
@@ -276,7 +313,99 @@ function board(PDO $pdo, array $ids, array $seen = []): array
         // Cast to object so it always encodes as a JSON object keyed by points.
         $categories[] = ['id' => $id, 'name' => $names[$id], 'questions' => (object) $questions];
     }
-    return ['points' => $points, 'categories' => $categories];
+    return $categories;
+}
+
+/** Names of the playable categories (PLAYABLE_HAVING, as categories.php?playable=1), keyed by id. */
+function playable_names(PDO $pdo): array
+{
+    return $pdo->query(
+        'SELECT c.id, c.name
+           FROM categories c
+           LEFT JOIN questions q ON q.category_id = c.id
+           LEFT JOIN point_values pv ON pv.points = q.points
+          GROUP BY c.id, c.name ' . PLAYABLE_HAVING
+    )->fetchAll(PDO::FETCH_KEY_PAIR);
+}
+
+/**
+ * The Kilo Meshakkal column (US-53 / D-53): {id: MIX_ID, name: MIX_NAME, mix: true, questions:
+ * {<points>: board_cell() + category_name}}. Each cell is a question at that value from any playable
+ * category, never one of $exclude (the questions already on the board). For each value it prefers a
+ * category not used yet in this column (so the cells spread over different topics), then one that
+ * still has an unseen question there (US-30), and draws by the board rule (draw_from_pool). The
+ * value with the fewest categories holding an unseen question is drawn first, so the two
+ * preferences rarely clash.
+ * 400 when a value has no question left.
+ */
+function mix_column(PDO $pdo, array $points, array $exclude, array $seenRank): array
+{
+    $column = ['id' => MIX_ID, 'name' => MIX_NAME, 'mix' => true, 'questions' => (object) []];
+    if (!$points) {
+        return $column; // no enabled point value: no rows, as for the other columns
+    }
+    $excluded = array_flip($exclude);
+    $names = playable_names($pdo);
+
+    // Drawable ids per enabled value and category: $cells[points][categoryId] = [['id' => id], ...].
+    $cells = [];
+    if ($names) {
+        $ids = array_map('intval', array_keys($names));
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $pdo->prepare(
+            "SELECT q.id, q.category_id, q.points FROM questions q
+               JOIN point_values pv ON pv.points = q.points AND pv.enabled = 1
+              WHERE q.category_id IN ($placeholders)"
+        );
+        $stmt->execute($ids);
+        foreach ($stmt->fetchAll() as $r) {
+            $id = (int) $r['id'];
+            if (!isset($excluded[$id])) {
+                $cells[(int) $r['points']][(int) $r['category_id']][] = ['id' => $id];
+            }
+        }
+    }
+    $missing = array_values(array_filter($points, fn(int $p): bool => empty($cells[$p])));
+    if ($missing) {
+        bad_request('"' . MIX_NAME . '" is missing questions for: ' . implode(', ', $missing));
+    }
+
+    $hasFresh = fn(array $pool): bool => (bool) array_filter($pool, fn(array $q): bool => !isset($seenRank[$q['id']]));
+    // A value with no unseen question anywhere has nothing to protect, so it is drawn last.
+    $freshCount = function (int $p) use ($cells, $hasFresh): int {
+        $count = count(array_filter($cells[$p], $hasFresh));
+        return $count === 0 ? PHP_INT_MAX : $count;
+    };
+    $order = $points;
+    usort($order, fn(int $a, int $b): int => $freshCount($a) <=> $freshCount($b));
+
+    $usedCategories = [];
+    $picked = []; // points => [question id, category id]
+    foreach ($order as $p) {
+        $choices = array_diff_key($cells[$p], $usedCategories) ?: $cells[$p];
+        $choices = array_filter($choices, $hasFresh) ?: $choices;
+        $categoryId = random_key($choices);
+        $usedCategories[$categoryId] = true;
+        $picked[$p] = [draw_from_pool($choices[$categoryId], $seenRank)['id'], $categoryId];
+    }
+
+    $placeholders = implode(',', array_fill(0, count($picked), '?'));
+    $stmt = $pdo->prepare('SELECT ' . CELL_COLUMNS . " FROM questions WHERE id IN ($placeholders)");
+    $stmt->execute(array_map(fn(array $pick): int => $pick[0], array_values($picked)));
+    $rows = [];
+    foreach ($stmt->fetchAll() as $r) {
+        $rows[(int) $r['id']] = $r;
+    }
+    $questions = [];
+    foreach ($points as $p) {
+        [$id, $categoryId] = $picked[$p];
+        if (!isset($rows[$id])) { // deleted by the admin a moment ago
+            conflict('The questions changed meanwhile. Please try again.');
+        }
+        $questions[$p] = board_cell($rows[$id]) + ['category_name' => $names[$categoryId]];
+    }
+    $column['questions'] = (object) $questions;
+    return $column;
 }
 
 /**
@@ -292,13 +421,7 @@ function random_question(PDO $pdo, array $exclude, array $seen): array
     $seenRank = array_flip($seen);
     $excluded = array_flip($exclude);
 
-    $names = $pdo->query(
-        'SELECT c.id, c.name
-           FROM categories c
-           LEFT JOIN questions q ON q.category_id = c.id
-           LEFT JOIN point_values pv ON pv.points = q.points
-          GROUP BY c.id, c.name ' . PLAYABLE_HAVING
-    )->fetchAll(PDO::FETCH_KEY_PAIR);
+    $names = playable_names($pdo);
 
     // Drawable ids per cell (category x enabled point value), all and unseen only.
     $cells = [];
