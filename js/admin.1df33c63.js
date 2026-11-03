@@ -59,6 +59,7 @@
     settingBannerText: byId('setting-banner-text'),
     settingStartHidden: byId('setting-start-hidden'),
     settingHelpersEnabled: byId('setting-helpers-enabled'),
+    settingFinalRound: byId('setting-final-round'),
     settingAdsEnabled: byId('setting-ads-enabled'),
     settingAdsClient: byId('setting-ads-client'),
     settingAdsSlot: byId('setting-ads-slot'),
@@ -344,6 +345,7 @@
     dom.settingBannerEnabled.checked = settings.banner_enabled === 1;
     dom.settingStartHidden.checked = settings.start_game_hidden === 1;
     dom.settingHelpersEnabled.checked = settings.helpers_enabled !== 0; // a missing row means on
+    dom.settingFinalRound.checked = settings.final_round_enabled === 1; // US-44: a missing row means off
     dom.settingBannerText.value = typeof settings.banner_text === 'string' ? settings.banner_text : BANNER_DEFAULT;
     dom.settingAdsEnabled.checked = settings.ads_enabled === 1; // a missing row means off
     dom.settingAdsClient.value = typeof settings.ads_client === 'string' ? settings.ads_client : '';
@@ -390,6 +392,7 @@
         banner_text: bannerText,
         start_game_hidden: dom.settingStartHidden.checked ? 1 : 0,
         helpers_enabled: dom.settingHelpersEnabled.checked ? 1 : 0,
+        final_round_enabled: dom.settingFinalRound.checked ? 1 : 0,
         ads_enabled: adsEnabled ? 1 : 0,
         ads_client: adsClient,
         ads_slot: adsSlot,

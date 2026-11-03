@@ -8,7 +8,7 @@ Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..U
 
 **Streak Challenge (2026-10-23, outside the sprint cycle):** US-33 / US-34 / D-37 (solo run of 3-choice questions until the first wrong answer or time's up, plus a shared top-10 leaderboard and an admin moderation list) implemented on branch `streak-mode` from main 4582c9d (`docs/sprints/streak-mode-dev.md`); game-tester verification next (max 2 fix loops), then the owner's local Chrome check before commit/PR. Needs `sql/migrate-add-streak.sql` (creates the `streaks` table) on every DB before the code; it reuses the helper's wrong options, so `sql/migrate-add-wrong-options.sql` must be there too.
 
-**New features, Epic E17 (2026-11-02):** the owner approved US-42..US-52. They are planned as Sprints 7-14 (below, after Sprint 6), in the owner's order: Sprints 7-10 are the near-term groups (owner's "A" to "D"), Sprints 11-14 are one story each, later. Sprints 7 and 8 were built and PO-accepted on 2026-11-02, pending the owner's local test and the hosted steps (Sprint 7: FU-25, FU-26; Sprint 8: FU-28, FU-29); Sprints 9-14 are not started. Each sprint lists the owner questions (FU-20..FU-24) that must be answered before development.
+**New features, Epic E17 (2026-11-02):** the owner approved US-42..US-52. They are planned as Sprints 7-14 (below, after Sprint 6), in the owner's order: Sprints 7-10 are the near-term groups (owner's "A" to "D"), Sprints 11-14 are one story each, later. Sprints 7, 8 and 9 were built and PO-accepted on 2026-11-02, pending the owner's local test and the hosted steps (Sprint 7: FU-25, FU-26; Sprint 8: FU-28, FU-29; Sprint 9: FU-31, FU-32); Sprints 10-14 are not started. Each sprint lists the owner questions (FU-20..FU-24) that must be answered before development.
 
 | Sprint | Goal | Status |
 |---|---|---|
@@ -20,7 +20,7 @@ Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..U
 | 6 | Question bank: random questions per new game (US-30, D-31; D-32 alongside) | Done (accepted 2026-10-11 after rework); owner Chrome check, commit/PR and hosted migration (FU-11) open |
 | 7 | Report a question (US-42) | Accepted by the PO 2026-11-02, pending the owner's local Chrome check (FU-25) and the hosted steps (FU-26); not committed |
 | 8 | Daily Challenge, share, weekly leaderboard (US-43, US-46, US-45) | Accepted by the PO 2026-11-02, pending the owner's local Chrome check and commit (FU-28) and the hosted steps (FU-29); not committed |
-| 9 | Final round with wagers, read aloud (US-44, US-48) | Planned |
+| 9 | Final round with wagers (Golden Goal ⚽ tiebreaker), read aloud (US-44, US-48) | Accepted by the PO 2026-11-02, re-accepted 2026-11-03 after the D-51 change, pending the owner's local Chrome check and commit (FU-31) and the hosted and device steps (FU-32); not committed |
 | 10 | Question difficulty stats (US-47) | Planned |
 | 11 | Custom category for one game (US-50) | Planned (later) |
 | 12 | Arabic interface (US-49) | Planned (later) |
@@ -247,7 +247,7 @@ New open follow-up FU-09 (Owner) was added by the PO (see "Follow-ups" below).
 
 ## Epic E17 — New features (Sprints 7-14, planned 2026-11-02)
 
-The owner approved US-42..US-52 on 2026-11-02 and set this grouping and order. Full story text is in `docs/product-backlog.md` ("Epic E17"); owner questions are FU-20..FU-24 ("Open owner questions (new features)"). Sprints 7 and 8 are PO-accepted pending the owner steps (see their Status); Sprints 9-14 are **Planned** and not started. Sprint numbers continue from Sprint 6; the owner's labels were A = Sprint 7, B = Sprint 8, C = Sprint 9, D = Sprint 10, and the four "later" items are Sprints 11-14.
+The owner approved US-42..US-52 on 2026-11-02 and set this grouping and order. Full story text is in `docs/product-backlog.md` ("Epic E17"); owner questions are FU-20..FU-24 ("Open owner questions (new features)"). Sprints 7, 8 and 9 are PO-accepted pending the owner steps (see their Status); Sprints 10-14 are **Planned** and not started. Sprint numbers continue from Sprint 6; the owner's labels were A = Sprint 7, B = Sprint 8, C = Sprint 9, D = Sprint 10, and the four "later" items are Sprints 11-14.
 
 **Rules common to Sprints 7-14** (on top of the global Definition of Done)
 
@@ -393,26 +393,78 @@ PO decisions on the developer's choices (no story change, D-46 stands):
 **Goal:** The host can add an optional final wager round before Results, and the device can read questions aloud. (Owner's Sprint C.)
 **Stories:** US-44, US-48
 **Dependencies:** Sprint 4 (End Game, Results, scoring), D-36 `questions.php?random=1` (random bank question), `settings.php` (new `final_round_enabled` setting, no migration: a missing row means off, like `banner_enabled`); D-28 saved-game version.
-**Owner questions needed before development:** **FU-22** (wager rule for contestants at 0 or below; draft: up to the smallest point value). US-48 needs none.
+**Owner questions needed before development:** **FU-22**, answered 2026-11-02 (D-48): TV-show style, a wager may go up to the contestant's score or the largest enabled point value, whichever is higher. US-48 needs none.
 
 **Developer tasks**
 1. `api/settings.php` + `admin.html` + `js/admin.js` — `final_round_enabled` (on/off, validated, off by default) in Admin > Game settings.
 2. `index.html` + `js/game.js` — when the setting is on, End Game (and the full-board offer) offers "Play final round" or "Skip to results"; the D-09 / D-26 confirm rules stay.
-3. `js/game.js` + `css/style.css` — final round screens: category shown first, then each contestant enters a wager one by one, masked, from 0 to their score (rule for 0 or negative per FU-22, derived from the smallest point value, not a literal); wagers hidden from the room; then the question opens via `questions.php?random=1` with the timer; Correct adds and Wrong subtracts that contestant's wager; every contestant scored once; then Results. Confirm the random endpoint's payload gives the category and the choices needed; if a small server change is needed, list it in the dev note.
+3. `js/game.js` + `css/style.css` — final round screens: category shown first, then each contestant enters a wager one by one, masked, from 0 to the higher of their score and the largest enabled point value (D-48, read from the point values, not a literal); wagers hidden from the room; then the question opens via `questions.php?random=1` with the timer; Correct adds and Wrong subtracts that contestant's wager; every contestant scored once; then Results. Confirm the random endpoint's payload gives the category and the choices needed; if a small server change is needed, list it in the dev note.
 4. `js/game.js` — saved game: wagers and scoring survive a refresh mid-round; saved `version` bumped with a safe migrate-or-discard of older saves (D-28).
 5. `js/speech.js` (new) or section of `js/game.js` — US-48: speaker button on the question screen using the browser speech API; reads the question, and the choices when they are shown; second click stops; hidden when no voice is installed for that language (detect voices, handle late-loaded voice lists); reading never pauses the timer; stops on Back to Board, question close and refresh.
 6. `index.html` + `js/game.js` + `css/style.css` — "Read questions automatically" setting, off by default; reading starts when a question opens. **Where it is stored is not stated in US-48:** this plan assumes an on-device preference (no migration); the PO confirms before development, and if it must be an Admin setting it goes with task 1.
 7. `README.md` + `how-to-play.html` — final round and read-aloud notes (voice quality varies; Arabic voice often missing on Windows).
 8. `docs/sprints/sprint-9-dev.md`.
 
-**Tester focus:** setting off (no change to End Game) and on (offer shown, Skip goes straight to Results); wagers 0, exactly the score, above the score (blocked), and a contestant at 0 and below (FU-22 rule); wagers masked and hidden; Correct/Wrong once per contestant; scores and Results after the round (ties D-10); refresh mid-wager and mid-question; old saved game (previous version) restored or discarded without a JS error; 6 contestants at 1366x768 and 375x812; speaker with an installed voice, with no voice (button hidden, check English and Arabic), second click stops, timer keeps running, automatic reading off by default and on when ticked; closing the question stops speech; no console errors.
+**Tester focus:** setting off (no change to End Game) and on (offer shown, Skip goes straight to Results); wagers 0, exactly the score, above the score (blocked), a contestant below the largest point value, at 0 and below (may wager up to the largest point value, D-48); wagers masked and hidden; Correct/Wrong once per contestant; scores and Results after the round (ties D-10); refresh mid-wager and mid-question; old saved game (previous version) restored or discarded without a JS error; 6 contestants at 1366x768 and 375x812; speaker with an installed voice, with no voice (button hidden, check English and Arabic), second click stops, timer keeps running, automatic reading off by default and on when ticked; closing the question stops speech; no console errors.
 
 **Definition of Done (Sprint 9, on top of the global DoD)**
 - Saved-game version bumped and tested with an older save (D-28).
-- Wager cap uses the smallest point value from the settings (no hard-coded 100); FU-22 answer recorded in the backlog.
+- Wager cap is the higher of the score and the largest enabled point value (D-48), read from the settings (no hard-coded 600).
 - No migration needed (setting is a key/value row); verified by the tester on a DB that never had `final_round_enabled`.
 
-**Status:** Planned
+**Definition of Done (Sprint 9, as delivered)**
+
+| # | DoD item | Status |
+|---|---|---|
+| 1 | Spec file structure; no hard-coded board size, point values or timer | Met (S6: no literal 500, 600 or 900 in `game.js` or `speech.js`. The limit is `wagerLimit(g, score) = Math.max(score, largestPoints(g))` over `game.points`. The new `js/speech.js` is listed in the spec's file structure) |
+| 2 | `php -l` clean on all `api/*.php` | Met (S1, RT14) |
+| 3 | Prepared statements only | Met (S4; PO code check: the only API change is one `SETTING_RULES` entry in `api/settings.php`, written through the existing prepared statements) |
+| 4 | `textContent` / DOM APIs only | Met (S3; PO code check: the wager list, the rows and the headings are built with `h()` / `textContent`) |
+| 5 | No credentials committed; `api/config.php` git-ignored | Met (S5) |
+| 6 | Tester report, no open Critical/Major bugs | Met: 131 checks, 126 PASS, 0 FAIL, 5 PENDING (owner or device steps A4, T4, R14, L4, S9), no open bug. BUG-9-01 and BUG-9-02 (Minor) fixed in fix loop 1 and re-tested (RT1-RT14); the D-50 rename (RN1-RN13) and the D-51 tiebreaker (RD1-RD26) re-tested (`docs/sprints/sprint-9-test-report.md`) |
+| 7 | Developer note | Met (`docs/sprints/sprint-9-dev.md`, incl. "Fix loop 1", "Rename to Shoot Your Shot (D-50)" and "Tiebreaker change (D-51) and Golden Goal name") |
+| 8 | PO accepted | Met 2026-11-02, re-accepted 2026-11-03 against the amended US-44 (D-52), pending the owner checks below |
+| + | PHP 8.0 / MariaDB 10.4 compatible (D-17) | Met (tested on PHP 8.0.30, MariaDB 10.4.32) |
+| + | Saved-game version bumped and tested with older saves (D-28) | Met (V1-V6: version 4; v3, v2 and v1 saves upgrade with `finalRound:false`; 30 invalid variants are discarded to Setup with no JS error) |
+| + | Wager limit = the higher of the score and the largest enabled point value (D-48), not hard-coded | Met (F7-F10: 500 locally, 600 with 600 enabled, 400 with 500 and 600 disabled; scores 400, 0 and −200 all get the largest value) |
+| + | No migration; checked on a DB that never had `final_round_enabled` | Met (A1, F1, A6: GET gives `null`, the game has no round, Admin shows the box unticked) |
+| + | Layout 1366x768 and 375x812 with 6 contestants; speaker and Report add no height | Met (L1-L3, RT6-RT9. The phone question screen scrolls vertically, as a board question does) |
+| + | US-48: speaker, hidden with no voice, second click stops, timer untouched, automatic reading off by default | Met (R1-R13; real speech with real clicks in R5 and R6) |
+| + | D-51 tiebreaker: offered only on a tie for first, everyone bets, repeat rounds with a new question, Results with the tie on Skip or when no question is left; saved version 4 extended safely | Met (RD1-RD15, RD21-RD22; PO code check: `endGame()` needs `isTiedAtTop()`, the draw excludes the board's and earlier rounds' ids, and a 409 ends the game on Results. Swap-in ids are not excluded, see FU-35) |
+| + | D-50 name: "Golden Goal ⚽" and "bet" in every player-facing text, ⚽ hidden from screen readers | Met (RD16-RD20) |
+| + | Owner's local Chrome check | Open (FU-31) |
+| + | Commit on `sprint-9` with `js/speech.js` staged, re-hash check (S9, FU-16 style) and PR to `main` (owner merges) | Open (FU-31) |
+| + | Hosted deploy and CDN purge; live 401 without a login (A4) | Open (FU-32) |
+| + | Real Android phone (T4), real Arabic voice (R14), real touch device (L4) | Open (FU-32; emulated or faked in T1-T3, R4, L2) |
+
+**Status:** Accepted by the PO 2026-11-02, pending the owner's local Chrome check and commit (FU-31) and the hosted and device steps (FU-32). Not committed yet. On 2026-11-03 the owner renamed the round for players to "Shoot Your Shot" and the amount to "bet" (D-50, wording only; a proposed scoring change was cancelled). Re-tested: 105 checks, 100 PASS, 0 FAIL, 5 PENDING. Later on 2026-11-03 the owner renamed it "Golden Goal ⚽" and made it a tiebreaker offered only on a tie for first, repeating while still tied (D-50 amended, D-51). Re-tested: 131 checks, 126 PASS, 0 FAIL, 5 PENDING, no open bug. **Re-accepted by the PO 2026-11-03** against the amended US-44 (D-52), still pending the owner's local Chrome check and commit (FU-31) and the hosted and device steps (FU-32). Not committed yet.
+
+**Outcome:** US-44 is accepted against all four criteria and the dependency line: browser only apart from the setting, wagers entered one by one and masked. US-48 is accepted against all four criteria (no server work). The developer built the `final_round_enabled` setting (Admin checkbox, validated 0-1, no migration), the offer, the wager and question screens with the D-48 limit, saved-game version 4, Android Back handling, `js/speech.js` with the speaker on every question screen, and the on-device "Read questions automatically" choice. The guide, Privacy, `llms.txt`, README, spec and deploy-guide texts were updated too. One fix loop closed BUG-9-01 (the setting was read when Setup loaded, not at Start) and BUG-9-02 (phone scoring rows grew when marked). New follow-ups: FU-31 and FU-32 (owner steps) and FU-33 (final round text polish, Could). Recorded as D-49.
+
+PO decisions on the developer's choices (no story change, D-48 stands):
+1. **The setting is taken at Start and saved with the game:** keep (D-49 a). "Given the setting is on, when the host ends the game" is read as "on for this game", the same as `helpers_enabled`. A round can't then appear or disappear in the middle of a game, and End Game needs no extra request. Since the BUG-9-01 fix the value is read at the click on Start.
+2. **The largest value comes from the game's board:** keep (D-49 b). The board holds the enabled values at Start, so this meets D-48 ("read from the enabled point values"), and F10 tested it with 400, 500 and 600.
+3. **The question is drawn at "Play final round":** keep (D-49 c). Showing the category before the wagers needs the question to be picked first. The text stays off the page until "Show the question" (F6).
+4. **Several contestants can be Correct:** keep (D-49 d). US-44 says "every contestant is scored once". Everyone answers the final question, so D-08's single Correct, which is about a board cell, does not apply.
+5. **No way to stop the round half-way on the website; only Android Back offers it:** keep (D-49 e). Every contestant has an answer to judge, and a missing one is marked Wrong. This is the same reasoning as D-47 f. A web "stop the round" control would be a new request if the owner asks.
+6. **Masked text field with Show; the dots show the digit count; wagers readable with DevTools:** keep (D-49 f). US-44 asks for wagers hidden from the room, and F12 and F13 show that they are. The digit count and DevTools are the shared-screen trust level already accepted in D-37 g.
+7. **The final question's timer restarts at full length after a refresh:** keep (D-49 g). This matches D-04 for board questions, and the wagers and marks survive, as US-44 asks.
+8. **No helpers and no double score; Report and the speaker work:** keep (D-49 h). Helpers (D-36) and the double (D-40) belong to board cells. US-42 and US-48 apply to every open question.
+9. **"Read questions automatically" is stored on the device:** confirmed (D-49 j). US-48 says only "a setting", and the plan's task 6 assumed this. Reading depends on each device's voices, so a per-device choice fits, and it needs no migration.
+10. **Accepted limitations:** the browser may block automatic reading after a refresh until the first click; the speaker is hidden for Arabic on a PC with no Arabic voice (this is what US-48 says); final rounds are not written to the game log, which records started games only (D-49 i, k). Tester Info 2, 3 and 7 (solo "look away" text, the Swap wording on a failed draw, "+0" / "−0") go to FU-33 (Could).
+
+**Change loop (2026-11-03, D-50 amended, D-51):** US-44 is re-accepted against its five amended criteria:
+- **Offered only on a tie for first:** RD1-RD5, RD14.
+- **Category first, D-48 limit, hidden bets, everyone bets:** RD6, RD12.
+- **Random question, timer, each contestant marked once:** RD7, RD8.
+- **Repeat rounds with a new question until the tie is broken or the host skips; the tie stands when no question is left:** RD9-RD11.
+- **Refresh and saved game:** RD12, RD13.
+
+The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on the points raised (D-52):
+1. **Android Back on a repeat offer goes to Results with the tie:** keep (D-52 a). It matches Skip, and the board can't be reopened on changed scores. **Back on a question where everyone is marked and the top is still tied** also goes to Results with no confirm. This is accepted for now, and FU-34 adds a confirm (D-43 a: a Back press is easily made by mistake).
+2. **"Continue" while still tied:** accepted for this sprint. FU-34 renames it **"Next round"**, which says what happens next. Wording only.
+3. **The US-44 story sentence:** changed to the tiebreaker purpose. The title stays "Final round with wagers (Golden Goal ⚽)".
+4. **PO code check, new point:** the draw excludes the board's questions and earlier Golden Goal questions, but not a question brought in by Swap. That question is only avoided through the played list. FU-35 (Could) closes this gap in D-51 e. FU-33 now keeps only "+0" / "−0", since D-51 made its other two items lapse (D-52 f). FU-31 and FU-32 were amended so that the owner's test makes a tie.
 
 ---
 
@@ -567,7 +619,7 @@ PO decisions on the developer's choices (no story change, D-46 stands):
 | 6 | US-30 (amends US-19, US-20, US-21, US-24, US-25; US-22 stays retired); D-32 (US-04 amended) delivered alongside |
 | 7 | US-42 (accepted 2026-11-02, pending owner checks FU-25 and FU-26) |
 | 8 | US-43, US-46, US-45 (accepted 2026-11-02, pending owner checks FU-28 and FU-29) |
-| 9 | US-44, US-48 (planned) |
+| 9 | US-44, US-48 (accepted 2026-11-02, re-accepted 2026-11-03 after D-51, pending owner checks FU-31 and FU-32) |
 | 10 | US-47 (planned) |
 | 11 | US-50 (planned, later) |
 | 12 | US-49 (planned, later) |
