@@ -48,7 +48,7 @@
   <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="css/style.56810955.css">
+  <link rel="stylesheet" href="css/style.b8666cf7.css">
 </head>
 <body class="game">
   <header class="page-header">
@@ -174,6 +174,14 @@
             <label for="timer-input">Seconds per question (this game only)</label>
             <input id="timer-input" class="timer-input" type="number" min="5" max="600" step="1" aria-describedby="timer-error">
             <p id="timer-error" class="field-error" hidden></p>
+            <!-- Read aloud (US-48): an on-device choice (saved in this browser); hidden when the browser has no speech -->
+            <div id="read-aloud-field" class="read-aloud-field" hidden>
+              <label class="check-label" for="read-aloud">
+                <input id="read-aloud" type="checkbox" aria-describedby="read-aloud-hint">
+                Read questions automatically
+              </label>
+              <p id="read-aloud-hint" class="hint">On this device, when a question opens. The &#128266; button on a question reads it any time.</p>
+            </div>
           </fieldset>
 
           <fieldset class="setup-block">
@@ -216,10 +224,15 @@
     <!-- Question screen (US-11, US-12, US-13, US-14) -->
     <section id="screen-question" class="screen question" aria-labelledby="question-title" hidden>
       <div class="question-layout">
-        <div class="question-main">
+        <div id="question-main" class="question-main">
           <h2 id="question-title" class="question-heading" tabindex="-1"></h2>
-          <!-- Report a question (US-42): on an open board question and an answered Streak question; top right, so it adds no height -->
-          <button type="button" id="report-btn" class="btn btn-small report-btn" aria-label="Report a problem with this question" aria-haspopup="dialog" hidden>Report</button>
+          <!-- Top right, so they add no height: Read aloud (US-48), shown when a voice for the question's
+               language is installed; Report a question (US-42), on an open board question and an answered
+               Streak question -->
+          <div class="question-tools">
+            <button type="button" id="speak-btn" class="btn btn-small speak-btn" aria-pressed="false" hidden></button>
+            <button type="button" id="report-btn" class="btn btn-small report-btn" aria-label="Report a problem with this question" aria-haspopup="dialog" hidden>Report</button>
+          </div>
           <!-- Picture questions only; the generic alt text must not give the answer away -->
           <img id="question-image" class="question-image" alt="Question picture" hidden>
           <!-- Photo credit of the picture (e.g. CC BY-SA attribution); empty credit = no caption -->
@@ -250,8 +263,9 @@
         </div>
 
         <section class="scoring" aria-labelledby="scoring-title">
+          <!-- game.js sets the final round's title and hint (US-44) and puts these back -->
           <h3 id="scoring-title">Scoring</h3>
-          <p class="hint">Each player or team can be scored once. Only one can be correct.
+          <p id="scoring-hint" class="hint">Each player or team can be scored once. Only one can be correct.
             Helpers, once per game before anyone is scored: ABC 3 choices, &#8644; swap, &frac12; skip for half the points.</p>
           <p id="helper-msg" class="msg msg-error" role="alert" hidden></p>
           <ul id="score-rows" class="score-rows"></ul>
@@ -272,6 +286,42 @@
           <button type="button" id="streak-next" class="btn btn-primary btn-large btn-block" hidden>Next question</button>
           <button type="button" id="streak-end" class="btn btn-end btn-block">End run</button>
         </section>
+      </div>
+    </section>
+
+    <!-- Final round (US-44, D-48), when the admin turned it on and 2 or more players are tied for first
+         (D-51): the offer after End Game, then the category and the wagers, one contestant at a time
+         and masked. The question itself opens on the question screen. Players see it as "Golden Goal"
+         and the wager as their "bet" (D-50); the ball is decorative (aria-hidden). game.js sets the
+         title and the lead per round. -->
+    <section id="screen-final" class="screen final" aria-labelledby="final-title" hidden>
+      <h2 id="final-title" tabindex="-1">Golden Goal <span aria-hidden="true">&#9917;</span></h2>
+      <div id="final-offer">
+        <p id="final-lead" class="final-lead"></p>
+        <p id="final-rule" class="hint"></p>
+        <div id="final-msg" class="msg" role="alert" hidden></div>
+        <div class="actions start-row">
+          <button type="button" id="final-play" class="btn btn-primary btn-large">Go for goal</button>
+          <button type="button" id="final-skip" class="btn btn-large">Skip to results</button>
+        </div>
+      </div>
+      <div id="final-wagers" hidden>
+        <p class="final-category"><span class="final-category-label">Category</span> <span id="final-category-name"></span></p>
+        <ul id="final-wager-list" class="final-wager-list" aria-label="Bets"></ul>
+        <form id="final-wager-form" class="final-wager-form" novalidate>
+          <label id="final-wager-label" class="final-wager-label" for="final-wager-input"></label>
+          <p id="final-wager-hint" class="hint"></p>
+          <div class="final-wager-row">
+            <input id="final-wager-input" class="final-wager-input" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="final-wager-hint final-wager-error">
+            <button type="button" id="final-wager-show" class="btn" aria-pressed="false" aria-controls="final-wager-input">Show</button>
+            <button type="submit" id="final-wager-lock" class="btn btn-primary">Lock in bet</button>
+          </div>
+          <p id="final-wager-error" class="field-error" role="alert" hidden></p>
+        </form>
+        <div id="final-ready" class="final-ready" hidden>
+          <p class="final-ready-text">All bets are in!</p>
+          <button type="button" id="final-open" class="btn btn-primary btn-large">Show the question</button>
+        </div>
       </div>
     </section>
 
@@ -337,6 +387,8 @@
   <script src="js/app.05c6d08d.js"></script>
   <!-- Sharing (US-43, US-46): loaded before game.js, which uses it -->
   <script src="js/share.28bcd18c.js"></script>
-  <script src="js/game.a5e62052.js"></script>
+  <!-- Read aloud (US-48): loaded before game.js, which uses it -->
+  <script src="js/speech.852d2b55.js"></script>
+  <script src="js/game.6ef41919.js"></script>
 </body>
 </html>

@@ -8,8 +8,9 @@
 (function () {
   const API_BASE = 'api/';
   const STORAGE_KEY = 'brainrush.game';
-  // v3 adds the helpers (US-32); v2 (used cells + open question) and v1 (Sprint 3) saves are migrated
-  const STORAGE_VERSION = 3;
+  // v4 adds the final round (US-44); v3 (helpers, US-32), v2 (used cells + open question) and
+  // v1 (Sprint 3) saves are migrated
+  const STORAGE_VERSION = 4;
   // Ids of the questions opened in this browser, oldest first; new boards avoid them.
   const SEEN_KEY = 'brainrush.seenQuestions';
   const SEEN_MAX = 5000; // BOARD_MAX_SEEN in api/questions.php
@@ -64,6 +65,19 @@
   const SQUARE_RIGHT = String.fromCodePoint(0x1f7e9); // green square, in the shared result
   const SQUARE_WRONG = String.fromCodePoint(0x1f7e5); // red square
 
+  // Final round (US-44, D-48): offer -> wagers (one contestant at a time) -> question -> done (Results).
+  const FINAL_STAGES = ['offer', 'wager', 'question', 'done'];
+  const WAGER_PATTERN = /^\d{1,9}$/; // a whole number typed by a contestant
+  // D-50 (amended): players see the round as "Golden Goal ⚽" and the wager as their "bet" (code keeps
+  // "final"/"wager"). The ball is decorative: shown in an aria-hidden span, never in labels.
+  const FINAL_NAME = 'Golden Goal';
+  const GOAL_BALL = String.fromCodePoint(0x26bd); // soccer ball
+
+  // Read aloud (US-48): the "Read questions automatically" choice of this device ('1' = on).
+  const READ_ALOUD_KEY = 'brainrush.readAloud';
+  const SPEAKER = String.fromCodePoint(0x1f50a); // speaker with sound waves
+  const STOP_SIGN = String.fromCharCode(0x25a0); // black square: stop reading
+
   const MODES = {
     players: { limit: 6, title: 'Players', label: 'Player', one: 'player', many: 'players' },
     teams: { limit: 4, title: 'Teams', label: 'Team', one: 'team', many: 'teams' },
@@ -80,7 +94,7 @@
     { value: '#22b8cf', name: 'Cyan', ink: '#0b1026' },
   ];
 
-  const SCREENS = ['setup', 'board', 'question', 'results']; // a saved board game may be on these
+  const SCREENS = ['setup', 'board', 'question', 'results', 'final']; // a saved board game may be on these
   const ALL_SCREENS = SCREENS.concat(['leaderboard', 'daily']);
 
   // Central state. `setup` is the form being filled in (memory only);
@@ -89,8 +103,15 @@
   //     categories: [{id, name, questions, hidden}] (hidden = unopened "Surprise me!" pick, shown as "?"),
   //     used: { "<categoryId>:<points>": { owner: contestantId | null } },
   //     double?: "<categoryId>:<points>" (D-40: the hidden double-score cell, picked at Start),
+  //     finalRound?: boolean (US-44: final_round_enabled when the game started; missing = off),
+  //     final?: null | { stage, category?, question?, wagers?, marks?, answerShown?, lang? } (see below),
   //     current: null | { catId, points, marks: { "<contestantId>": "correct" | "wrong" }, answerShown,
   //                       lang, by?, choiceOrder?, swap? } }
+  // final (US-44): stage 'offer' (End Game offered the round) has no other field. From 'wager' on:
+  // category = { id, name } and question (isValidQuestion) from questions.php?random=1; wagers =
+  // { "<contestantId>": points } entered so far, in setup order; marks as on a board question but
+  // any number may be Correct; answerShown and lang as on a board question. 'question' = the
+  // question is open on the question screen; 'done' = scored, Results shown.
   // helpers: true = still available (US-32). On the open question: by = id of the contestant who
   // used a helper on it (only they can be scored then); choiceOrder = order of the 3 choices on
   // screen, a permutation of [0, 1, 2] where 0 is the answer; swap = { catId, catName, points,
@@ -139,6 +160,15 @@
   // touches the saved game or run, the timer or the scores.
   let report = null;
 
+  // Final round (US-44): the random question request in flight (memory only).
+  let finalLoading = false;
+
+  // Read aloud (US-48), memory only apart from the on-device choice: the browser's speech module
+  // (null without speech synthesis), whether the open question is being read, and the choice.
+  const speech = window.BrainRushSpeech && window.BrainRushSpeech.supported() ? window.BrainRushSpeech : null;
+  let reading = false;
+  let readAloud = false;
+
   let nextEntryKey = 1;
 
   const byId = (id) => document.getElementById(id);
@@ -150,6 +180,7 @@
       results: byId('screen-results'),
       leaderboard: byId('screen-leaderboard'),
       daily: byId('screen-daily'),
+      final: byId('screen-final'),
     },
     setupForm: byId('setup-form'),
     playersBlock: byId('players-block'),
@@ -176,6 +207,8 @@
     catError: byId('cat-error'),
     timerInput: byId('timer-input'),
     timerError: byId('timer-error'),
+    readAloudField: byId('read-aloud-field'),
+    readAloudInput: byId('read-aloud'),
     playedTrack: byId('played-track'),
     playedBar: byId('played-bar'),
     playedCount: byId('played-count'),
@@ -198,7 +231,9 @@
     boardDoneBtn: byId('board-done-btn'),
     endBtn: byId('end-btn'),
     scoreboard: byId('scoreboard'),
+    questionMain: byId('question-main'),
     qHeading: byId('question-title'),
+    speakBtn: byId('speak-btn'),
     qImage: byId('question-image'),
     qCredit: byId('question-credit'),
     qText: byId('question-text'),
@@ -214,6 +249,8 @@
     answerText: byId('answer-text'),
     answerValue: byId('answer-value'),
     helperMsg: byId('helper-msg'),
+    scoringTitle: byId('scoring-title'),
+    scoringHint: byId('scoring-hint'),
     scoreRows: byId('score-rows'),
     backBtn: byId('back-btn'),
     streakPanel: byId('streak-panel'),
@@ -250,6 +287,24 @@
     dailyNext: byId('daily-next'),
     dailyMsg: byId('daily-msg'),
     dailyPlay: byId('daily-play'),
+    finalTitle: byId('final-title'),
+    finalOffer: byId('final-offer'),
+    finalLead: byId('final-lead'),
+    finalRule: byId('final-rule'),
+    finalMsg: byId('final-msg'),
+    finalPlay: byId('final-play'),
+    finalSkip: byId('final-skip'),
+    finalWagers: byId('final-wagers'),
+    finalCategory: byId('final-category-name'),
+    finalWagerList: byId('final-wager-list'),
+    finalWagerForm: byId('final-wager-form'),
+    finalWagerLabel: byId('final-wager-label'),
+    finalWagerHint: byId('final-wager-hint'),
+    finalWagerInput: byId('final-wager-input'),
+    finalWagerShow: byId('final-wager-show'),
+    finalWagerError: byId('final-wager-error'),
+    finalReady: byId('final-ready'),
+    finalOpen: byId('final-open'),
     reportBtn: byId('report-btn'),
     reportOverlay: byId('report-overlay'),
     reportAbout: byId('report-about'),
@@ -268,6 +323,12 @@
     title: dom.streakPanelTitle.textContent,
     label: dom.streakCountLabel.textContent,
     hint: dom.streakHint.textContent,
+  };
+  // The scoring panel's texts and the Back to Board label; the final round sets its own (US-44).
+  const SCORING_PANEL_TEXT = {
+    title: dom.scoringTitle.textContent,
+    hint: dom.scoringHint.textContent,
+    back: dom.backBtn.textContent,
   };
 
   // ---------- Generic helpers ----------
@@ -351,9 +412,11 @@
       data = null; // non-JSON body (e.g. PHP not running): never show it raw
     }
     if (!response.ok) {
-      throw new Error(data && typeof data.error === 'string' && data.error
+      const error = new Error(data && typeof data.error === 'string' && data.error
         ? data.error
         : 'Request failed (HTTP ' + response.status + ').');
+      error.status = response.status; // e.g. 409 = no question left to draw (Golden Goal, D-51)
+      throw error;
     }
     if (data === null) throw new Error('The server sent an unexpected response.');
     return data;
@@ -495,6 +558,20 @@
         screen: upgraded.screen,
         game: Object.assign({}, upgraded.game, { contestants: contestants }),
       };
+    }
+    // v3 had no final round (US-44): the game goes on without one, as it was started.
+    if (upgraded.version === 3 && isPlainObject(upgraded.game)) {
+      upgraded = {
+        version: 4,
+        screen: upgraded.screen,
+        game: Object.assign({}, upgraded.game, { finalRound: false, final: null }),
+      };
+    }
+    // Version 4 was never released: a save made before the round counter (D-51) is round 1.
+    const fin = upgraded.version === 4 && isPlainObject(upgraded.game) ? upgraded.game.final : null;
+    if (isPlainObject(fin) && fin.round === undefined && fin.usedIds === undefined) {
+      const ids = isPlainObject(fin.question) && Number.isInteger(fin.question.id) ? [fin.question.id] : [];
+      upgraded.game.final = Object.assign({}, fin, { round: 1, usedIds: ids });
     }
     return upgraded.version === STORAGE_VERSION ? upgraded : null;
   }
@@ -683,12 +760,58 @@
       (g.helpersOff === undefined || typeof g.helpersOff === 'boolean') && // games saved before the setting
       isValidBoard(g.points, g.categories) &&
       (g.double === undefined || (typeof g.double === 'string' && isBoardCellKey(g.double, g))) && // games saved before D-40
+      typeof g.finalRound === 'boolean' && isValidFinal(g.final, g) &&
       isValidUsed(g.used, g) && isValidCurrent(g.current, g);
   }
 
-  /** The question screen needs an open question; board and results must not have one. */
+  /**
+   * Final round / Golden Goal (US-44, D-51): a known stage, round and drawn ids; from the wagers on, a real question and category, wagers
+   * of real contestants within the D-48 limit, and marks only once every wager is in.
+   */
+  function isValidFinal(f, g) {
+    if (f === null) return true;
+    if (!isPlainObject(f) || FINAL_STAGES.indexOf(f.stage) === -1 || g.finalRound !== true) return false;
+    // D-51: round counter and the questions drawn so far (one per round; never one of the board's).
+    if (!Number.isInteger(f.round) || f.round < 1 || !isValidIdList(f.usedIds)) return false;
+    const offer = f.stage === 'offer';
+    if (f.usedIds.length !== f.round - (offer ? 1 : 0)) return false;
+    if (offer) return Object.keys(f).length === 3 && isTiedAtTop(g); // only a tie for first is offered
+    if (!isPlainObject(f.category) || !Number.isInteger(f.category.id) || typeof f.category.name !== 'string' ||
+        !isValidQuestion(f.question) || typeof f.answerShown !== 'boolean' ||
+        !(f.lang === undefined || f.lang === 'en' || (f.lang === 'ar' && hasArabic(f.question))) ||
+        !isPlainObject(f.wagers) || !isPlainObject(f.marks) || f.usedIds.indexOf(f.question.id) === -1) return false;
+    const ids = g.contestants.map((c) => String(c.id));
+    const wagerIds = Object.keys(f.wagers);
+    const markIds = Object.keys(f.marks);
+    if (wagerIds.some((id) => ids.indexOf(id) === -1) || markIds.some((id) => ids.indexOf(id) === -1)) return false;
+    if (markIds.some((id) => f.marks[id] !== 'correct' && f.marks[id] !== 'wrong')) return false;
+    // Wagers are entered in setup order: the ones in are the first contestants.
+    if (wagerIds.length > ids.length || !ids.slice(0, wagerIds.length).every((id) => hasOwn(f.wagers, id))) return false;
+    const allIn = wagerIds.length === ids.length;
+    if (f.stage !== 'wager' && !allIn) return false;
+    if (f.stage === 'wager' && (markIds.length || f.answerShown)) return false;
+    return g.contestants.every((c) => !hasOwn(f.wagers, String(c.id)) || isValidWager(f, g, c));
+  }
+
+  /** Distinct positive integer ids. */
+  function isValidIdList(list) {
+    return Array.isArray(list) && list.every((id, i) => Number.isInteger(id) && id > 0 && list.indexOf(id) === i);
+  }
+
+  /** A wager is a whole number from 0 to the D-48 limit at the time it was entered. */
+  function isValidWager(f, g, c) {
+    const wager = f.wagers[String(c.id)];
+    return Number.isInteger(wager) && wager >= 0 && wager <= wagerLimit(g, scoreBeforeFinal(f, c));
+  }
+
+  /** The question screen needs an open question (a board one, or the final round's); the others none. */
   function isValidScreenFor(screen, g) {
-    return screen === 'question' ? g.current !== null : g.current === null;
+    const stage = g.final ? g.final.stage : null;
+    if (g.current !== null) return screen === 'question' && stage === null;
+    if (screen === 'question') return stage === 'question';
+    if (screen === 'final') return stage === 'offer' || stage === 'wager';
+    if (screen === 'board') return stage === null;
+    return stage === null || stage === 'done'; // results
   }
 
   // ---------- Screens ----------
@@ -698,6 +821,7 @@
     if (name !== 'question') {
       stopTimer();
       closeReport(); // US-42: the report form belongs to the question screen
+      stopReading(); // US-48: closing the question stops the reading
     }
     if (name !== 'daily') stopDailyCountdown();
     ALL_SCREENS.forEach((key) => { dom.screens[key].hidden = key !== name; });
@@ -841,8 +965,12 @@
       closeDoublePopup();
     } else if (isReportOpen()) {
       closeReport();                                 // US-42: the report form, as Cancel
+    } else if (state.screen === 'final') {
+      onFinalBack();                                 // final round (US-44): offer -> board, wagers -> ask
     } else if (state.screen === 'question') {
-      if (dailyOnScreen()) {                         // Daily Challenge (US-43)
+      if (finalOnScreen()) {                         // final round question (US-44)
+        onFinalLeave();                              // "Stop the final round?" confirm
+      } else if (dailyOnScreen()) {                  // Daily Challenge (US-43)
         if (daily.current.picked !== null) onDailyNext(); // answered: on, as Next
         else onDailyLeave();                         // "Leave today's Daily Challenge?" confirm
       } else if (!streakOnScreen()) confirmBackToBoard(); // "Back to Board", after a confirm
@@ -927,6 +1055,7 @@
       entries: [],
       maintenance: false, // start_game_hidden from settings (maintenance mode)
       helpersOn: true,    // helpers_enabled from settings; a new game keeps it
+      finalRoundOn: false, // final_round_enabled from settings (US-44); a new game keeps it
       perGame: null,      // categories_per_game from settings
       timerDefault: null, // timer_seconds from settings
       playable: [],       // [{id, name}] from categories.php?playable=1
@@ -1220,6 +1349,7 @@
       setAdConfig(settings);
       s.maintenance = settings.start_game_hidden === 1;
       s.helpersOn = settings.helpers_enabled !== 0; // a missing row means on
+      s.finalRoundOn = settings.final_round_enabled === 1; // US-44: a missing row means off
       s.playable = results[1].filter((c) => isPlainObject(c) && Number.isInteger(c.id) && typeof c.name === 'string')
         .map((c) => ({ id: c.id, name: c.name }));
       s.selected = s.selected.filter((id) => id === SURPRISE || s.playable.some((c) => c.id === id));
@@ -1483,8 +1613,13 @@
     try {
       const selection = resolveSelection(s);
       const ids = selection.ids;
-      const data = await apiPost('questions.php?board=1', { categories: ids.join(','), seen: loadSeen() });
-      const board = parseBoard(data, ids);
+      // BUG-9-01: the game settings are read again with the board, so a change in Admin while Setup
+      // was open counts ("taken at Start"); the settings request never fails the start.
+      const answers = await Promise.all([
+        apiPost('questions.php?board=1', { categories: ids.join(','), seen: loadSeen() }),
+        refreshStartSettings(s),
+      ]);
+      const board = parseBoard(answers[0], ids);
       board.categories.forEach((c) => { c.hidden = selection.hidden.indexOf(c.id) !== -1; });
       preloadImages(board.categories);
       beginGame(board, timer);
@@ -1495,6 +1630,22 @@
       s.starting = false;
       dom.startBtn.textContent = 'Start Game';
       updateStartButton();
+    }
+  }
+
+  /**
+   * The settings a new game takes at Start (helpers_enabled, final_round_enabled), read fresh at the
+   * click on Start Game. If the request fails or answers oddly, the values Setup loaded are kept.
+   * Never rejects.
+   */
+  async function refreshStartSettings(s) {
+    try {
+      const settings = await apiGet('settings.php');
+      if (!isPlainObject(settings)) return;
+      s.helpersOn = settings.helpers_enabled !== 0;         // a missing row means on
+      s.finalRoundOn = settings.final_round_enabled === 1;  // US-44: a missing row means off
+    } catch (err) {
+      // keep the values loaded with Setup
     }
   }
 
@@ -1522,6 +1673,8 @@
       categories: board.categories,
       used: {},
       double: pickDoubleCell(board.categories, board.points), // D-40: secret until it is opened
+      finalRound: s.finalRoundOn, // US-44: admin setting when the game starts (final_round_enabled)
+      final: null,
       current: null,
     };
     renderGame();
@@ -1649,7 +1802,11 @@
     dom.boardDoneText.textContent = done ? 'All ' + totalCells(g) + ' questions have been played.' : '';
   }
 
-  /** End Game: confirm first while cells are still open (D-09); unused cells are ignored. */
+  /**
+   * End Game: confirm first while cells are still open (D-09); unused cells are ignored. With the
+   * final round on (US-44) and a tie for first (D-51), Golden Goal is offered before the results
+   * (both End Game buttons, D-26).
+   */
   function endGame() {
     const g = state.game;
     if (!g || state.screen !== 'board') return;
@@ -1659,6 +1816,14 @@
         ' not been played and will be ignored.';
       if (!window.confirm(text)) return;
     }
+    if (g.finalRound === true && isTiedAtTop(g)) { // D-51: Golden Goal only breaks a tie for first
+      openFinalOffer(1, []);
+      return;
+    }
+    showResults();
+  }
+
+  function showResults() {
     renderResults();
     showScreen('results');
     dom.newGameBtn.focus();
@@ -1726,8 +1891,9 @@
     category.hidden = false; // a "Surprise me!" column shows its name from its first question on
     // Opened = played: later boards in this browser avoid it.
     markSeen(category.questions[String(points)].id);
-    showQuestion();
-    if (isDoubleCurrent(g)) showDoublePopup();
+    const double = isDoubleCurrent(g);
+    showQuestion(double); // the double-score popup comes first; reading waits for it (US-48)
+    if (double) showDoublePopup();
   }
 
   /**
@@ -1744,6 +1910,7 @@
     dom.doubleText.textContent = 'A correct answer earns +' + points * DOUBLE_FACTOR + ' instead of +' + points +
       '. A wrong answer costs the normal ' + MINUS + points + '.';
     pauseTimer();
+    stopReading(); // US-48: automatic reading starts once the popup is closed
     dom.doubleOverlay.hidden = false;
     setPageInert(true); // keyboard focus stays on the popup
     dom.doubleOk.focus();
@@ -1755,15 +1922,20 @@
     setPageInert(false);
     resumeTimer();
     dom.qHeading.focus();
+    autoRead();
   }
 
-  /** Render the open question and (re)start its timer at full length (also used on restore, D-04, and after a Swap). */
-  function showQuestion() {
+  /**
+   * Render the open question and (re)start its timer at full length (also used on restore, D-04, and
+   * after a Swap). holdReading: no automatic reading yet (the double-score popup opens first, US-48).
+   */
+  function showQuestion(holdReading) {
     const g = state.game;
     const cur = g.current;
     const active = activeQuestion(g);
     const q = active.question;
     setStreakLayout(false);
+    setScoringPanelTexts(SCORING_PANEL_TEXT);
     renderQuestionHeading(active);
     // Arabic first when the question has an Arabic version; a restored choice is kept.
     if (!hasArabic(q)) cur.lang = 'en';
@@ -1771,12 +1943,21 @@
     clearMessage(dom.helperMsg);
     renderQuestionImage(q);
     renderQuestionLang(q);
-    renderAnswerState();
+    renderAnswerState(cur.answerShown);
     renderScoringRows();
     showScreen('question'); // also saves the state
     updateReportButton(); // US-42 (needs the question screen): also for a Swap question, the one shown is reported
     startTimer(g.timerSeconds);
     dom.qHeading.focus();
+    onQuestionShown(holdReading === true); // US-48
+  }
+
+  /** The scoring panel's title, hint and Back button: the board's, or the final round's (US-44). */
+  function setScoringPanelTexts(texts) {
+    dom.scoringTitle.textContent = texts.title;
+    dom.scoringHint.textContent = texts.hint;
+    dom.backBtn.textContent = texts.back;
+    dom.backBtn.disabled = false;
   }
 
   /**
@@ -1834,6 +2015,13 @@
   /** Show the question and its answer in the open question's language (cur.lang). */
   function renderQuestionLang(q) {
     const arabic = state.game.current.lang === 'ar';
+    renderTextAndAnswer(q, arabic);
+    renderChoices(q, arabic);
+    updateSpeakButton(); // US-48: the voice depends on the language shown
+  }
+
+  /** Question text, answer and language button of a board or final round question (US-44). */
+  function renderTextAndAnswer(q, arabic) {
     renderQuestionText(arabic ? q.question_ar : q.question, arabic);
     dom.answerValue.textContent = arabic ? q.answer_ar : q.answer;
     dom.answerValue.dir = arabic ? 'rtl' : 'ltr';
@@ -1841,7 +2029,6 @@
     dom.answerValue.translate = !arabic;
     dom.answerText.classList.toggle('is-rtl', arabic);
     renderLangButton(hasArabic(q), arabic);
-    renderChoices(q, arabic);
   }
 
   /**
@@ -1915,6 +2102,11 @@
   }
 
   function toggleLang() {
+    stopReading(); // US-48: the text changes; the speaker reads the new language on the next click
+    if (finalOnScreen()) {
+      toggleFinalLang();
+      return;
+    }
     if (dailyOnScreen()) {
       toggleDailyLang();
       return;
@@ -1942,18 +2134,21 @@
     return Math.max(QUESTION_MIN_SCALE, Math.sqrt(QUESTION_FULL_SIZE_CHARS / length));
   }
 
-  function renderAnswerState() {
-    const shown = state.game.current.answerShown;
+  function renderAnswerState(shown) {
     dom.answerBtn.hidden = shown;
     dom.answerText.hidden = !shown;
     dom.qChoices.classList.toggle('is-revealed', shown); // the right choice turns green
   }
 
   function showAnswer() {
+    if (finalOnScreen()) {
+      showFinalAnswer();
+      return;
+    }
     const cur = state.game && state.game.current;
     if (!cur) return;
     cur.answerShown = true;
-    renderAnswerState();
+    renderAnswerState(true);
     updateScoringRows(); // no helpers once the answer is shown
     saveState();
     dom.answerText.focus();
@@ -2295,7 +2490,7 @@
   }
 
   function onResetClick() {
-    if (state.game && state.game.current) startTimer(state.game.timerSeconds);
+    if (state.game && (state.game.current || finalOnScreen())) startTimer(state.game.timerSeconds);
   }
 
   // ---------- Results (US-15, US-16) ----------
@@ -2314,10 +2509,16 @@
     return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
   }
 
+  /** D-10: everyone on the top score (several = a tie), in setup order. Results, Share and Golden Goal use it. */
+  function topContestants(g) {
+    const ranked = rankedContestants(g);
+    return ranked.filter((c) => c.score === ranked[0].score);
+  }
+
   function renderResults() {
     const ranked = rankedContestants(state.game);
     const top = ranked[0].score;
-    const winners = ranked.filter((c) => c.score === top); // D-10: everyone on the top score
+    const winners = topContestants(state.game);
     dom.resultsWinner.textContent = winners.length === 1
       ? winners[0].name + ' wins!'
       : "It's a tie between " + joinNames(winners.map((c) => c.name));
@@ -2364,8 +2565,8 @@
   function resultsShareText(g) {
     const ranked = rankedContestants(g);
     const top = ranked[0].score;
-    const winners = ranked.filter((c) => c.score === top);
-    const others = ranked.filter((c) => c.score !== top).map((c) => c.name + ' ' + formatScore(c.score));
+    const winners = topContestants(g);
+    const others =ranked.filter((c) => c.score !== top).map((c) => c.name + ' ' + formatScore(c.score));
     const head = winners.length === 1
       ? winners[0].name + ' won BrainRush with ' + formatScore(top) + '!'
       : "It's a tie between " + joinNames(winners.map((c) => c.name)) + ' in BrainRush with ' +
@@ -2707,6 +2908,7 @@
     renderStreakPanel();
     showScreen('question');
     updateReportButton(); // US-42 (needs the question screen): only once the question is answered
+    onQuestionShown(cur.picked !== null); // US-48: an answered question (after a refresh) is not read again
     if (cur.picked !== null) {
       showTimerAt(run.timerSeconds, cur.leftMs || 0);
       dom.timerStatus.textContent = cur.picked === STREAK_TIME_UP ? "Time's up!" : '';
@@ -2740,6 +2942,7 @@
     renderQuestionText(arabic ? q.question_ar : q.question, arabic);
     renderLangButton(isFilled(q.question_ar), arabic);
     renderRunChoices(q, cur, onPick);
+    updateSpeakButton(); // US-48: the voice depends on the language shown
   }
 
   function toggleStreakLang() {
@@ -3321,6 +3524,7 @@
     renderDailyPanel();
     showScreen('question');
     updateReportButton(); // US-42: once the question is answered
+    onQuestionShown(cur.picked !== null); // US-48: an answered question (after a refresh) is not read again
     if (cur.picked !== null) {
       showTimerAt(daily.timerSeconds, cur.leftMs || 0);
       dom.timerStatus.textContent = cur.picked === STREAK_TIME_UP ? "Time's up!" : '';
@@ -3539,6 +3743,587 @@
     else nextDailyQuestion();
   }
 
+  // ---------- Final round: Golden Goal (US-44, D-48, D-50, D-51) ----------
+  // Players see it as "Golden Goal" and the wager as their "bet" (D-50). A tiebreaker (D-51): End
+  // Game offers it only when the admin turned it on (taken into the game at Start, like the helpers)
+  // and 2 or more contestants share the top score. While the top is still shared after everyone is
+  // marked, another round follows (new question never used in this game, new bets), until the tie
+  // is broken, the host skips or no question is left. The category is shown first; then each contestant enters a wager, one at a time and
+  // masked, from 0 up to their score or the largest point value of the game, whichever is higher
+  // (D-48: read from the game's point values, which are the enabled ones). The question is a random
+  // bank question (questions.php?random=1, the Swap draw) and opens on the question screen with the
+  // timer: Correct adds that contestant's wager, Wrong subtracts it, and everyone is scored once.
+  // Everything is saved with the game (saved version 4), so a refresh keeps the wagers and marks.
+
+  /** The largest point value of this game's board (the enabled point values when it started). */
+  function largestPoints(g) {
+    return Math.max.apply(null, g.points);
+  }
+
+  /** D-48: a wager goes up to the contestant's score or the largest point value, whichever is higher. */
+  function wagerLimit(g, score) {
+    return Math.max(score, largestPoints(g));
+  }
+
+  /** A contestant's score before the final round's mark (a marked wager is taken back out). */
+  function scoreBeforeFinal(f, c) {
+    const key = String(c.id);
+    const mark = hasOwn(f.marks, key) ? f.marks[key] : null;
+    if (mark === 'correct') return c.score - f.wagers[key];
+    if (mark === 'wrong') return c.score + f.wagers[key];
+    return c.score;
+  }
+
+  /** The final round's question is open on the question screen. */
+  function finalOnScreen() {
+    const g = state.game;
+    return state.screen === 'question' && !!g && g.current === null && !!g.final && g.final.stage === 'question';
+  }
+
+  /** D-51: Golden Goal is offered while 2 or more contestants share the top score (Results' D-10 rule). */
+  function isTiedAtTop(g) {
+    return topContestants(g).length >= 2;
+  }
+
+  /** " – round 2" from the second round on; round 1 has no counter. */
+  function roundSuffix(round) {
+    return round > 1 ? ' ' + EN_DASH + ' round ' + round : '';
+  }
+
+  /** "Golden Goal – round 2 – History" as plain text (Report, labels): no ball (D-50). */
+  function finalHeading(f) {
+    return FINAL_NAME + roundSuffix(f.round) + ' ' + EN_DASH + ' ' + f.category.name;
+  }
+
+  /** "<before>Golden Goal ⚽<after>" in `node`; the ball is decorative, so screen readers skip it. */
+  function setGoalText(node, before, after) {
+    clear(node);
+    node.appendChild(document.createTextNode((before || '') + FINAL_NAME + ' '));
+    node.appendChild(h('span', { text: GOAL_BALL, 'aria-hidden': 'true' }));
+    if (after) node.appendChild(document.createTextNode(after));
+  }
+
+  /** The contestant whose wager is asked for now (setup order), or null once all are in. */
+  function nextWagerContestant(g) {
+    return g.contestants.find((c) => !hasOwn(g.final.wagers, String(c.id))) || null;
+  }
+
+  /** Offer round `round` (1 at End Game, 2+ while the tie lasts); usedIds = the questions drawn so far. */
+  function openFinalOffer(round, usedIds) {
+    state.game.final = { stage: 'offer', round: round, usedIds: usedIds };
+    clearMessage(dom.finalMsg);
+    renderFinal();
+    showScreen('final'); // also saves the state
+    dom.finalPlay.focus();
+  }
+
+  /** The Golden Goal screen: the offer (who is tied), or the category with the bets. */
+  function renderFinal() {
+    const g = state.game;
+    const f = g.final;
+    const offer = f.stage === 'offer';
+    dom.finalOffer.hidden = !offer;
+    dom.finalWagers.hidden = offer;
+    if (offer) {
+      const top = topContestants(g);
+      const tied = joinNames(top.map((c) => c.name));
+      const score = formatScore(top[0].score);
+      if (f.round === 1) {
+        setGoalText(dom.finalTitle, "It's a tie! ", '?');
+        dom.finalLead.textContent = tied + ' are tied for first on ' + score + '. One more question decides it: ' +
+          'everyone bets, get it right and win your bet, get it wrong and lose it.';
+      } else {
+        setGoalText(dom.finalTitle, 'Still tied! ', ' again?');
+        dom.finalLead.textContent = tied + ' are still level on ' + score + '. Round ' + f.round +
+          ' brings a new question, and everyone bets again from their current score.';
+      }
+      dom.finalRule.textContent = 'Each ' + MODES[g.mode].one + ' can bet from 0 up to their score or ' +
+        largestPoints(g) + ', whichever is higher. You see the category before you bet.';
+      setFinalLoading(false);
+      return;
+    }
+    setGoalText(dom.finalTitle, '', roundSuffix(f.round));
+    dom.finalCategory.textContent = f.category.name;
+    renderWagerList(g);
+    renderWagerTurn(g);
+  }
+
+  /** Every contestant with their score and whether their wager is in; the amounts stay hidden. */
+  function renderWagerList(g) {
+    const f = g.final;
+    const turn = nextWagerContestant(g);
+    clear(dom.finalWagerList);
+    g.contestants.forEach((c) => {
+      const locked = hasOwn(f.wagers, String(c.id));
+      const color = paletteEntry(c.color);
+      const swatch = h('span', { className: 'result-swatch', 'aria-hidden': 'true' });
+      swatch.style.backgroundColor = color.value;
+      const item = h('li', { className: 'final-wager-item' + (locked ? ' is-locked' : '') + (c === turn ? ' is-turn' : '') }, [
+        swatch,
+        h('span', { className: 'final-wager-name', text: c.name }),
+        h('span', { className: 'final-wager-score' }, [
+          h('span', { className: 'visually-hidden', text: 'score ' }),
+          document.createTextNode(formatScore(c.score)),
+        ]),
+        h('span', { className: 'final-wager-state', text: locked ? CHECK + ' Bet locked' : c === turn ? 'Your turn' : 'Waiting' }),
+      ]);
+      item.style.borderLeftColor = color.value;
+      dom.finalWagerList.appendChild(item);
+    });
+  }
+
+  /** The wager form for the next contestant (an empty, masked field), or "Show the question" once all are in. */
+  function renderWagerTurn(g) {
+    const c = nextWagerContestant(g);
+    dom.finalWagerForm.hidden = c === null;
+    dom.finalReady.hidden = c !== null;
+    setWagerError('');
+    dom.finalWagerInput.value = '';
+    setWagerMasked(true);
+    if (c === null) return;
+    dom.finalWagerLabel.textContent = c.name + ", what's your bet?";
+    dom.finalWagerHint.textContent = 'Your bet (up to ' + wagerLimit(g, c.score) +
+      '). Everyone else, look away!';
+  }
+
+  // Masked entry: dots instead of digits through -webkit-text-security (Chrome, Edge, Safari and
+  // Firefox), so the browser never offers to save a password. Without it, a password field.
+  const MASK_BY_CSS = !!(window.CSS && typeof window.CSS.supports === 'function' &&
+    window.CSS.supports('-webkit-text-security', 'disc'));
+
+  function setWagerMasked(masked) {
+    const input = dom.finalWagerInput;
+    input.classList.toggle('is-masked', masked && MASK_BY_CSS);
+    if (!MASK_BY_CSS) input.type = masked ? 'password' : 'text';
+    dom.finalWagerShow.setAttribute('aria-pressed', String(!masked));
+  }
+
+  /** "Show": the contestant checks what they typed (the room should still look away). */
+  function onWagerShowToggle() {
+    setWagerMasked(dom.finalWagerShow.getAttribute('aria-pressed') === 'true');
+    dom.finalWagerInput.focus();
+  }
+
+  function setWagerError(message) {
+    dom.finalWagerError.textContent = message;
+    dom.finalWagerError.hidden = !message;
+    if (message) dom.finalWagerInput.setAttribute('aria-invalid', 'true');
+    else dom.finalWagerInput.removeAttribute('aria-invalid');
+  }
+
+  /** Arabic-Indic and Persian digits as 0-9, so a wager typed on an Arabic keyboard counts too. */
+  function westernDigits(text) {
+    return text.replace(/[٠-٩۰-۹]/g, (d) => String(d.charCodeAt(0) & 0xf));
+  }
+
+  /** Lock in the wager of the contestant on turn: a whole number from 0 to their D-48 limit. */
+  function onWagerSubmit(event) {
+    event.preventDefault();
+    const g = state.game;
+    if (!g || !g.final || g.final.stage !== 'wager' || state.screen !== 'final') return;
+    const c = nextWagerContestant(g);
+    if (!c) return;
+    const raw = westernDigits(dom.finalWagerInput.value.trim());
+    const limit = wagerLimit(g, c.score);
+    if (!WAGER_PATTERN.test(raw) || Number(raw) > limit) {
+      setWagerError('Enter a whole number from 0 to ' + limit + '.'); // never repeats what was typed
+      dom.finalWagerInput.focus();
+      return;
+    }
+    g.final.wagers[String(c.id)] = Number(raw);
+    saveState();
+    renderWagerList(g);
+    renderWagerTurn(g);
+    (nextWagerContestant(g) ? dom.finalWagerInput : dom.finalOpen).focus();
+  }
+
+  function setFinalLoading(loading) {
+    finalLoading = loading;
+    dom.finalPlay.disabled = loading;
+    dom.finalPlay.textContent = loading ? 'Loading...' : 'Go for goal';
+  }
+
+  /**
+   * "Go for goal": draw the question (shown later), then ask for the bets. Never a question of this
+   * game: the board's and the earlier rounds' are excluded, as the board avoids repeats. When none
+   * is left (409), the game ends in a tie (Results, D-10, D-51).
+   */
+  async function onFinalPlay() {
+    const g = state.game;
+    const f = g && g.final;
+    if (!f || f.stage !== 'offer' || state.screen !== 'final' || finalLoading) return;
+    clearMessage(dom.finalMsg);
+    setFinalLoading(true);
+    let drawn = null;
+    let failure = '';
+    let noneLeft = false;
+    try {
+      drawn = parseSwap(await apiPost('questions.php?random=1', {
+        exclude: boardQuestionIds(g).concat(f.usedIds),
+        seen: loadSeen(),
+      }));
+    } catch (err) {
+      noneLeft = err.status === 409;
+      const reason = errorText(err).trim();
+      failure = 'Could not load the question: ' + reason + (/[.!?]$/.test(reason) ? '' : '.') +
+        ' Try again, or skip to the results.';
+    }
+    setFinalLoading(false);
+    if (state.game !== g || g.final !== f || state.screen !== 'final') return; // skipped meanwhile
+    if (noneLeft) {
+      g.final = null;
+      showResults();
+      return;
+    }
+    if (failure) {
+      showMessage(dom.finalMsg, failure, 'error');
+      return;
+    }
+    g.final = {
+      stage: 'wager',
+      round: f.round,
+      usedIds: f.usedIds.concat([drawn.question.id]),
+      category: { id: drawn.catId, name: drawn.catName },
+      question: drawn.question,
+      wagers: {},
+      marks: {},
+      answerShown: false,
+    };
+    if (drawn.question.image) new Image().src = drawn.question.image;
+    renderFinal();
+    saveState();
+    dom.finalWagerInput.focus();
+  }
+
+  function onFinalSkip() {
+    const g = state.game;
+    if (!g || !g.final || g.final.stage !== 'offer' || state.screen !== 'final') return;
+    g.final = null;
+    showResults();
+  }
+
+  /** "Show the question" once every wager is in. */
+  function onFinalOpen() {
+    const g = state.game;
+    if (!g || !g.final || g.final.stage !== 'wager' || state.screen !== 'final' || nextWagerContestant(g)) return;
+    g.final.stage = 'question';
+    markSeen(g.final.question.id); // opened = played, as on the board
+    showFinalQuestion();
+  }
+
+  /** The final question on the question screen; after a refresh its timer restarts (D-04). */
+  function showFinalQuestion() {
+    const g = state.game;
+    const f = g.final;
+    if (!hasArabic(f.question)) f.lang = 'en';
+    else if (f.lang !== 'en' && f.lang !== 'ar') f.lang = 'ar';
+    setStreakLayout(false);
+    setScoringPanelTexts({
+      title: FINAL_NAME + roundSuffix(f.round),
+      hint: 'Every ' + MODES[g.mode].one + ' answers, for example on paper. Correct wins their bet, ' +
+        'Wrong loses it. Mark each one once.',
+      back: 'See results', // "Continue" once everyone is marked and the top is still shared (updateFinalRows)
+    });
+    setGoalText(dom.qHeading, '', roundSuffix(f.round) + ' ' + EN_DASH + ' ' + f.category.name);
+    clearMessage(dom.helperMsg);
+    renderQuestionImage(f.question);
+    renderFinalLang();
+    renderAnswerState(f.answerShown);
+    renderFinalRows();
+    showScreen('question'); // also saves the state
+    updateReportButton();
+    startTimer(g.timerSeconds);
+    dom.qHeading.focus();
+    onQuestionShown(false); // US-48
+  }
+
+  function renderFinalLang() {
+    const f = state.game.final;
+    renderTextAndAnswer(f.question, f.lang === 'ar');
+    clear(dom.qChoices); // no helpers in the final round
+    dom.qChoices.hidden = true;
+    dom.questionMain.classList.remove('has-choices');
+    updateSpeakButton();
+  }
+
+  function toggleFinalLang() {
+    const f = state.game.final;
+    if (!hasArabic(f.question)) return;
+    f.lang = f.lang === 'ar' ? 'en' : 'ar';
+    renderFinalLang();
+    saveState();
+  }
+
+  function showFinalAnswer() {
+    state.game.final.answerShown = true;
+    renderAnswerState(true);
+    saveState();
+    dom.answerText.focus();
+  }
+
+  /** One row per contestant: Correct / Wrong without amounts; the wager shows once they are scored. */
+  function renderFinalRows() {
+    const g = state.game;
+    clear(dom.scoreRows);
+    scoringRows = g.contestants.map((c) => {
+      const color = paletteEntry(c.color);
+      const name = h('span', { className: 'srow-name', text: c.name });
+      name.style.backgroundColor = color.value;
+      name.style.color = color.ink;
+      const ref = {
+        contestant: c,
+        wager: h('span', { className: 'srow-wager' }),
+        score: h('span', { className: 'srow-score', text: formatScore(c.score) }),
+        status: h('span', { className: 'visually-hidden', 'aria-live': 'polite' }),
+        correct: h('button', {
+          type: 'button',
+          className: 'btn btn-correct',
+          text: CHECK + ' Correct',
+          'aria-label': 'Correct for ' + c.name + ', plus their bet',
+          onclick: () => markFinal(c, 'correct'),
+        }),
+        wrong: h('button', {
+          type: 'button',
+          className: 'btn btn-wrong',
+          text: CROSS + ' Wrong',
+          'aria-label': 'Wrong for ' + c.name + ', minus their bet',
+          onclick: () => markFinal(c, 'wrong'),
+        }),
+      };
+      // The wager and the score share one block: on phones they stack, so a mark never widens the row (BUG-9-02).
+      const tally = h('span', { className: 'srow-tally' }, [ref.wager, ref.score]);
+      ref.row = h('li', { className: 'srow' }, [name, tally, ref.status, ref.correct, ref.wrong]);
+      ref.row.style.borderLeftColor = color.value;
+      dom.scoreRows.appendChild(ref.row);
+      return ref;
+    });
+    updateFinalRows();
+  }
+
+  /** Once per contestant, any number Correct; See results once everyone is scored. */
+  function updateFinalRows() {
+    const g = state.game;
+    const f = g.final;
+    scoringRows.forEach((ref) => {
+      const key = String(ref.contestant.id);
+      const mark = hasOwn(f.marks, key) ? f.marks[key] : null;
+      const wager = f.wagers[key];
+      ref.correct.disabled = mark !== null;
+      ref.wrong.disabled = mark !== null;
+      ref.correct.classList.toggle('is-chosen', mark === 'correct');
+      ref.wrong.classList.toggle('is-chosen', mark === 'wrong');
+      ref.row.classList.toggle('is-scored', mark !== null);
+      ref.score.textContent = formatScore(ref.contestant.score);
+      ref.wager.textContent = mark === null ? '' : (mark === 'correct' ? '+' : MINUS) + wager;
+      ref.wager.className = 'srow-wager' + (mark === null ? '' : ' is-' + mark);
+      ref.status.textContent = mark === null ? ''
+        : ref.contestant.name + ' marked ' + mark + ', bet ' + wager + ', score ' + formatScore(ref.contestant.score);
+    });
+    const allMarked = g.contestants.every((c) => hasOwn(f.marks, String(c.id)));
+    dom.backBtn.disabled = !allMarked;
+    // D-51: still level at the top -> Continue to the next round's offer; otherwise the results.
+    dom.backBtn.textContent = allMarked && isTiedAtTop(g) ? 'Continue' : 'See results';
+  }
+
+  function markFinal(contestant, result) {
+    if (!finalOnScreen()) return;
+    const f = state.game.final;
+    const key = String(contestant.id);
+    if (hasOwn(f.marks, key)) return;
+    f.marks[key] = result;
+    contestant.score += result === 'correct' ? f.wagers[key] : -f.wagers[key];
+    updateFinalRows();
+    saveState();
+    focusNextScoringButton();
+  }
+
+  /** The final round is over: Results (with the D-10 tie rule as always). */
+  function finishFinal() {
+    if (!finalOnScreen()) return;
+    stopTimer();
+    state.game.final.stage = 'done';
+    showResults();
+  }
+
+  /** The question screen's big button: Back to Board; in Golden Goal, the next round's offer or the results. */
+  function onBackClick() {
+    if (finalOnScreen()) {
+      if (dom.backBtn.disabled) return;
+      if (isTiedAtTop(state.game)) nextFinalRound();
+      else finishFinal();
+      return;
+    }
+    backToBoard();
+  }
+
+  /** D-51: everyone is marked and the top is still shared: offer another round (new question, new bets). */
+  function nextFinalRound() {
+    const f = state.game.final;
+    stopTimer();
+    openFinalOffer(f.round + 1, f.usedIds.slice());
+  }
+
+  /** Android Back on the final question (US-40): ask, then the results; anyone not scored keeps their score. */
+  function onFinalLeave() {
+    if (!finalOnScreen()) return;
+    const g = state.game;
+    const unscored = g.contestants.some((c) => !hasOwn(g.final.marks, String(c.id)));
+    if (unscored && !window.confirm('Stop ' + FINAL_NAME + ' and show the results? ' + MODES[g.mode].title +
+        ' not marked yet keep their score.')) return;
+    finishFinal();
+  }
+
+  /**
+   * Android Back on the Golden Goal screen: the first offer goes back to the board (undoes End Game);
+   * a repeat offer goes to the results, as Skip (the board is over); the bets ask first.
+   */
+  function onFinalBack() {
+    const g = state.game;
+    const f = g && g.final;
+    if (!f) return;
+    if (f.stage === 'offer') {
+      g.final = null;
+      if (f.round > 1) {
+        showResults();
+        return;
+      }
+      renderGame();
+      showScreen('board');
+      return;
+    }
+    if (!window.confirm('Stop ' + FINAL_NAME + ' and show the results? The bets of this round are dropped and no score changes.')) return;
+    if (state.game !== g || g.final !== f || state.screen !== 'final') return;
+    g.final = null;
+    showResults();
+  }
+
+  function bindFinalEvents() {
+    dom.finalPlay.addEventListener('click', onFinalPlay);
+    dom.finalSkip.addEventListener('click', onFinalSkip);
+    dom.finalWagerForm.addEventListener('submit', onWagerSubmit);
+    dom.finalWagerShow.addEventListener('click', onWagerShowToggle);
+    dom.finalWagerInput.addEventListener('input', () => setWagerError(''));
+    dom.finalOpen.addEventListener('click', onFinalOpen);
+  }
+
+  // ---------- Read aloud (US-48) ----------
+  // A speaker button on the question screen reads the question, and the choices when they are
+  // shown, with the browser's own voices (js/speech.js). It is hidden when no voice is installed
+  // for the language shown (also once the browser's late voice list arrives). Reading never touches
+  // the timer. It stops on a second click, when the language is switched, when the question closes
+  // (Back to Board, Next, any other screen) and on a refresh. "Read questions automatically" is a
+  // choice saved on this device only (setup screen, off by default): reading then starts by itself
+  // when a question opens (after the double-score popup).
+
+  function loadReadAloud() {
+    try {
+      return window.localStorage.getItem(READ_ALOUD_KEY) === '1';
+    } catch (err) {
+      return false; // storage disabled: off
+    }
+  }
+
+  function saveReadAloud(on) {
+    try {
+      if (on) window.localStorage.setItem(READ_ALOUD_KEY, '1');
+      else window.localStorage.removeItem(READ_ALOUD_KEY);
+    } catch (err) {
+      // storage full or disabled: the choice lasts until the page is closed
+    }
+  }
+
+  /** What the speaker reads now, as [{ text, lang }] (the question first), or null when no question is open. */
+  function speechParts() {
+    if (state.screen !== 'question') return null;
+    if (streakOnScreen()) return runSpeechParts(streak.current.q, streak.current);
+    if (dailyOnScreen()) return runSpeechParts(dailyQuestion(), daily.current);
+    const g = state.game;
+    if (finalOnScreen()) {
+      const arabic = g.final.lang === 'ar';
+      return [{ text: arabic ? g.final.question.question_ar : g.final.question.question, lang: arabic ? 'ar' : 'en' }];
+    }
+    if (!g || !g.current) return null;
+    const q = activeQuestion(g).question;
+    const arabic = g.current.lang === 'ar';
+    const parts = [{ text: arabic ? q.question_ar : q.question, lang: arabic ? 'ar' : 'en' }];
+    if (g.current.choiceOrder !== undefined && hasChoices(q)) { // the "3 choices" helper, in the shown order
+      const texts = choiceTexts(q, arabic);
+      g.current.choiceOrder.forEach((index, position) => {
+        parts.push({ text: CHOICE_LETTERS[position] + ': ' + texts.options[index], lang: texts.arabic ? 'ar' : 'en' });
+      });
+    }
+    return parts;
+  }
+
+  /** A Streak or Daily Challenge question and its 3 choices, in the shown language. */
+  function runSpeechParts(q, cur) {
+    const arabic = cur.lang === 'ar';
+    const lang = arabic ? 'ar' : 'en';
+    return [{ text: arabic ? q.question_ar : q.question, lang: lang }].concat(q.choices.map((choice, index) => ({
+      text: CHOICE_LETTERS[index] + ': ' + (arabic ? choice.text_ar : choice.text),
+      lang: lang,
+    })));
+  }
+
+  /** The speaker shows only with a voice for the question's language; pressed while it reads. */
+  function updateSpeakButton() {
+    const parts = speech ? speechParts() : null;
+    const shown = parts !== null && speech.hasVoice(parts[0].lang);
+    if (!shown && reading) {
+      stopReading(); // updates the button again
+      return;
+    }
+    dom.speakBtn.hidden = !shown;
+    dom.questionMain.classList.toggle('can-speak', shown);
+    dom.speakBtn.textContent = reading ? STOP_SIGN : SPEAKER;
+    dom.speakBtn.setAttribute('aria-pressed', String(reading));
+    dom.speakBtn.setAttribute('aria-label', 'Read the question aloud');
+    dom.speakBtn.title = reading ? 'Stop reading' : 'Read the question aloud';
+  }
+
+  function startReading() {
+    const parts = speechParts();
+    if (!speech || parts === null || !speech.hasVoice(parts[0].lang)) return;
+    reading = speech.speak(parts, () => { // the reading ended by itself
+      reading = false;
+      updateSpeakButton();
+    });
+    updateSpeakButton();
+  }
+
+  function stopReading() {
+    if (speech) speech.stop();
+    reading = false;
+    updateSpeakButton();
+  }
+
+  function onSpeakClick() {
+    if (reading) stopReading();
+    else startReading();
+  }
+
+  /** A question was put on the screen: stop the last reading; read this one if automatic reading is on. */
+  function onQuestionShown(hold) {
+    stopReading();
+    if (!hold) autoRead();
+  }
+
+  function autoRead() {
+    if (readAloud && dom.doubleOverlay.hidden) startReading();
+  }
+
+  function initReadAloud() {
+    readAloud = speech !== null && loadReadAloud();
+    dom.readAloudField.hidden = speech === null;
+    dom.readAloudInput.checked = readAloud;
+    dom.readAloudInput.addEventListener('change', () => {
+      readAloud = dom.readAloudInput.checked;
+      saveReadAloud(readAloud);
+    });
+    dom.speakBtn.addEventListener('click', onSpeakClick);
+    if (speech) speech.onVoicesChanged(updateSpeakButton); // voices often arrive after the page loads
+  }
+
   // ---------- Report a question (US-42, D-45) ----------
   // "Report" on an open board question (the Swap question once swapped) and on an answered Streak
   // question opens a small form: one of six reasons and an optional note of up to 200 characters.
@@ -3558,6 +4343,10 @@
       const q = dailyQuestion();
       return { id: q.id, label: q.category_name + ' ' + EN_DASH + ' ' + q.points };
     }
+    if (finalOnScreen()) { // final round question (US-44), like an open board question
+      const f = state.game.final;
+      return Number.isInteger(f.question.id) && f.question.id > 0 ? { id: f.question.id, label: finalHeading(f) } : null;
+    }
     const g = state.game;
     if (!g || !g.current) return null;
     const active = activeQuestion(g);
@@ -3570,7 +4359,7 @@
   function updateReportButton() {
     const shown = reportTarget() !== null;
     dom.reportBtn.hidden = !shown;
-    dom.reportBtn.parentElement.classList.toggle('can-report', shown);
+    dom.questionMain.classList.toggle('can-report', shown);
   }
 
   function isReportOpen() {
@@ -3721,12 +4510,13 @@
     dom.langBtn.addEventListener('click', toggleLang);
     dom.timerPause.addEventListener('click', onPauseClick);
     dom.timerReset.addEventListener('click', onResetClick);
-    dom.backBtn.addEventListener('click', backToBoard);
+    dom.backBtn.addEventListener('click', onBackClick);
     dom.doubleOk.addEventListener('click', closeDoublePopup);
     dom.newGameBtn.addEventListener('click', newGame);
     bindStreakEvents();
     bindDailyEvents();
     bindReportEvents();
+    bindFinalEvents();
   }
 
   /** US-17: reopen the saved screen. An open question restarts its timer at full length (D-04). */
@@ -3739,8 +4529,18 @@
     }
     renderGame();
     preloadImages(state.game.categories);
-    if (saved.screen === 'question') showQuestion();
-    else showScreen('board');
+    const f = state.game.final;
+    if (saved.screen === 'final') { // the final round's offer or wagers (US-44)
+      if (f.question && f.question.image) new Image().src = f.question.image;
+      renderFinal();
+      showScreen('final');
+    } else if (saved.screen === 'question' && f) {
+      showFinalQuestion(); // its timer restarts at full length, like a board question (D-04)
+    } else if (saved.screen === 'question') {
+      showQuestion();
+    } else {
+      showScreen('board');
+    }
   }
 
   function init() {
@@ -3748,6 +4548,7 @@
       byId('mode-limit-' + key).textContent = '(max ' + MODES[key].limit + ')';
     });
     bindEvents();
+    initReadAloud();
     initApp();
     registerServiceWorker();
     const saved = loadState();

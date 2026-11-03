@@ -5,7 +5,8 @@
 - Up to 6 players or 4 teams, each with their own color.
 - A correct answer adds the question's points, a wrong one takes them away.
 - One random question on each board is secretly worth double points for a correct answer; a popup reveals it when it is opened.
-- Every question has a countdown timer.
+- Every question has a countdown timer, and a speaker button can read it aloud with the device's own voices.
+- When players are tied for first at the end, an optional "Golden Goal" tiebreaker follows: everyone secretly bets points on one more question, up to their score or the board's top point value, whichever is higher, and it repeats while the tie lasts.
 - Each player or team has 3 helpers per game: 3 choices, Swap (a random new question) and Skip (lose only half the points).
 - Playing alone, the Streak Challenge asks multiple-choice questions from every category until the first wrong answer or time's up; the longest streaks go on a shared top-10 leaderboard under the challenger name the player enters, for this week (Monday to Sunday, UTC) and of all time.
 - The Daily Challenge gives everyone the same 3 multiple-choice questions each day (a new set at midnight UTC); the result, such as "BrainRush Daily #12: 2/3" with a row of green and red squares, can be shared, as can the final standings of a board game.
@@ -18,7 +19,7 @@ This file lists no questions or answers, on purpose.
 ## Play
 
 - [Play BrainRush](https://brainrush.integration.ninja/): set up players or teams, pick categories and start a game
-- [How to play](https://brainrush.integration.ninja/how-to-play.html): player guide covering setup, the board, answering, scoring, helpers, ending the game, the Streak Challenge and the Daily Challenge
+- [How to play](https://brainrush.integration.ninja/how-to-play.html): player guide covering setup, the board, answering, scoring, helpers, ending the game, the Golden Goal tiebreaker, the Streak Challenge and the Daily Challenge
 
 ## Optional
 

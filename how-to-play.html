@@ -17,7 +17,7 @@
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0b1026">
-  <link rel="stylesheet" href="css/style.56810955.css">
+  <link rel="stylesheet" href="css/style.b8666cf7.css">
   <link rel="stylesheet" href="css/guide.12d2b532.css">
 </head>
 <body class="guide">
@@ -42,6 +42,7 @@
         <li><a href="#helpers">Helpers</a></li>
         <li><a href="#double">&times;2 Double score</a></li>
         <li><a href="#ending">Ending the game</a></li>
+        <li><a href="#golden-goal">Golden Goal <span aria-hidden="true">&#9917;</span></a></li>
         <li><a href="#streak">💀 Sudden Death Streak (solo)</a></li>
         <li><a href="#daily">📅 Daily Challenge</a></li>
         <li><a href="#tips">Tips and questions</a></li>
@@ -109,6 +110,8 @@
         <li>The host can <strong>Pause</strong>, <strong>Resume</strong> or <strong>Reset</strong> the timer.</li>
         <li>Many questions are in <strong>Arabic and English</strong>. Arabic is shown first; the language button switches between the two. The answer follows the same language.</li>
         <li>The host clicks <strong>Show Answer</strong> to reveal the answer. Text in brackets such as <em>(accept Makkah)</em> lists other answers that also count as correct.</li>
+        <li>The speaker button <strong>&#128266;</strong> in the corner reads the question aloud, and its 3 answers when they are shown. Click it again to stop. The timer keeps running while it reads. It uses the voices installed on your device, so the sound differs between devices, and the button only appears when there is a voice for the language shown. Many Windows computers have no Arabic voice: switch the question to English, or add the Arabic speech pack in Windows settings.</li>
+        <li>Tick <strong>Read questions automatically</strong> under the timer on the setup screen to have every question read as soon as it opens. This choice is saved on your device.</li>
       </ul>
     </section>
 
@@ -193,6 +196,33 @@
         <li><strong>Share</strong> on the results sends the final standings, such as "Team Red won BrainRush with 2300! Team Blue 1800.", with a link to BrainRush. On a phone it opens the share menu; on a computer it copies the text so you can paste it, and shows <strong>Copied</strong>.</li>
         <li><strong>New Game</strong> takes you back to setup for the next round.</li>
       </ul>
+    </section>
+
+    <section id="golden-goal" class="guide-section">
+      <h2>Golden Goal <span aria-hidden="true">&#9917;</span></h2>
+      <p>Like the golden goal in football, this breaks a tie. When the site has it turned on and <strong>2 or more players or teams are tied for first</strong> at the end of the game, <strong>End Game</strong> asks <strong>It's a tie! Golden Goal?</strong>: <strong>Go for goal</strong> or <strong>Skip to results</strong>. Without a tie for first, the results show straight away.</p>
+      <ul>
+        <li><strong>Everyone</strong> plays, not only the tied players. The question comes from any category, and only its <strong>category</strong> is shown first.</li>
+        <li>Each player or team then types a <strong>bet</strong>, one at a time, while the others look away. The digits show as dots; <strong>Show</strong> lets the person typing check them. The screen only shows whose bet is locked, never how much.</li>
+        <li>You can bet from 0 up to <strong>your score or the board's largest point value, whichever is higher</strong>. So even with 0 points, or below, you can bet as much as the top question is worth.</li>
+        <li><strong>Show the question</strong> opens it with the timer. Everyone answers, for example on paper.</li>
+        <li>The host marks each player or team once: <strong>&check; Correct</strong> wins their bet, <strong>&cross; Wrong</strong> loses it. Several can be correct. The bet shows next to the name once it is marked.</li>
+        <li>If the top is <strong>still shared</strong> after everyone is marked, <strong>Continue</strong> offers another round: a new question that hasn't been played in this game, and new bets from the new scores. It goes on until the tie is broken or the host chooses <strong>Skip to results</strong>. If no new question is left, the game ends in a tie.</li>
+        <li>Refreshing the page keeps the round, the bets and the marks.</li>
+      </ul>
+      <h3>Example</h3>
+      <p>The board's largest point value is 500. Sara and Omar are tied for first on 600, and Lina has 200.</p>
+      <table class="guide-table">
+        <thead>
+          <tr><th scope="col">Player</th><th scope="col">Can bet up to</th><th scope="col">Bets</th><th scope="col">Answer</th><th scope="col">Final score</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Sara</td><td>600</td><td>200</td><td>Correct</td><td class="pos">800</td></tr>
+          <tr><td>Omar</td><td>600</td><td>600</td><td>Wrong</td><td>0</td></tr>
+          <tr><td>Lina</td><td>500</td><td>500</td><td>Correct</td><td class="pos">700</td></tr>
+        </tbody>
+      </table>
+      <p>Sara wins with 800. Had Sara and Omar both been wrong with the same bet, they would still be level, and a second round would follow.</p>
     </section>
 
     <section id="streak" class="guide-section">

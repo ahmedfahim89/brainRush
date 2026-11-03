@@ -1,6 +1,6 @@
 <?php
-// GET  /api/settings.php  -> { categories_per_game, timer_seconds, banner_enabled, banner_text, start_game_hidden, helpers_enabled, ads_enabled, ads_client, ads_slot }
-// PUT  /api/settings.php  body { categories_per_game?, timer_seconds?, banner_enabled?, banner_text?, start_game_hidden?, helpers_enabled?, ads_enabled?, ads_client?, ads_slot? } -> updated settings
+// GET  /api/settings.php  -> { categories_per_game, timer_seconds, banner_enabled, banner_text, start_game_hidden, helpers_enabled, ads_enabled, final_round_enabled, ads_client, ads_slot }
+// PUT  /api/settings.php  body { categories_per_game?, timer_seconds?, banner_enabled?, banner_text?, start_game_hidden?, helpers_enabled?, ads_enabled?, final_round_enabled?, ads_client?, ads_slot? } -> updated settings
 // Writes need admin access (require_admin: 401/403 otherwise).
 require_once __DIR__ . '/db.php';
 
@@ -12,6 +12,7 @@ const SETTING_RULES = [
     'start_game_hidden'   => [0, 1], // maintenance mode: hides Start Game and shows an overlay
     'helpers_enabled'     => [0, 1], // 3 choices, Swap and Skip; a missing row counts as on
     'ads_enabled'         => [0, 1], // AdSense banner on the Streak leaderboard (D-41); a missing row counts as off
+    'final_round_enabled' => [0, 1], // final wager round before Results (US-44); a missing row counts as off
 ];
 
 // Editable text settings and their maximum length in characters.

@@ -1127,12 +1127,16 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 .ad-label { display: block; margin-bottom: 0.3rem; color: var(--muted); font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; }
 
 /* ---------- Report a question (US-42, D-45) ---------- */
-/* "Report" sits in the question panel's top right corner, so it adds no height (D-30); the
-   heading keeps clear of it. Muted until hovered: it is not part of playing the question. */
+/* "Report" (and the speaker, US-48) sit in the question panel's top right corner, so they add no
+   height (D-30); the heading keeps clear of them. Report is muted until hovered: it is not part of
+   playing the question. */
 .question-main { position: relative; }
-.report-btn { position: absolute; top: 0.9rem; right: 1rem; color: var(--muted); }
+.question-tools { position: absolute; top: 0.9rem; right: 1rem; display: flex; gap: 0.4rem; }
+.report-btn { color: var(--muted); }
 @media (hover: hover) { .report-btn:hover:not(:disabled) { color: var(--text); } }
 .question-main.can-report .question-heading { padding-right: 5rem; }
+.question-main.can-speak .question-heading { padding-right: 3rem; }
+.question-main.can-report.can-speak .question-heading { padding-right: 8rem; }
 /* The form lies over the question screen like the double-score popup; the timer behind keeps running */
 .report-overlay {
   position: fixed;
@@ -1182,6 +1186,60 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 .report-privacy { margin: 0.2rem 0 0; font-size: 0.8rem; }
 .report-card .actions { margin-top: 0.7rem; }
 .report-card .msg { margin: 0.6rem 0 0; }
+
+/* ---------- Read aloud (US-48) ---------- */
+/* The speaker next to Report; gold while it reads (second click stops) */
+.speak-btn { min-width: 2.4rem; line-height: 1.2; }
+.speak-btn[aria-pressed="true"] { color: #1a1a1a; background: var(--gold); border-color: var(--gold); }
+/* "Read questions automatically" under the setup timer (an on-device choice) */
+.read-aloud-field[hidden] { display: none; }
+.read-aloud-field .check-label { margin-top: 0.6rem; }
+.read-aloud-field .hint { margin: 0.2rem 0 0; }
+
+/* ---------- Final round (US-44, D-48) ---------- */
+.final { max-width: 46rem; margin: 0 auto; text-align: center; }
+.final h2:focus { outline: none; }
+.final-lead { margin: 0.2rem 0 0.4rem; font-size: 1.15rem; }
+#final-offer .msg { text-align: left; }
+.final-category { margin: 0 0 0.8rem; color: var(--gold); font-size: clamp(1.4rem, 2.6vw, 2.2rem); font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
+.final-category-label { display: block; color: var(--muted); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+/* Who has locked in a wager (never the amount), with the scores the wagers are based on */
+.final-wager-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; margin: 0 0 1rem; padding: 0; list-style: none; }
+.final-wager-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.3rem 0.7rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 6px solid var(--border);
+  border-radius: 6px;
+}
+.final-wager-item .result-swatch { width: 0.9rem; height: 0.9rem; }
+.final-wager-name { min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.final-wager-score { font-weight: 800; font-variant-numeric: tabular-nums; }
+.final-wager-state { color: var(--muted); font-size: 0.85rem; white-space: nowrap; }
+.final-wager-item.is-locked .final-wager-state { color: var(--success); }
+.final-wager-item.is-turn { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); }
+.final-wager-item.is-turn .final-wager-state { color: var(--gold); font-weight: 700; }
+/* The wager of the contestant on turn: one masked field */
+.final-wager-form { max-width: 32rem; margin: 0 auto; padding: 1rem 1.2rem 1.1rem; text-align: left; background: var(--panel); border: 1px solid var(--gold-dark); border-radius: var(--radius); }
+.final-wager-form[hidden], .final-ready[hidden], #final-offer[hidden], #final-wagers[hidden] { display: none; }
+.final-wager-label { margin: 0 0 0.2rem; color: var(--text); font-size: 1.25rem; font-weight: 700; overflow-wrap: anywhere; }
+.final-wager-form .hint { margin: 0 0 0.6rem; }
+.final-wager-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.final-wager-input { flex: 1 1 8rem; width: auto; min-width: 0; font-size: 1.4rem; font-variant-numeric: tabular-nums; letter-spacing: 0.1em; }
+.final-wager-input.is-masked { -webkit-text-security: disc; }
+.final-wager-row .btn { flex: none; }
+#final-wager-show[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+.final-ready-text { margin: 0 0 0.6rem; font-size: 1.2rem; font-weight: 700; color: var(--success); }
+/* Final question scoring: the wager appears (+300 / -300) once the contestant is scored */
+.srow-tally { display: flex; flex: none; align-items: center; gap: 0.35rem; }
+.srow-wager { font-weight: 800; font-variant-numeric: tabular-nums; }
+.srow-wager:empty { display: none; }
+.srow-wager.is-correct { color: var(--success); }
+.srow-wager.is-wrong { color: var(--danger); }
 
 /* ---------- Phones (portrait, up to 600px wide) ----------
    The game targets laptops and projectors (D-30). On a phone: less padding, the setup label above
@@ -1250,8 +1308,22 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
   .helper-chip { min-width: 48px; height: 48px; font-size: 0.8rem; }
 
   /* Report (US-42): the 48px button in the corner; the heading is as tall, so nothing sits under it */
-  .report-btn { top: 0.6rem; right: 0.6rem; }
+  .question-tools { top: 0.6rem; right: 0.6rem; }
   .question-main.can-report .question-heading { min-height: calc(48px - 0.3rem); padding-right: 5.5rem; }
+  /* Read aloud (US-48): the 48px speaker next to Report */
+  .speak-btn { min-width: 48px; }
+  .question-main.can-speak .question-heading { min-height: calc(48px - 0.3rem); padding-right: 3.4rem; }
+  .question-main.can-report.can-speak .question-heading { padding-right: 8.9rem; }
+  .read-aloud-field .check-label { min-height: 48px; }
+  .read-aloud-field .check-label input { width: 1.4rem; height: 1.4rem; }
+  /* Final round (US-44): the wager field on its own line, Show and Lock in side by side under it */
+  .final-wager-form { padding: 0.8rem 0.8rem 0.9rem; }
+  .final-wager-input { flex-basis: 100%; }
+  .final-wager-row .btn { flex: 1 1 0; }
+  .final-wager-item { padding: 0.25rem 0.55rem; }
+  /* BUG-9-02: the wager sits small above the score, so a marked row keeps its width and height */
+  .srow-tally { flex-direction: column; align-items: flex-end; gap: 0; line-height: 1.1; }
+  .srow-tally .srow-wager { font-size: 0.8rem; }
   .report-overlay { padding: 0.6rem; }
   .report-card { padding: 1rem 0.9rem; }
   .report-reason { min-height: 48px; padding: 0.3rem 0.5rem; }
