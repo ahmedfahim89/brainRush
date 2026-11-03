@@ -1,5 +1,7 @@
 <?php
-// POST /api/question-stats.php   body { question_id, outcome } -> 201 { question_id, outcome }
+// POST   /api/question-stats.php   body { question_id, outcome } -> 201 { question_id, outcome } (public)
+// DELETE /api/question-stats.php   -> 200 { deleted: <rows removed> } (admin only: 401/403 otherwise)
+// Other methods -> 405; without the question_stats table -> 503.
 // Question difficulty stats (US-47, D-55). The POST is public: the game sends one outcome when a
 // board question closes or a Streak question is answered (read_json_body() forces a CORS
 // preflight). outcome is one of correct / wrong / nobody / timeout; the server adds 1 to that
@@ -7,7 +9,9 @@
 // stored: no name, no IP, no device id and no time. Accepted limitation (D-37 g): anyone can post
 // counts, so the numbers can be faked; they are a hint for the admin, never used by the game.
 // The Admin question list (GET api/questions.php) reads the counters; deleting a question deletes
-// them (ON DELETE CASCADE).
+// them (ON DELETE CASCADE). The DELETE is Admin's "Reset all stats" (change request after Sprint 11):
+// it empties the table with DELETE FROM (not TRUNCATE, which needs the DDL privilege), so every
+// question is back to 0 attempts.
 require_once __DIR__ . '/db.php';
 
 // The four outcomes of D-55, each a counter column of question_stats; only 'correct' is correct.
@@ -58,8 +62,7 @@ function add_stat(PDO $pdo, int $questionId, string $outcome): void
                 bad_request('This question does not exist (any more).');
             }
             if (is_missing_table($e)) {
-                error_log('BrainRush API: table question_stats is missing (run sql/migrate-add-question-stats.sql).');
-                json_response(['error' => 'Question stats are not available right now.'], 503);
+                stats_unavailable();
             }
             // 1213 deadlock / 1205 lock wait timeout: the statement was rolled back, so it can run again.
             $code = (int) ($e->errorInfo[1] ?? 0);
@@ -70,6 +73,28 @@ function add_stat(PDO $pdo, int $questionId, string $outcome): void
     }
 }
 
+/** 503 when the question_stats table is missing (sql/migrate-add-question-stats.sql not run yet). */
+function stats_unavailable(): void
+{
+    error_log('BrainRush API: table question_stats is missing (run sql/migrate-add-question-stats.sql).');
+    json_response(['error' => 'Question stats are not available right now.'], 503);
+}
+
+/** Remove every stats row (Admin "Reset all stats"); returns how many rows were removed. */
+function reset_stats(PDO $pdo): int
+{
+    try {
+        $stmt = $pdo->prepare('DELETE FROM question_stats');
+        $stmt->execute();
+        return $stmt->rowCount();
+    } catch (PDOException $e) {
+        if (is_missing_table($e)) {
+            stats_unavailable();
+        }
+        throw $e;
+    }
+}
+
 switch ($_SERVER['REQUEST_METHOD']) {
     case 'POST':
         [$questionId, $outcome] = read_stat(read_json_body());
@@ -77,6 +102,11 @@ switch ($_SERVER['REQUEST_METHOD']) {
         json_response(['question_id' => $questionId, 'outcome' => $outcome], 201);
         break;
 
+    case 'DELETE':
+        require_admin();
+        json_response(['deleted' => reset_stats(db())]);
+        break;
+
     default:
-        method_not_allowed(['POST']);
+        method_not_allowed(['POST', 'DELETE']);
 }
