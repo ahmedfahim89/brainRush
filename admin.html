@@ -8,7 +8,7 @@
   <link rel="icon" href="img/logo.svg" type="image/svg+xml">
   <link rel="icon" href="img/favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.f2b43475.css">
+  <link rel="stylesheet" href="css/style.ca3e62fe.css">
 </head>
 <body class="admin">
   <header class="page-header">
@@ -179,10 +179,13 @@
         <select id="question-points-filter"></select>
         <span id="question-count" class="hint"></span>
       </div>
+      <!-- Difficulty stats (US-47, D-55): attempts and % correct from the game; the band of each enabled value -->
+      <p id="question-stats-hint" class="hint"></p>
+      <p id="question-stats-msg" class="msg" role="status" aria-live="polite" hidden></p>
       <div class="table-wrap">
         <table class="data-table">
           <thead>
-            <tr><th scope="col">Category</th><th scope="col">Points</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Arabic</th><th scope="col">Picture?</th><th scope="col">Choices</th><th scope="col">Actions</th></tr>
+            <tr><th scope="col">Category</th><th scope="col">Points</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Arabic</th><th scope="col">Picture?</th><th scope="col">Choices</th><th scope="col" id="sort-attempts-head" aria-sort="none"><button type="button" class="sort-btn" data-sort="attempts">Attempts</button></th><th scope="col" id="sort-percent-head" aria-sort="none"><button type="button" class="sort-btn" data-sort="percent">% correct</button></th><th scope="col">Actions</th></tr>
           </thead>
           <tbody id="questions-body"></tbody>
         </table>
@@ -249,6 +252,6 @@
     </section>
   </main>
 
-  <script src="js/admin.1df33c63.js"></script>
+  <script src="js/admin.b5e5aba1.js"></script>
 </body>
 </html>

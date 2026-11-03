@@ -1,7 +1,7 @@
 // BrainRush game page: setup, dynamic board, question + timer, scoring, results
 // and localStorage persistence (survives a page refresh).
-// The page only uses public endpoints (GETs, the board POST and the game log), so it works
-// on the hosted site without the admin login.
+// The page only uses public endpoints (GETs, the board POST, the game log, reports and question
+// stats), so it works on the hosted site without the admin login.
 // All API/user text is rendered with textContent / DOM APIs (never innerHTML).
 'use strict';
 
@@ -63,6 +63,9 @@
   const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/; // "YYYY-MM-DD" from the API
   const LB_PERIODS = ['week', 'all']; // leaderboard tabs (US-45): GET streaks.php?period=
   const REPORT_NOTE_MAX = 200; // REPORT_NOTE_MAX in api/reports.php (US-42, D-45)
+  // Question difficulty stats (US-47, D-55): what a closed board question or an answered Streak
+  // question sends to api/question-stats.php (STAT_OUTCOMES there), once per question per game.
+  const STAT = { correct: 'correct', wrong: 'wrong', nobody: 'nobody', timeout: 'timeout' };
 
   // Daily Challenge (US-43, D-46): the server sets the day (midnight UTC), the number of questions
   // and #N; the browser only plays them. The run and today's result are saved under their own key,
@@ -117,8 +120,12 @@
   //     double?: "<categoryId>:<points>" (D-40: the hidden double-score cell, picked at Start),
   //     finalRound?: boolean (US-44: final_round_enabled when the game started; missing = off),
   //     final?: null | { stage, category?, question?, wagers?, marks?, answerShown?, lang? } (see below),
+  //     statsSent?: [questionId] (US-47: questions whose outcome was sent; missing = a save from before
+  //       US-47, which sends none),
   //     current: null | { catId, points, marks: { "<contestantId>": "correct" | "wrong" }, answerShown,
-  //                       lang, by?, choiceOrder?, swap? } }
+  //                       lang, by?, choiceOrder?, swap?, timedOut? } }
+  // timedOut (US-47, D-55 e): the open question's timer reached 0 at least once (a Reset or a
+  // refresh doesn't undo it; a Swap clears it, the new question has its own timer).
   // final (US-44): stage 'offer' (End Game offered the round) has no other field. From 'wager' on:
   // category = { id, name } and question (isValidQuestion) from questions.php?random=1; wagers =
   // { "<contestantId>": points } entered so far, in setup order; marks as on a board question but
@@ -135,14 +142,16 @@
   };
 
   // Countdown of the open question (memory only; restarts at full length after a refresh, D-04).
-  // onExpire runs when it reaches 0 (the Streak Challenge ends the run then; the board game has none).
+  // onExpire runs when it reaches 0 (the Streak Challenge ends the run then; a board question notes
+  // it for its stats outcome, US-47).
   const timer = { totalMs: 0, remainingMs: 0, endAt: 0, running: false, handle: null, onExpire: null };
   let scoringRows = []; // DOM references of the question screen's scoring rows
   let swapping = null; // id of the contestant whose Swap request is running (memory only)
 
   // Streak Challenge run (US-33), saved under STREAK_KEY on every change; null when none:
   //   { version, name, color, timerSeconds, count, queue: [question], usedIds: [id],
-  //     current: null | { q, lang, deadline, picked, leftMs? }, over }
+  //     current: null | { q, lang, deadline, picked, leftMs? }, over, statsSent? }
+  // statsSent (US-47): ids whose outcome was sent, as in the board game (missing = sends none).
   // A question is the API's { id, category_name, points, question, question_ar, image,
   // image_credit, choices: [{text, text_ar}] x3, correct } (choices already cut by the server).
   // deadline = Date.now() ms when time is up, so a refresh keeps the remaining time; picked =
@@ -738,7 +747,8 @@
   function isValidCurrent(current, g) {
     if (current === null) return true;
     if (!isPlainObject(current) || !Number.isInteger(current.catId) || !Number.isInteger(current.points) ||
-        typeof current.answerShown !== 'boolean' || !isPlainObject(current.marks)) return false;
+        typeof current.answerShown !== 'boolean' || !isPlainObject(current.marks) ||
+        !(current.timedOut === undefined || typeof current.timedOut === 'boolean')) return false; // US-47
     const key = cellKey(current.catId, current.points);
     if (!isBoardCellKey(key, g) || hasOwn(g.used, key)) return false;
     let correct = 0;
@@ -789,7 +799,13 @@
       isValidBoard(g.points, g.categories) && isValidMixColumns(g) &&
       (g.double === undefined || (typeof g.double === 'string' && isBoardCellKey(g.double, g))) && // games saved before D-40
       typeof g.finalRound === 'boolean' && isValidFinal(g.final, g) &&
+      isValidStatsSent(g.statsSent) && // US-47
       isValidUsed(g.used, g) && isValidCurrent(g.current, g);
+  }
+
+  /** US-47: the ids whose outcome was sent; missing in a save from before US-47 (then none are sent). */
+  function isValidStatsSent(list) {
+    return list === undefined || (Array.isArray(list) && list.length <= SEEN_MAX && isValidIdList(list));
   }
 
   /**
@@ -1724,6 +1740,7 @@
       double: pickDoubleCell(board.categories, board.points), // D-40: secret until it is opened
       finalRound: s.finalRoundOn, // US-44: admin setting when the game starts (final_round_enabled)
       final: null,
+      statsSent: [], // US-47: questions whose outcome was sent (at most once per question per game)
       current: null,
     };
     renderGame();
@@ -1765,6 +1782,28 @@
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(body),
     }).catch(() => {});
+  }
+
+  /**
+   * US-47 / D-55: send one question's outcome (a STAT value) for the Admin difficulty stats, at most
+   * once per question per game. `holder` is the board game or the Streak run: its statsSent list
+   * (saved with it, the caller saves) remembers the ids already sent, and a save from before US-47
+   * has no list, so it sends nothing. Fire-and-forget: a failed send never interrupts play.
+   */
+  function sendQuestionStat(holder, questionId, outcome) {
+    if (!holder || !Array.isArray(holder.statsSent) || !Number.isInteger(questionId) || questionId < 1 ||
+        holder.statsSent.indexOf(questionId) !== -1) return;
+    holder.statsSent.push(questionId);
+    try {
+      fetch(API_BASE + 'question-stats.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ question_id: questionId, outcome: outcome }),
+        keepalive: true, // still sent when the page is closed right after the question
+      }).catch(() => {});
+    } catch (err) {
+      // fetch unavailable or the request refused at once: the game goes on without this count
+    }
   }
 
   // ---------- Board and scoreboard (US-07, US-08, US-09, US-10) ----------
@@ -2017,9 +2056,27 @@
     renderScoringRows();
     showScreen('question'); // also saves the state
     updateReportButton(); // US-42 (needs the question screen): also for a Swap question, the one shown is reported
-    startTimer(g.timerSeconds);
+    startTimer(g.timerSeconds, undefined, onBoardTimeUp);
     dom.qHeading.focus();
     onQuestionShown(holdReading === true); // US-48
+  }
+
+  /** US-47 / D-55 e: the board question's timer reached 0; kept for its outcome (saved, a refresh keeps it). */
+  function onBoardTimeUp() {
+    const cur = state.game && state.game.current;
+    if (!cur || cur.timedOut) return;
+    cur.timedOut = true;
+    saveState();
+  }
+
+  /**
+   * US-47 / D-55 e: a board question's outcome, decided once when it closes, from its marks at that
+   * moment: anyone Correct, else anyone Wrong, else the timer reached 0, else nobody (also a Skip).
+   */
+  function boardOutcome(cur) {
+    if (correctContestantId(cur) !== null) return STAT.correct;
+    if (Object.keys(cur.marks).some((id) => cur.marks[id] === 'wrong')) return STAT.wrong;
+    return cur.timedOut === true ? STAT.timeout : STAT.nobody;
   }
 
   /** The scoring panel's title, hint and Back button: the board's, or the final round's (US-44). */
@@ -2431,6 +2488,7 @@
     // 3 choices used before the Swap carry over: a fresh order for the new question.
     if (cur.choiceOrder !== undefined) cur.choiceOrder = shuffled([0, 1, 2]);
     delete cur.lang; // the new question starts in its default language
+    delete cur.timedOut; // US-47: the swapped-away question is not counted; the new one has its own timer
     markSeen(swap.question.id);
     showQuestion(); // new heading, picture and points, timer from the start; also saves
   }
@@ -2467,12 +2525,16 @@
     (next || dom.backBtn).focus();
   }
 
-  /** US-13: stop the timer, mark the cell used (owner = the Correct contestant, else grey). */
+  /**
+   * US-13: stop the timer, mark the cell used (owner = the Correct contestant, else grey). US-47: the
+   * question on screen (the Swap one after a Swap) sends its outcome; later +/- corrections don't.
+   */
   function backToBoard() {
     const g = state.game;
     const cur = g && g.current;
     if (!cur) return;
     stopTimer();
+    sendQuestionStat(g, activeQuestion(g).question.id, boardOutcome(cur)); // saved below with the cell
     const cell = { owner: correctContestantId(cur) };
     // A Swap replaced the question: the board shows the old value struck through and the new one small.
     if (cur.swap) cell.swap = { catName: cur.swap.catName, points: cur.swap.points };
@@ -2560,7 +2622,9 @@
   }
 
   function onResetClick() {
-    if (state.game && (state.game.current || finalOnScreen())) startTimer(state.game.timerSeconds);
+    if (!state.game) return;
+    if (state.game.current) startTimer(state.game.timerSeconds, undefined, onBoardTimeUp); // US-47
+    else if (finalOnScreen()) startTimer(state.game.timerSeconds);
   }
 
   // ---------- Results (US-15, US-16) ----------
@@ -2807,6 +2871,7 @@
       Array.isArray(run.usedIds) && run.usedIds.length <= SEEN_MAX &&
       run.usedIds.every((id) => Number.isInteger(id) && id > 0) &&
       Number.isInteger(run.count) && run.count >= 0 && run.count <= run.usedIds.length &&
+      isValidStatsSent(run.statsSent) && // US-47
       isValidStreakCurrent(run.current, run);
   }
 
@@ -2910,6 +2975,7 @@
       usedIds: [],
       current: null,
       over: false,
+      statsSent: [], // US-47
     };
     lastStreakProfile = profile;
     addToQueue(streak, questions);
@@ -3131,6 +3197,9 @@
     cur.picked = index === null || leftMs <= 0 ? STREAK_TIME_UP : index;
     if (cur.picked === cur.q.correct) run.count += 1;
     else run.over = true;
+    // US-47 / D-55 f: right -> correct, wrong -> wrong, time's up -> timeout (End run sends nothing).
+    sendQuestionStat(run, cur.q.id, cur.picked === cur.q.correct ? STAT.correct
+      : cur.picked === STREAK_TIME_UP ? STAT.timeout : STAT.wrong);
     saveStreak();
     showTimerAt(run.timerSeconds, cur.leftMs);
     if (cur.picked === STREAK_TIME_UP) dom.timerStatus.textContent = "Time's up!";

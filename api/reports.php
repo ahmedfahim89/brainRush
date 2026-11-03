@@ -15,12 +15,6 @@ require_once __DIR__ . '/db.php';
 const REPORT_REASONS = ['wrong_answer', 'typo', 'translation', 'outdated', 'picture', 'other'];
 const REPORT_NOTE_MAX = 200; // REPORT_NOTE_MAX in js/game.js, VARCHAR(200) in the table
 
-/** MySQL error 1146: the table does not exist (the migration has not run on this database). */
-function is_missing_table(PDOException $e): bool
-{
-    return $e->getCode() === '42S02' && (int) ($e->errorInfo[1] ?? 0) === 1146;
-}
-
 /** Run a reports query; a database without question_reports gives a clear 503 instead of a 500. */
 function with_reports_table(callable $action, string $missingMessage)
 {

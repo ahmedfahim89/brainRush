@@ -1,6 +1,8 @@
 <?php
-// GET    /api/questions.php                          -> all questions
-// GET    /api/questions.php?category_id=<id>         -> one category's questions
+// GET    /api/questions.php                          -> all questions, each with attempts, percent_correct
+//                                                          and stats {correct, wrong, nobody, timeout} (US-47)
+// GET    /api/questions.php?category_id=<id>         -> one category's questions (same fields)
+//        either list: &sort=percent_correct          -> lowest % correct first, no attempts last
 // GET    /api/questions.php?board=1&categories=3,1,2 -> board payload (requested order)
 // POST   /api/questions.php?board=1                  body { categories: "3,1,2", seen?: [id, ...] }
 //                                                          -> board payload that avoids seen questions
@@ -73,12 +75,12 @@ function image_or_null(string $image): ?string
     return $image === '' ? null : $image;
 }
 
-const QUESTION_SELECT =
-    'SELECT q.id, q.category_id, c.name AS category_name, q.points, q.question, q.answer,
-           q.question_ar, q.answer_ar, q.image, q.image_credit,
-           q.wrong_1, q.wrong_2, q.wrong_1_ar, q.wrong_2_ar
-       FROM questions q
-       JOIN categories c ON c.id = q.category_id';
+const QUESTION_COLUMNS =
+    'q.id, q.category_id, c.name AS category_name, q.points, q.question, q.answer,
+     q.question_ar, q.answer_ar, q.image, q.image_credit,
+     q.wrong_1, q.wrong_2, q.wrong_1_ar, q.wrong_2_ar';
+const QUESTION_FROM = ' FROM questions q JOIN categories c ON c.id = q.category_id';
+const QUESTION_SELECT = 'SELECT ' . QUESTION_COLUMNS . QUESTION_FROM;
 
 function question_row(array $r): array
 {
@@ -131,22 +133,87 @@ function find_question(PDO $pdo, int $id): ?array
     return $row ? question_row($row) : null;
 }
 
+/**
+ * The admin list: question_row() plus the difficulty stats (US-47, D-55): attempts (all four
+ * outcomes), percent_correct (whole number, null with 0 attempts) and stats {correct, wrong,
+ * nobody, timeout}. A question with no stats row has 0 attempts. ?sort=percent_correct orders by
+ * % correct, lowest first (then the most attempts first; questions with no attempts last).
+ */
 function list_questions(PDO $pdo): array
 {
-    if (!isset($_GET['category_id'])) {
-        $rows = $pdo->query(QUESTION_SELECT . ' ORDER BY c.name ASC, q.points ASC, q.id ASC')->fetchAll();
-        return array_map('question_row', $rows);
+    $sort = $_GET['sort'] ?? '';
+    if (!in_array($sort, ['', 'percent_correct'], true)) {
+        bad_request("sort must be 'percent_correct' or left out");
     }
+    $where = '';
+    $params = [];
+    $order = ' ORDER BY c.name ASC, q.points ASC, q.id ASC';
+    if (isset($_GET['category_id'])) {
+        $categoryId = require_query_id('category_id');
+        $stmt = $pdo->prepare('SELECT 1 FROM categories WHERE id = :id');
+        $stmt->execute([':id' => $categoryId]);
+        if (!$stmt->fetchColumn()) {
+            not_found('Category not found');
+        }
+        $where = ' WHERE q.category_id = :id';
+        $params = [':id' => $categoryId];
+        $order = ' ORDER BY q.points ASC, q.id ASC';
+    }
+    $rows = array_map('listed_question', question_rows_with_stats($pdo, $where, $order, $params));
+    if ($sort === 'percent_correct') {
+        usort($rows, fn(array $a, array $b): int =>
+            [$a['percent_correct'] === null, $a['percent_correct'], -(int) $a['attempts']] <=>
+            [$b['percent_correct'] === null, $b['percent_correct'], -(int) $b['attempts']]);
+    }
+    return $rows;
+}
 
-    $categoryId = require_query_id('category_id');
-    $stmt = $pdo->prepare('SELECT 1 FROM categories WHERE id = :id');
-    $stmt->execute([':id' => $categoryId]);
-    if (!$stmt->fetchColumn()) {
-        not_found('Category not found');
+// The four outcome counters of question_stats (US-47; STAT_OUTCOMES in api/question-stats.php).
+const STAT_COLUMNS = ['correct', 'wrong', 'nobody', 'timeout'];
+
+/**
+ * The list's rows with their counters (LEFT JOIN question_stats). A database without the table
+ * (sql/migrate-add-question-stats.sql not run yet) still lists the questions, with the counters
+ * null, so only the stats are missing (FU-19 rule).
+ */
+function question_rows_with_stats(PDO $pdo, string $where, string $order, array $params): array
+{
+    $counters = implode(', ', array_map(fn(string $c): string => "s.$c AS stat_$c", STAT_COLUMNS));
+    $withStats = 'SELECT ' . QUESTION_COLUMNS . ", $counters" . QUESTION_FROM .
+        ' LEFT JOIN question_stats s ON s.question_id = q.id' . $where . $order;
+    try {
+        $stmt = $pdo->prepare($withStats);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
+    } catch (PDOException $e) {
+        if (!is_missing_table($e)) {
+            throw $e;
+        }
+        error_log('BrainRush API: table question_stats is missing (run sql/migrate-add-question-stats.sql).');
     }
-    $stmt = $pdo->prepare(QUESTION_SELECT . ' WHERE q.category_id = :id ORDER BY q.points ASC, q.id ASC');
-    $stmt->execute([':id' => $categoryId]);
-    return array_map('question_row', $stmt->fetchAll());
+    $stmt = $pdo->prepare(QUESTION_SELECT . $where . $order);
+    $stmt->execute($params);
+    return $stmt->fetchAll(); // no stat_* keys: listed_question() gives null stats
+}
+
+/** question_row() plus attempts, percent_correct and stats (all null when the stats table is missing). */
+function listed_question(array $r): array
+{
+    $row = question_row($r);
+    if (!array_key_exists('stat_correct', $r)) {
+        return $row + ['attempts' => null, 'percent_correct' => null, 'stats' => null];
+    }
+    $stats = [];
+    foreach (STAT_COLUMNS as $column) {
+        $stats[$column] = (int) ($r["stat_$column"] ?? 0); // no row (LEFT JOIN) = 0
+    }
+    $attempts = array_sum($stats);
+    return $row + [
+        'attempts'        => $attempts,
+        // D-55 b: the shown whole number, round(100 x correct / attempts); the Check value mark compares it.
+        'percent_correct' => $attempts > 0 ? (int) round(100 * $stats['correct'] / $attempts) : null,
+        'stats'           => $stats,
+    ];
 }
 
 /**

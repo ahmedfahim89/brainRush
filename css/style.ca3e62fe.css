@@ -330,6 +330,33 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 }
 .badge-ok { background: var(--success-bg); color: var(--success); }
 .badge-missing { background: var(--danger-bg); color: #ffb3b3; }
+/* Difficulty stats (US-47): "Check value" under the % correct, in the warning colours of .msg-warning */
+.badge-check { background: rgba(245, 197, 24, 0.12); color: #fff1c2; cursor: help; }
+/* The mark sits under the %, and both may wrap, so the 10 columns fit 1024px with no inner scroll (D-19) */
+.data-table td.stats-cell { white-space: normal; }
+.data-table td.stats-cell .badge { display: inline-block; margin-top: 0.2rem; white-space: normal; }
+#questions-panel .data-table th, #questions-panel .data-table td { padding-left: 0.45rem; padding-right: 0.45rem; }
+/* BUG-11-01: a smaller Category minimum here (names up to "Food & Drink" still fit on one line) leaves
+   about 29px to spare at 1024px with a classic 15px scrollbar */
+#questions-panel .data-table td.name-cell { min-width: 7rem; }
+/* Sortable column headers (Attempts, % correct): look like the other headers, arrow when sorted */
+.sort-btn {
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+@media (hover: hover) { .sort-btn:hover { color: var(--text); } }
+/* The arrows are decoration (aria-sort tells screen readers); the "/ ''" form hides them where supported */
+.sort-btn::after { content: " \2195"; content: " \2195" / ""; opacity: 0.5; } /* up-down arrow: sortable */
+.sort-btn[data-dir="ascending"]::after { content: " \2191"; content: " \2191" / ""; opacity: 1; }
+.sort-btn[data-dir="descending"]::after { content: " \2193"; content: " \2193" / ""; opacity: 1; }
+.sort-btn.is-sorted { color: var(--gold); }
 
 /* ---------- Game page ---------- */
 .game-main { padding: 1.25rem 1.5rem 1rem; }
