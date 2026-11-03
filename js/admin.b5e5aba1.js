@@ -27,13 +27,27 @@
     picture: 'Picture problem',
     other: 'Other',
   };
+  // Difficulty stats (US-47, D-55). The "Check value" band of a point value comes from its rank among
+  // the enabled values, never from the values themselves: the smallest expects BAND_TOP % correct, the
+  // largest BAND_TOP - BAND_SPREAD, the ones between evenly in between (one enabled value: the middle),
+  // each plus or minus BAND_HALF_WIDTH within 0-100. A question is marked from MIN_ATTEMPTS attempts on.
+  const BAND_TOP = 80;
+  const BAND_SPREAD = 40;
+  const BAND_HALF_WIDTH = 20;
+  const MIN_ATTEMPTS = 20;
+  const MIDDOT = String.fromCharCode(0x00b7); // "100: 60–100% · 200: 50–90%"
+  // Sortable stats columns: the direction of the first click (most attempts / lowest % correct first).
+  const STATS_SORTS = { attempts: 'descending', percent: 'ascending' };
 
   const state = {
     settings: null,    // { categories_per_game, timer_seconds, banner_enabled, banner_text, ..., ads_enabled, ads_client, ads_slot }
     points: [],        // [{ id, points, enabled, question_count }] ascending
     categories: [],    // [{ id, name, question_count }] sorted by name
     questions: [],     // [{ id, category_id, category_name, points, question, answer, question_ar, answer_ar, image, image_credit,
-                       //    wrong_1, wrong_2, wrong_1_ar, wrong_2_ar }]
+                       //    wrong_1, wrong_2, wrong_1_ar, wrong_2_ar, attempts, percent_correct,
+                       //    stats: {correct, wrong, nobody, timeout} }]; the stats fields are null without
+                       //    the question_stats table (US-47), percent_correct also with 0 attempts
+    statsSort: null,   // { key: 'attempts' | 'percent', dir: 'ascending' | 'descending' }, or null (list order)
     reports: [],       // open reports per question, most reported first (US-42): [{ question: {id, category_id,
                        //    category_name, points, question, answer, image}, count, reasons: {reason: count},
                        //    reports: [{ id, reason, note, created_at }] newest first, last_at }]
@@ -95,6 +109,9 @@
     qPointsFilter: byId('question-points-filter'),
     qCount: byId('question-count'),
     questionsBody: byId('questions-body'),
+    qStatsHint: byId('question-stats-hint'),
+    qStatsMsg: byId('question-stats-msg'),
+    sortButtons: Array.prototype.slice.call(document.querySelectorAll('.sort-btn[data-sort]')),
     reportsReload: byId('reports-reload'),
     reportsCount: byId('reports-count'),
     reportsMsg: byId('reports-msg'),
@@ -727,14 +744,17 @@
   function renderQuestions() {
     const filterId = Number(dom.qFilter.value);
     const filterPoints = Number(dom.qPointsFilter.value);
-    const rows = state.questions.filter((q) =>
-      (!filterId || q.category_id === filterId) && (!filterPoints || q.points === filterPoints));
+    const rows = sortedByStats(state.questions.filter((q) =>
+      (!filterId || q.category_id === filterId) && (!filterPoints || q.points === filterPoints)));
+    const bands = valueBands();
     dom.qCount.textContent = 'Showing ' + rows.length + ' of ' + state.questions.length;
+    renderStatsHint(bands);
+    renderSortButtons();
     clear(dom.questionsBody);
     if (!rows.length) {
       const text = filterId || filterPoints ? 'No questions match this filter.' : 'No questions yet.';
       dom.questionsBody.appendChild(h('tr', {}, [
-        h('td', { className: 'empty-row', colSpan: 8, text: text }),
+        h('td', { className: 'empty-row', colSpan: 10, text: text }),
       ]));
       return;
     }
@@ -749,6 +769,8 @@
         h('td', { className: 'text-cell', text: q.question_ar ? 'Yes' : '-' }),
         h('td', { className: 'text-cell', text: q.image ? 'Yes' : '-' }),
         h('td', { className: 'text-cell', text: choicesLabel(q) }),
+        attemptsCell(q),
+        percentCell(q, bands),
         h('td', { className: 'row-actions' }, [
           h('button', {
             type: 'button',
@@ -767,6 +789,114 @@
         ]),
       ]));
     });
+  }
+
+  // ---------- Difficulty stats (US-47, D-55) ----------
+
+  /**
+   * The "Check value" band of each enabled point value, keyed by points: { low, high } in % correct.
+   * Rank r (1 = smallest) of n enabled values: centre = round(BAND_TOP - BAND_SPREAD * (r - 1) / (n - 1)),
+   * the middle of that range when n = 1; band = centre +/- BAND_HALF_WIDTH within 0-100, ends included.
+   * Disabled values have no rank, so no band (D-55 c). Follows the point values loaded with the page.
+   */
+  function valueBands() {
+    const values = enabledPoints().map((p) => p.points).sort((a, b) => a - b);
+    const bands = {};
+    values.forEach((points, i) => {
+      const centre = values.length === 1
+        ? Math.round(BAND_TOP - BAND_SPREAD / 2)
+        : Math.round(BAND_TOP - BAND_SPREAD * i / (values.length - 1));
+      bands[points] = { low: Math.max(0, centre - BAND_HALF_WIDTH), high: Math.min(100, centre + BAND_HALF_WIDTH) };
+    });
+    return bands;
+  }
+
+  function bandText(band) {
+    return band.low + EN_DASH + band.high + '%';
+  }
+
+  /** D-55 b: marked from MIN_ATTEMPTS attempts when the shown whole % is outside its value's band. */
+  function needsCheck(q, bands) {
+    const band = bands[q.points];
+    return !!band && q.attempts !== null && q.attempts >= MIN_ATTEMPTS && q.percent_correct !== null &&
+      (q.percent_correct < band.low || q.percent_correct > band.high);
+  }
+
+  /** D-55 j: "Check value: 20+ attempts and % correct outside 100: 60–100% · 200: 50–90% · …". */
+  function renderStatsHint(bands) {
+    const values = Object.keys(bands).map(Number).sort((a, b) => a - b);
+    dom.qStatsHint.hidden = !state.points.length; // nothing loaded yet (or no point values at all)
+    dom.qStatsHint.textContent = values.length
+      ? 'Check value: ' + MIN_ATTEMPTS + '+ attempts and % correct outside ' +
+        values.map((p) => p + ': ' + bandText(bands[p])).join(' ' + MIDDOT + ' ') +
+        '. Attempts and % correct come from board and Streak games.'
+      : 'Check value: no point value is enabled, so no question is marked.';
+    // Without the question_stats table the list still loads; only the stats are missing (FU-19 rule).
+    if (state.questions.some((q) => q.attempts === null)) {
+      showMessage(dom.qStatsMsg, 'Attempts and % correct are not set up on this database yet: run sql/migrate-add-question-stats.sql.', 'warning');
+    } else {
+      clearMessage(dom.qStatsMsg);
+    }
+  }
+
+  /** Attempts, with the four outcomes in the tooltip ("12 correct · 5 wrong · 2 nobody · 1 time's up"). */
+  function attemptsCell(q) {
+    if (q.attempts === null) return h('td', { className: 'num hint', text: '-' });
+    const s = q.stats;
+    const detail = [s.correct + ' correct', s.wrong + ' wrong', s.nobody + ' nobody', s.timeout + " time's up"]
+      .join(' ' + MIDDOT + ' ');
+    return h('td', { className: 'num', text: String(q.attempts), title: detail });
+  }
+
+  /** % correct ("-" with no attempts) and the "Check value" mark, its tooltip naming the band. */
+  function percentCell(q, bands) {
+    if (q.percent_correct === null) return h('td', { className: 'num hint', text: '-' });
+    const children = [h('span', { text: q.percent_correct + '%' })];
+    if (needsCheck(q, bands)) {
+      const tip = 'Expected ' + bandText(bands[q.points]) + ' for ' + q.points;
+      children.push(h('span', { className: 'badge badge-check', text: 'Check value', title: tip }));
+      children.push(h('span', { className: 'visually-hidden', text: ' (' + tip + ')' }));
+    }
+    return h('td', { className: 'num stats-cell' }, children);
+  }
+
+  /** The rows in the chosen stats order; no attempts always last; equal values keep the list order. */
+  function sortedByStats(rows) {
+    const sort = state.statsSort;
+    if (!sort) return rows;
+    const field = sort.key === 'attempts' ? 'attempts' : 'percent_correct';
+    const sign = sort.dir === 'ascending' ? 1 : -1;
+    const noValue = (q) => q[field] === null || (field === 'attempts' && q.attempts === 0);
+    return rows.slice().sort((a, b) => {
+      if (noValue(a) || noValue(b)) return Number(noValue(a)) - Number(noValue(b));
+      return sign * (a[field] - b[field]);
+    });
+  }
+
+  /** Column header state: aria-sort and an arrow on the sorted column. */
+  function renderSortButtons() {
+    dom.sortButtons.forEach((button) => {
+      const key = button.getAttribute('data-sort');
+      const active = state.statsSort && state.statsSort.key === key ? state.statsSort.dir : 'none';
+      button.parentElement.setAttribute('aria-sort', active);
+      button.classList.toggle('is-sorted', active !== 'none');
+      button.setAttribute('data-dir', active);
+    });
+  }
+
+  /** A click on a stats header: its first direction, then the other one, then back to the list order. */
+  function onSortClick(event) {
+    const key = event.currentTarget.getAttribute('data-sort');
+    const first = STATS_SORTS[key];
+    const sort = state.statsSort;
+    if (!sort || sort.key !== key) {
+      state.statsSort = { key: key, dir: first };
+    } else if (sort.dir === first) {
+      state.statsSort = { key: key, dir: first === 'ascending' ? 'descending' : 'ascending' };
+    } else {
+      state.statsSort = null;
+    }
+    renderQuestions();
   }
 
   /** "Choices" column: whether the "3 choices" helper has its wrong options (US-32), to track the backfill. */
@@ -1265,6 +1395,7 @@
     dom.qImagePreview.addEventListener('error', hideImagePreview);
     dom.qFilter.addEventListener('change', onFilterChange);
     dom.qPointsFilter.addEventListener('change', onFilterChange);
+    dom.sortButtons.forEach((button) => button.addEventListener('click', onSortClick));
     dom.authRetry.addEventListener('click', onAuthRetry);
     dom.reportsReload.addEventListener('click', onReportsReload);
     dom.streaksReload.addEventListener('click', onStreaksReload);

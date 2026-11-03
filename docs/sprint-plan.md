@@ -514,7 +514,7 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 **Goal:** Admin can see how often each question is answered correctly and spot questions at the wrong point value. (Owner's Sprint D.)
 **Stories:** US-47
 **Dependencies:** **Sprint 7 (US-42)**: reuse its admin panel pattern and `api/reports.php` conventions (public POST validation, rate limit style); Streak and board question flows.
-**Owner questions needed before development:** none from FU-20..FU-24. **PO to define before development:** the "Check value" band (the expected percentage correct for each point value). The story does not give numbers; the band must come from the enabled point values (for example by rank), not from hard-coded values (DoD 1).
+**Owner questions needed before development:** none from FU-20..FU-24. **"Check value" band:** defined by the PO 2026-11-03 in D-55 (backlog): rank r of n enabled values ascending, centre `round(80 − 40 × (r − 1) / (n − 1))` (60 when n = 1), band centre ± 20 within 0–100; marked at 20+ attempts outside the band; disabled values get no mark; all four outcomes are attempts, only "correct" is correct.
 
 **Developer tasks**
 1. `sql/migrate-add-question-stats.sql` (new) — `question_stats`: `question_id` (primary key, FK to `questions` ON DELETE CASCADE) with counters for correct / wrong / nobody / timeout. Re-runnable; run locally twice.
@@ -533,7 +533,7 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 - The "Check value" band is written down by the PO and has no hard-coded point values.
 - Public-write limitation (fake counts) noted in the dev note and Privacy needs no change (no personal data stored).
 
-**Status:** Planned
+**Status:** Accepted by the PO 2026-11-03 (test report: 72 checks, 68 PASS, 0 FAIL, 4 PENDING after the re-test; first run 62 PASS, 1 FAIL; BUG-11-01 (Minor, Admin Questions table 5 px too wide at 1024 px) fixed in fix loop 1 and re-tested; D-56). Pending the owner's local Chrome check and commit (FU-39) and the hosted migration, deploy and device steps (FU-40). Branch `sprint-11`, cut from `main` after the Sprint 10 merge (PR #90); not committed.
 
 ---
 

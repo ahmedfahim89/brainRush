@@ -131,6 +131,22 @@ CREATE TABLE IF NOT EXISTS daily_challenge (
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
+-- Question difficulty stats (US-47, D-55): one row per question with four counters, one per
+-- outcome the game sends when a board question closes or a Streak question is answered.
+-- Attempts = the four added up; only "correct" counts as correct. No name, IP address, device id
+-- or time is stored. Deleting a question deletes its counters.
+CREATE TABLE IF NOT EXISTS question_stats (
+  question_id INT UNSIGNED NOT NULL,
+  correct     INT UNSIGNED NOT NULL DEFAULT 0,
+  wrong       INT UNSIGNED NOT NULL DEFAULT 0,
+  nobody      INT UNSIGNED NOT NULL DEFAULT 0,
+  timeout     INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (question_id),
+  CONSTRAINT fk_stats_question
+    FOREIGN KEY (question_id) REFERENCES questions (id)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
 -- ---------------------------------------------------------------------------
 -- Seed data
 -- ---------------------------------------------------------------------------

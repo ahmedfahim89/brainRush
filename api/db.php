@@ -226,6 +226,12 @@ function is_duplicate_key(PDOException $e): bool
     return $e->getCode() === '23000' && (int) ($e->errorInfo[1] ?? 0) === 1062;
 }
 
+/** MySQL error 1146: the table does not exist (a migration has not run on this database). */
+function is_missing_table(PDOException $e): bool
+{
+    return $e->getCode() === '42S02' && (int) ($e->errorInfo[1] ?? 0) === 1146;
+}
+
 /** MySQL errors 1451/1452: foreign key constraint failed. */
 function is_foreign_key_error(PDOException $e): bool
 {
