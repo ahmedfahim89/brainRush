@@ -62,6 +62,7 @@ BrainRush/
   js/game.js            # game state machine, board, timer, scoring
   js/share.js           # sharing (US-43, US-46): share sheet on phones, else copy text + link ("Copied")
   js/speech.js          # read aloud (US-48): browser speech synthesis, a voice per language, start/stop
+  js/i18n.js            # interface language (US-49): EN/AR string tables, lookup with English fallback, lang/dir of the game page
   js/admin.js           # admin CRUD UI
   api/config.example.php # DB settings template (committed); copied to api/config.php (git-ignored)
   api/db.php            # PDO connection helper + json_response()/read_json_body()
@@ -101,6 +102,8 @@ New 2026-11-02 (US-42, D-45, report a question): `question_reports(id PK AI, que
 New 2026-11-02 (US-43, D-46, Daily Challenge): `daily_challenge(challenge_date DATE, position TINYINT UNSIGNED, question_id INT UNSIGNED FK→questions ON DELETE CASCADE, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (challenge_date, position), UNIQUE KEY uq_daily_question (challenge_date, question_id), KEY idx_daily_question (question_id))`, the questions of each day. Nothing about the player is stored. Existing databases get it from `sql/migrate-add-daily-challenge.sql` (run before the code).
 
 New 2026-11-03 (US-47, D-55, question difficulty stats): `question_stats(question_id INT UNSIGNED PK FK→questions ON DELETE CASCADE, correct, wrong, nobody, timeout INT UNSIGNED NOT NULL DEFAULT 0)`, one row per question, created on its first outcome (`INSERT ... ON DUPLICATE KEY UPDATE`). No name, IP, device id or time is stored. Existing databases get it from `sql/migrate-add-question-stats.sql` (run before the code).
+
+Changed 2026-11-09 (US-49 change request, Arabic category names): `categories` also has `name_ar VARCHAR(100) NULL` (after `name`), the optional Arabic name shown when the game's interface is Arabic (English name when NULL/blank). The API sends it as `name_ar` (categories list, board columns, Swap category) and `category_name_ar` (Kilo Meshakkal cells, Streak and Daily questions). Existing databases get it from `sql/migrate-add-category-name-ar.sql` (run before the code); `sql/add-category-arabic-names.sql` fills it in by English name.
 
 Changed 2026-10-11 (D-31, amended 2026-10-11): ~~`UNIQUE KEY uq_slot (category_id, points)`~~ is removed, so a category may have several questions per point value. `points` and its FK stay. The new unique key blocks duplicate question text within a category. Existing databases are converted by `sql/migrate-question-bank.sql`, which keeps all existing questions and their points.
 

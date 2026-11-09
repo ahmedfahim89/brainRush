@@ -24,7 +24,7 @@ Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..U
 | 10 | Kilo Meshakkal category (US-53) | Accepted by the PO 2026-11-03 (D-54; BUG-10-01 fixed), pending the owner's local Chrome check and commit (FU-36) and the hosted and device steps (FU-37); not committed |
 | 11 | Question difficulty stats (US-47) | Planned |
 | 12 | Custom category for one game (US-50) | Planned (later) |
-| 13 | Arabic interface (US-49) | Planned (later) |
+| 13 | Arabic interface (US-49) | Accepted by the PO 2026-11-09 (ran before Sprint 12); pending the owner's local Chrome check and commit (FU-47), the hosted and device steps (FU-49) and the native review of the strings (FU-48); not committed. CR "Arabic category names" accepted 2026-11-09 (D-61); hosted migration before the code (FU-53) |
 | 14 | Phone buzzers (US-52), spike first | Planned (later; not committed until the FU-24 spike) |
 | 15 | Rewarded second chance in Streak (US-51) | Planned (later; blocked by FU-23) |
 
@@ -559,6 +559,7 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 **Tester focus:** form validation (empty, too long, duplicate, missing a point value); custom plus real categories at the N limit; Start sends no custom data (check the network calls and the log line); helpers on the custom cell; refresh mid-game restores it; save, reload the page, reuse; export and import (valid, corrupt, oversized, `<img src=x onerror=alert(1)>` renders as text); storage full; 1366x768 and 375x812; no console errors.
 
 **Definition of Done (Sprint 12, on top of the global DoD)**
+- **Arabic (D-60, because Sprint 13 ran first):** every new or changed visible string (the "Add my own category" form, its validation messages, the save, export and import messages, tooltips and `aria-label`s) ships in **both English and Arabic** in `js/i18n.js`, through `t()` / `tn()`, with no hard-coded text. Tests include EN and AR, RTL and bidi isolation of the custom name, and D-30 layouts at 1366x768 and 375x812 in AR. New Arabic strings are AI-drafted (D-58 a) and added to the native review (FU-48).
 - Nothing custom is sent to or stored on the server (verified in the API calls and the game log).
 - Saved-game version bumped and tested with an older save (D-28).
 - No migration needed.
@@ -567,11 +568,11 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 
 ---
 
-## Sprint 13 — Arabic interface (US-49) — later
+## Sprint 13 — Arabic interface (US-49) — done early, before Sprint 12
 
 **Goal:** The whole game can be switched between English and Arabic, right to left, with the choice remembered. (Owner: later, its own sprint. Size L.)
 **Stories:** US-49
-**Dependencies:** Place it **after** Sprints 7-12 so all new screens and texts exist before they are translated; the existing Arabic question text and language button (earlier Arabic localization); D-30 layouts.
+**Dependencies:** Planned **after** Sprints 7-12, but **it actually ran before Sprint 12** (PO decision D-60, 2026-11-09), so the US-50 custom category screens were not translated here; they must ship bilingual in Sprint 12. The existing Arabic question text and language button (earlier Arabic localization); D-30 layouts.
 **Owner questions needed before development:** none open. Who supplies and reviews the Arabic UI strings is to be agreed (owner review, as for question content) before development starts.
 
 **Developer tasks**
@@ -587,11 +588,11 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 **Tester focus:** EN/AR on every screen with no leftover English string (list from task 1); choice remembered after refresh; RTL mirroring; Latin names, Arabic names and numbers mixed in the scoreboard and Results; every D-30 layout in AR at 1366x768, 1920x1080 and 375x812; saved game and open question restored in AR; question without Arabic; helpers, Streak, Daily, final round and Report flows in AR; English regression of all flows; no console errors.
 
 **Definition of Done (Sprint 13, on top of the global DoD)**
-- A string inventory exists and every item is translated or deliberately left in English with a reason.
-- English behaviour and layouts are unchanged (regression passed).
-- No migration needed; saved game keeps its version unless the language choice is stored in it (then D-28).
+- [x] A string inventory exists and every item is translated or deliberately left in English with a reason (293 keys, all with Arabic; in `docs/sprints/sprint-13-dev.md`). Arabic is AI-drafted (D-58 a) until the native review (FU-48).
+- [x] English behaviour and layouts are unchanged (regression passed, test report 29/29, then fix loop 1 re-test 16/16).
+- [x] No migration needed (no PHP, no SQL); saved game version unchanged. Remaining, not DoD of the code: owner Chrome check and commit (FU-47), hosted deploy and device check (FU-49), native review (FU-48). Global DoD "tester report has no open Critical/Major bugs" met (BUG-13-01 and BUG-13-02 fixed).
 
-**Status:** Planned (later)
+**Status:** Done (accepted by the PO 2026-11-09, after fix loop 1; 293 strings, no migration), pending the owner's local Chrome check and commit (FU-47), the hosted deploy and device check (FU-49) and the native review of the Arabic strings (FU-48). Branch `sprint-13`, not committed yet. **Outcome:** US-49 accepted; no carry-over stories; known issues: FU-50 (Arabic Setup 22 px taller on a phone, no action), FU-51 (`.gitignore` LF lines), FU-52 (local `question_stats` side effect). **Ran before Sprint 12:** see the notes in Sprints 12 and 14 (D-60). Test report `docs/sprints/sprint-13-test-report.md`: 29/29 PASS, then fix loop 1 re-test 16/16 PASS; BUG-13-01 and BUG-13-02 fixed. Decisions D-58 to D-60; follow-ups FU-47 to FU-52. **Change request "Arabic category names"** (owner, 2026-11-09, on top of Sprint 13): accepted by the PO 2026-11-09 (D-61, amends D-59 b). Names in a new `categories.name_ar` column edited in Admin; Kilo Meshakkal's in `js/i18n.js`; Setup order stays English alphabetical. Test report section 9: 20/20 PASS, 0 FAIL, 1 PENDING (Admin at 375 px, FU-55); BUG-13-04 (Minor wording, Flags) to the native review (FU-54). This CR adds a migration and PHP changes, so the "no migration" DoD line above holds for US-49 only: on hosted, `sql/migrate-add-category-name-ar.sql` and then `sql/add-category-arabic-names.sql` run **before** the code (FU-53). Follow-ups FU-53 to FU-56.
 
 ---
 
@@ -599,7 +600,7 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 
 **Goal:** Decide with evidence whether phone buzzers can work on Hostinger shared hosting (no WebSockets), and build them only if the owner commits the story after the spike. (Owner: later, its own sprint.)
 **Stories:** US-52 (**not committed** until the FU-24 spike result is accepted by the owner and the PO)
-**Dependencies:** **FU-24** (technical spike on short polling: latency, server load, cleanup). If committed: Sprint 13 first if the buzzer pages must be in Arabic; Setup/Question screens; Privacy page.
+**Dependencies:** **FU-24** (technical spike on short polling: latency, server load, cleanup). If committed: Sprint 13 is already done, so the buzzer pages (`buzzer.html`, `js/buzzer.js`) and the new host-screen room code / QR strings must ship in English and Arabic through `js/i18n.js` (D-60), with RTL and Arabic tests; Setup/Question screens; Privacy page.
 **Owner questions needed before development:** **FU-24** (spike) and, after it, the owner's go / no-go. Nothing in Phase 2 starts before that.
 
 **Phase 1 — Spike (time-boxed, no application code merged)**
@@ -666,7 +667,7 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 | 10 | US-53 (accepted 2026-11-03, pending owner checks FU-36 and FU-37) |
 | 11 | US-47 (planned) |
 | 12 | US-50 (planned, later) |
-| 13 | US-49 (planned, later) |
+| 13 | US-49 (done, accepted 2026-11-09) |
 | 14 | US-52 (planned, later; spike first, not committed) |
 | 15 | US-51 (planned, later; blocked by FU-23) |
 

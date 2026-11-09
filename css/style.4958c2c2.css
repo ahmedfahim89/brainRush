@@ -403,8 +403,8 @@ body[data-screen="board"] .site-footer, body[data-screen="question"] .site-foote
 .mode-toggle { display: inline-flex; margin: 0.3rem 0 0.2rem; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
 .mode-option { position: relative; margin: 0; font-size: 1rem; color: var(--text); }
 .mode-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-.mode-option span { display: block; padding: 0.45rem 1.2rem; cursor: pointer; }
-.mode-option + .mode-option span { border-left: 1px solid var(--border); }
+.mode-option > span { display: block; padding: 0.45rem 1.2rem; cursor: pointer; }
+.mode-option + .mode-option > span { border-left: 1px solid var(--border); }
 .mode-option input:checked + span { background: var(--gold); color: #1a1a1a; font-weight: 700; }
 .mode-option input:focus-visible + span { box-shadow: inset var(--focus); }
 .mode-limit { font-size: 0.8rem; font-weight: 400; }
@@ -1338,7 +1338,7 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
   .page-header .nav-link { padding: 0.8rem 0.15rem; }
   .site-footer nav a { min-height: 48px; padding: 0.8rem 0.3rem; } /* footer links (US-41): same 48px rule */
   .game .btn, .game input[type="text"], .game input[type="number"] { min-height: 48px; }
-  .mode-option span { padding-top: 0.7rem; padding-bottom: 0.7rem; }
+  .mode-option > span { padding-top: 0.7rem; padding-bottom: 0.7rem; }
   .cat-label { min-height: 48px; }
   .swatch { width: 48px; height: 48px; }
   .helper-chip { min-width: 48px; height: 48px; font-size: 0.8rem; }
@@ -1363,4 +1363,73 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
   .report-overlay { padding: 0.6rem; }
   .report-card { padding: 1rem 0.9rem; }
   .report-reason { min-height: 48px; padding: 0.3rem 0.5rem; }
+}
+
+/* ---------- Interface language (US-49) ---------- */
+/* EN / AR switch at the end of the game page's header: a small pill toggle like Players / Teams. On a
+   phone it sits on the logo's line (the links keep their own line), and a 48px-tall invisible tap
+   area (US-40) adds no height to the header, so the board keeps its room (D-30). */
+.game .page-header nav { margin-inline-start: auto; }
+.ui-lang { display: inline-flex; flex: none; border: 1px solid var(--border); border-radius: 999px; }
+.ui-lang-btn {
+  position: relative;
+  padding: 0.15rem 0.75rem;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.4;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.ui-lang-btn[aria-pressed="true"] { color: #1a1a1a; background: var(--gold); }
+@media (hover: hover) { .ui-lang-btn[aria-pressed="false"]:hover { background: var(--panel-2); } }
+@media (max-width: 600px) {
+  .ui-lang { order: 1; margin-inline-start: auto; }
+  .game .page-header nav { order: 2; margin-inline-start: 0; }
+  .ui-lang-btn::after { content: ""; position: absolute; top: 50%; left: 0; right: 0; height: 48px; transform: translateY(-50%); }
+}
+
+/* Arabic is right to left (html[dir="rtl"], set by js/i18n.js). Only the rules with a physical left or
+   right are mirrored here, so the English layout stays exactly as it was; grids and flex rows follow
+   the direction by themselves. game.js colours a contestant's row edge with border-inline-start. */
+html[dir="rtl"] .brand-logo { margin-right: 0; margin-left: 0.6rem; }
+html[dir="rtl"] .msg { border-left: 0; border-right: 4px solid var(--muted); }
+html[dir="rtl"] .msg-error { border-right-color: var(--danger); }
+html[dir="rtl"] .msg-success { border-right-color: var(--success); }
+html[dir="rtl"] .msg-warning { border-right-color: var(--gold); }
+html[dir="rtl"] .msg .btn { margin-left: 0; margin-right: 0.6rem; }
+html[dir="rtl"] .mode-option + .mode-option > span { border-left: 0; border-right: 1px solid var(--border); }
+html[dir="rtl"] .cat-surprise-hint { margin-left: 0; margin-right: 0.6rem; }
+html[dir="rtl"] .played-bar, html[dir="rtl"] .timer-bar { transform-origin: right center; }
+html[dir="rtl"] .cell-double { right: auto; left: 0.3rem; }
+html[dir="rtl"] .question-main.has-photo .question-text { margin: 0 0 0.4rem 1rem; }
+html[dir="rtl"] .question-double, html[dir="rtl"] .question-swap-note { margin-left: 0; margin-right: 0.8rem; }
+html[dir="rtl"] .timer-value { text-align: left; }
+html[dir="rtl"] .answer-text { border-left: 0; border-right: 4px solid var(--success); }
+html[dir="rtl"] .srow { border-left: 1px solid var(--border); border-right: 8px solid var(--border); }
+html[dir="rtl"] .srow-score, html[dir="rtl"] .result-score { text-align: left; }
+html[dir="rtl"] .results-list { text-align: right; }
+html[dir="rtl"] .result-row { border-left: 1px solid var(--border); border-right: 10px solid var(--border); }
+html[dir="rtl"] .lb-list .result-row { border-right-width: 6px; }
+html[dir="rtl"] .streak-name { border-left: 0; border-right: 6px solid var(--border); }
+html[dir="rtl"] .streak-count { margin-left: 0; margin-right: 0.3rem; }
+html[dir="rtl"] .lb-tab + .lb-tab { border-left: 0; border-right: 1px solid var(--border); }
+html[dir="rtl"] .daily .msg, html[dir="rtl"] #final-offer .msg, html[dir="rtl"] .final-wager-form { text-align: right; }
+html[dir="rtl"] .final-wager-item { border-left: 1px solid var(--border); border-right: 6px solid var(--border); }
+html[dir="rtl"] .report-count { text-align: left; }
+html[dir="rtl"] .question-tools { right: auto; left: 1rem; }
+html[dir="rtl"] .question-main.can-report .question-heading { padding-right: 0; padding-left: 5rem; }
+html[dir="rtl"] .question-main.can-speak .question-heading { padding-right: 0; padding-left: 3rem; }
+html[dir="rtl"] .question-main.can-report.can-speak .question-heading { padding-right: 0; padding-left: 8rem; }
+/* Arabic letters are joined: letter spacing would pull them apart */
+html[lang="ar"] .question-heading, html[lang="ar"] .board-cat, html[lang="ar"] .answer-label,
+html[lang="ar"] .streak-count-line, html[lang="ar"] .final-category-label, html[lang="ar"] .ad-label { letter-spacing: 0; }
+@media (max-width: 600px) {
+  html[dir="rtl"] .lb-meta { margin-left: 0; margin-right: 2.7rem; }
+  html[dir="rtl"] .question-tools { right: auto; left: 0.6rem; }
+  html[dir="rtl"] .question-main.can-report .question-heading { padding-right: 0; padding-left: 5.5rem; }
+  html[dir="rtl"] .question-main.can-speak .question-heading { padding-right: 0; padding-left: 3.4rem; }
+  html[dir="rtl"] .question-main.can-report.can-speak .question-heading { padding-right: 0; padding-left: 8.9rem; }
 }

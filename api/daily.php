@@ -20,7 +20,7 @@ const DAILY_PICK_TRIES = 3; // rounds of "fill the missing positions, read back"
 const DAILY_UNAVAILABLE = 'The Daily Challenge is not available right now. Please try again later.';
 
 const DAILY_SET_SELECT =
-    'SELECT d.position, c.name AS category_name,
+    'SELECT d.position, c.name AS category_name, c.name_ar AS category_name_ar,
             q.id, q.category_id, q.points, q.question, q.answer, q.question_ar, q.answer_ar,
             q.image, q.image_credit, q.wrong_1, q.wrong_2, q.wrong_1_ar, q.wrong_2_ar
        FROM daily_challenge d
@@ -215,7 +215,7 @@ function daily_challenge(PDO $pdo, DateTimeImmutable $now): array
             error_log("BrainRush API: Daily Challenge question {$r['id']} has no 3 choices any more.");
             json_response(['error' => DAILY_UNAVAILABLE], 503);
         }
-        $questions[] = streak_question($r, $r['category_name'], $choices);
+        $questions[] = streak_question($r, $r['category_name'], $choices, $r['category_name_ar']);
     }
     return [
         'date'            => $date,

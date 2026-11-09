@@ -32,9 +32,11 @@ CREATE TABLE IF NOT EXISTS point_values (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
 -- Board columns (x-axis). The _ci collation makes the unique name case-insensitive.
+-- name_ar: optional Arabic name, shown when the game's interface is Arabic.
 CREATE TABLE IF NOT EXISTS categories (
   id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
   name       VARCHAR(100) NOT NULL,
+  name_ar    VARCHAR(100) NULL,
   created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_category_name (name)

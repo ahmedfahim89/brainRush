@@ -9,6 +9,9 @@
 
 (function () {
   const STATUS_MS = 4000; // how long "Copied" stays visible
+  // Interface language (US-49): js/i18n.js gives the status texts in English or Arabic; without it, English.
+  const i18n = window.BrainRushI18n;
+  const label = (key, english) => (i18n ? i18n.t(key) : english);
 
   /** The site link: the canonical URL of the page (D-42), else this page without query or hash. */
   function siteUrl() {
@@ -79,10 +82,10 @@
       }
     }
     if (await copyText(full)) {
-      showStatus(status, 'Copied', false);
+      showStatus(status, label('share.copied', 'Copied'), false);
       return 'copied';
     }
-    showStatus(status, 'Could not copy. Your browser blocked it.', true);
+    showStatus(status, label('share.copyFailed', 'Could not copy. Your browser blocked it.'), true);
     return 'failed';
   }
 

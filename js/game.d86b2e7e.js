@@ -3,9 +3,17 @@
 // The page only uses public endpoints (GETs, the board POST, the game log, reports and question
 // stats), so it works on the hosted site without the admin login.
 // All API/user text is rendered with textContent / DOM APIs (never innerHTML).
+// Interface language (US-49): every text comes from js/i18n.js (loaded first): t(key, params) and
+// tn(key, count) give the English or Arabic text; iso() and ltr() keep names and signed numbers in
+// their own direction inside Arabic text (both return the text unchanged in English).
 'use strict';
 
 (function () {
+  const i18n = window.BrainRushI18n;
+  const t = i18n.t;
+  const tn = i18n.n;
+  const iso = i18n.iso;
+  const ltr = i18n.ltr;
   const API_BASE = 'api/';
   const STORAGE_KEY = 'brainrush.game';
   // v4 adds the final round (US-44); v3 (helpers, US-32), v2 (used cells + open question) and
@@ -41,13 +49,15 @@
   const DOUBLE_FACTOR = 2; // D-40: a Correct on the hidden double-score cell earns this many times its points
 
   // Helpers (US-32, D-36): each contestant may use each one once per game. `chip` is the
-  // icon-sized text on the scoring row and the scoreboard; `name` is used in confirms and tooltips.
+  // icon-sized text on the scoring row and the scoreboard; the name (t('helper.<key>')) is used in
+  // confirms and tooltips. The chips and the A/B/C letters are symbols and stay the same in Arabic.
   const HELPER_KEYS = ['choices', 'swap', 'skip'];
   const HELPERS = {
-    choices: { chip: 'ABC', name: '3 choices' },
-    swap: { chip: String.fromCharCode(0x21c4), name: 'Swap' },          // left-right arrows
-    skip: { chip: String.fromCharCode(0x00bd), name: 'Skip' },          // one half
+    choices: { chip: 'ABC' },
+    swap: { chip: String.fromCharCode(0x21c4) },          // left-right arrows
+    skip: { chip: String.fromCharCode(0x00bd) },          // one half
   };
+  const helperName = (key) => t('helper.' + key);
   const CHOICE_LETTERS = ['A', 'B', 'C'];
   const CHOICES_SHORT_CHARS = 24; // text question: 3 choices this short sit side by side
   const WRONG_FIELDS = ['wrong_1', 'wrong_2', 'wrong_1_ar', 'wrong_2_ar'];
@@ -59,7 +69,6 @@
   const STREAK_REFILL_AT = 5;   // ask for the next batch once fewer questions are queued
   const STREAK_MAX_QUEUE = 100; // a saved queue is never longer (batches are 20)
   const STREAK_TIME_UP = -1;    // `picked` when the time ran out
-  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/; // "YYYY-MM-DD" from the API
   const LB_PERIODS = ['week', 'all']; // leaderboard tabs (US-45): GET streaks.php?period=
   const REPORT_NOTE_MAX = 200; // REPORT_NOTE_MAX in api/reports.php (US-42, D-45)
@@ -81,8 +90,8 @@
   const FINAL_STAGES = ['offer', 'wager', 'question', 'done'];
   const WAGER_PATTERN = /^\d{1,9}$/; // a whole number typed by a contestant
   // D-50 (amended): players see the round as "Golden Goal ⚽" and the wager as their "bet" (code keeps
-  // "final"/"wager"). The ball is decorative: shown in an aria-hidden span, never in labels.
-  const FINAL_NAME = 'Golden Goal';
+  // "final"/"wager"); its name is t('final.name'). The ball is decorative: shown in an aria-hidden
+  // span, never in labels.
   const GOAL_BALL = String.fromCodePoint(0x26bd); // soccer ball
 
   // Read aloud (US-48): the "Read questions automatically" choice of this device ('1' = on).
@@ -90,20 +99,22 @@
   const SPEAKER = String.fromCodePoint(0x1f50a); // speaker with sound waves
   const STOP_SIGN = String.fromCharCode(0x25a0); // black square: stop reading
 
+  // Players or teams: the limit, and the mode's key in the string tables ('entry.add.players', ...).
   const MODES = {
-    players: { limit: 6, title: 'Players', label: 'Player', one: 'player', many: 'players' },
-    teams: { limit: 4, title: 'Teams', label: 'Team', one: 'team', many: 'teams' },
+    players: { limit: 6, key: 'players' },
+    teams: { limit: 4, key: 'teams' },
   };
 
-  // Six distinct contestant colors; `ink` is the readable text color on that background.
+  // Six distinct contestant colors; `ink` is the readable text color on that background; `name` is
+  // the key of the color's name (t('color.red')).
   // Grey (unanswered cell) and gold (UI accent) are deliberately not in the palette.
   const PALETTE = [
-    { value: '#e5484d', name: 'Red', ink: '#ffffff' },
-    { value: '#3e7bfa', name: 'Blue', ink: '#ffffff' },
-    { value: '#2fb36d', name: 'Green', ink: '#0b1026' },
-    { value: '#f08c2e', name: 'Orange', ink: '#0b1026' },
-    { value: '#9b5de5', name: 'Purple', ink: '#ffffff' },
-    { value: '#22b8cf', name: 'Cyan', ink: '#0b1026' },
+    { value: '#e5484d', name: 'color.red', ink: '#ffffff' },
+    { value: '#3e7bfa', name: 'color.blue', ink: '#ffffff' },
+    { value: '#2fb36d', name: 'color.green', ink: '#0b1026' },
+    { value: '#f08c2e', name: 'color.orange', ink: '#0b1026' },
+    { value: '#9b5de5', name: 'color.purple', ink: '#ffffff' },
+    { value: '#22b8cf', name: 'color.cyan', ink: '#0b1026' },
   ];
 
   const SCREENS = ['setup', 'board', 'question', 'results', 'final']; // a saved board game may be on these
@@ -112,10 +123,11 @@
   // Central state. `setup` is the form being filled in (memory only);
   // `game` is the running game and is saved to localStorage on every change:
   //   { mode, contestants: [{id, name, color, score, helpers: {choices, swap, skip}}], timerSeconds, points,
-  //     categories: [{id, name, questions, hidden}] (hidden = unopened "Surprise me!" pick, shown as "?");
+  //     categories: [{id, name, nameAr, questions, hidden}] (hidden = unopened "Surprise me!" pick, shown as "?";
+  //       nameAr = the Arabic name or null, missing in older saves; see localName());
   //       the Kilo Meshakkal column (id MIX, US-53) also has order (its values top to bottom, a shuffled
   //       copy of points) and faces (one emoji per box, same length); its questions have catName
-  //       (the source category),
+  //       and catNameAr (the source category),
   //     used: { "<categoryId>:<points>": { owner: contestantId | null } },
   //     double?: "<categoryId>:<points>" (D-40: the hidden double-score cell, picked at Start),
   //     finalRound?: boolean (US-44: final_round_enabled when the game started; missing = off),
@@ -127,14 +139,14 @@
   // timedOut (US-47, D-55 e): the open question's timer reached 0 at least once (a Reset or a
   // refresh doesn't undo it; a Swap clears it, the new question has its own timer).
   // final (US-44): stage 'offer' (End Game offered the round) has no other field. From 'wager' on:
-  // category = { id, name } and question (isValidQuestion) from questions.php?random=1; wagers =
+  // category = { id, name, nameAr } and question (isValidQuestion) from questions.php?random=1; wagers =
   // { "<contestantId>": points } entered so far, in setup order; marks as on a board question but
   // any number may be Correct; answerShown and lang as on a board question. 'question' = the
   // question is open on the question screen; 'done' = scored, Results shown.
   // helpers: true = still available (US-32). On the open question: by = id of the contestant who
   // used a helper on it (only they can be scored then); choiceOrder = order of the 3 choices on
-  // screen, a permutation of [0, 1, 2] where 0 is the answer; swap = { catId, catName, points,
-  // question }, the question that replaced the cell's one. The cell still closes on Back to Board.
+  // screen, a permutation of [0, 1, 2] where 0 is the answer; swap = { catId, catName, catNameAr,
+  // points, question }, the question that replaced the cell's one. The cell still closes on Back to Board.
   const state = {
     screen: 'setup',
     setup: null,
@@ -152,7 +164,7 @@
   //   { version, name, color, timerSeconds, count, queue: [question], usedIds: [id],
   //     current: null | { q, lang, deadline, picked, leftMs? }, over, statsSent? }
   // statsSent (US-47): ids whose outcome was sent, as in the board game (missing = sends none).
-  // A question is the API's { id, category_name, points, question, question_ar, image,
+  // A question is the API's { id, category_name, category_name_ar, points, question, question_ar, image,
   // image_credit, choices: [{text, text_ar}] x3, correct } (choices already cut by the server).
   // deadline = Date.now() ms when time is up, so a refresh keeps the remaining time; picked =
   // null (open), the tapped choice or STREAK_TIME_UP; leftMs = time left when it was answered.
@@ -164,6 +176,7 @@
   let leaderboardResult = null;  // the run shown on the leaderboard screen (null = opened from setup)
   let leaderboardLoads = 0;      // drops leaderboard responses that arrive after a newer request
   let lbPeriod = 'all';          // the leaderboard tab shown (US-45), memory only
+  let lastLeaderboard = null;    // the rows on screen, drawn again after a language switch (US-49)
 
   // Daily Challenge (US-43), saved under DAILY_KEY on every change; null when none:
   //   { version, date, number, timerSeconds, nextAt, questions: [question], results: [boolean],
@@ -338,19 +351,16 @@
     reportCancel: byId('report-cancel'),
     reportDone: byId('report-done'),
     reportClose: byId('report-close'),
+    uiLangBtns: Array.prototype.slice.call(document.querySelectorAll('[data-ui-lang]')), // US-49
   };
-  // The streak panel's texts in the page; the Daily Challenge sets its own and puts these back.
-  const STREAK_PANEL_TEXT = {
-    title: dom.streakPanelTitle.textContent,
-    label: dom.streakCountLabel.textContent,
-    hint: dom.streakHint.textContent,
-  };
+  // The streak panel's texts; the Daily Challenge sets its own and puts these back.
+  function streakPanelText() {
+    return { title: t('streak.legend'), label: t('streak.count'), hint: t('streak.hint') };
+  }
   // The scoring panel's texts and the Back to Board label; the final round sets its own (US-44).
-  const SCORING_PANEL_TEXT = {
-    title: dom.scoringTitle.textContent,
-    hint: dom.scoringHint.textContent,
-    back: dom.backBtn.textContent,
-  };
+  function scoringPanelText() {
+    return { title: t('scoring.title'), hint: t('scoring.hint'), back: t('scoring.back') };
+  }
 
   // ---------- Generic helpers ----------
 
@@ -377,31 +387,74 @@
     while (node.firstChild) node.removeChild(node.firstChild);
   }
 
-  function plural(count, word, pluralWord) {
-    return count + ' ' + (count === 1 ? word : (pluralWord || word + 's'));
-  }
-
   function hasOwn(obj, key) {
     return Object.prototype.hasOwnProperty.call(obj, key);
   }
 
+  /** A score as shown: a typographic minus for negatives; kept left to right inside Arabic text. */
   function formatScore(score) {
-    return score < 0 ? MINUS + Math.abs(score) : String(score);
+    return ltr(score < 0 ? MINUS + Math.abs(score) : String(score));
   }
 
+  /** "+400" / "−200" (points won or lost), kept left to right inside Arabic text. */
+  function signed(sign, value) {
+    return ltr(sign + value);
+  }
+
+  // Texts on screen that are made by a function are remembered with it, so a language switch
+  // (US-49) can make them again in the new language (refreshTexts).
+  const liveTexts = new Map();
+
+  /** Set `node`'s text from `text` (a string, or a function giving it now and after a language switch). */
+  function setText(node, text) {
+    if (typeof text === 'function') liveTexts.set(node, text);
+    else liveTexts.delete(node);
+    node.textContent = typeof text === 'function' ? text() : text;
+  }
+
+  function refreshTexts() {
+    liveTexts.forEach((make, node) => {
+      if (node.isConnected) node.textContent = make();
+      else liveTexts.delete(node);
+    });
+  }
+
+  /** text: a string, or a function giving it (see setText). */
   function showMessage(node, text, kind) {
-    node.textContent = text;
+    setText(node, text);
     node.className = 'msg msg-' + kind;
     node.hidden = false;
   }
 
   function clearMessage(node) {
-    node.textContent = '';
+    setText(node, '');
     node.hidden = true;
   }
 
+  /** An error whose message is a string table text, so it can be shown again in another language. */
+  function textError(key, params) {
+    const error = new Error(t(key, params));
+    error.key = key;
+    error.params = params;
+    return error;
+  }
+
   function errorText(err) {
-    return err && err.message ? err.message : 'Something went wrong.';
+    if (err && err.key) return t(err.key, err.params);
+    return err && err.message ? err.message : t('err.generic');
+  }
+
+  /** An error reason inside a longer message: trimmed, with a full stop when it has none. */
+  function sentence(text) {
+    const reason = text.trim();
+    return /[.!?؟]$/.test(reason) ? reason : reason + '.';
+  }
+
+  /** "X and Y" / "X, Y and Z" (D-10); each name keeps its own direction in Arabic. */
+  function joinNames(names) {
+    const list = names.map(iso);
+    if (list.length <= 1) return list.join('');
+    return list.slice(0, -1).join(t('list.sep')) + t('list.and') + list[list.length - 1];
   }
 
   /** Read-only JSON API call (GET). Rejects with the API's `error` text, never raw output. */
@@ -424,7 +477,7 @@
     try {
       response = await fetch(API_BASE + path, options);
     } catch (err) {
-      throw new Error('Could not reach the server. Check that it is running.');
+      throw textError('err.network');
     }
     let data = null;
     try {
@@ -433,13 +486,14 @@
       data = null; // non-JSON body (e.g. PHP not running): never show it raw
     }
     if (!response.ok) {
-      const error = new Error(data && typeof data.error === 'string' && data.error
-        ? data.error
-        : 'Request failed (HTTP ' + response.status + ').');
+      // The server's own error text is shown as it was sent (English); a missing one is ours.
+      const error = data && typeof data.error === 'string' && data.error
+        ? new Error(data.error)
+        : textError('err.http', { status: response.status });
       error.status = response.status; // e.g. 409 = no question left to draw (Golden Goal, D-51)
       throw error;
     }
-    if (data === null) throw new Error('The server sent an unexpected response.');
+    if (data === null) throw textError('err.response');
     return data;
   }
 
@@ -496,15 +550,19 @@
 
   /**
    * The question being played: the Swap question if there is one (US-32), otherwise the cell's.
-   * Returns { question, points, catName }; Correct / Wrong / Skip use these points.
+   * Returns { question, points, catName }; Correct / Wrong / Skip use these points. catName is the
+   * label shown, in the interface language.
    */
   function activeQuestion(g) {
     const cur = g.current;
-    if (cur.swap) return { question: cur.swap.question, points: cur.swap.points, catName: cur.swap.catName };
+    if (cur.swap) {
+      return { question: cur.swap.question, points: cur.swap.points, catName: localName(cur.swap.catName, cur.swap.catNameAr) };
+    }
     const category = findCategory(g, cur.catId);
     const q = category.questions[String(cur.points)];
     // US-53: a Kilo Meshakkal box names its source category, "Kilo Meshakkal: Football".
-    const catName = category.id === MIX && q.catName ? MIX_NAME + ': ' + q.catName : category.name;
+    const catName = category.id === MIX && q.catName
+      ? columnName(category) + ': ' + localName(q.catName, q.catNameAr) : columnName(category);
     return { question: q, points: cur.points, catName: catName };
   }
 
@@ -680,7 +738,7 @@
     const ids = {};
     return categories.every((c) => {
       const ok = isPlainObject(c) && Number.isInteger(c.id) && !ids[c.id] &&
-        typeof c.name === 'string' && isPlainObject(c.questions) &&
+        typeof c.name === 'string' && isOptionalText(c.nameAr) && isPlainObject(c.questions) &&
         (c.hidden === undefined || typeof c.hidden === 'boolean') &&
         (c.id === MIX || (c.order === undefined && c.faces === undefined)) && // US-53: mix column only
         points.every((p) => isValidQuestion(hasOwn(c.questions, String(p)) ? c.questions[String(p)] : null));
@@ -704,7 +762,7 @@
   /** One question (board cell or Swap question); the picture, credit, wrong options and source category are optional. */
   function isValidQuestion(q) {
     return isPlainObject(q) && typeof q.question === 'string' && typeof q.answer === 'string' &&
-      isValidImage(q.image) && isOptionalText(q.image_credit) && isOptionalText(q.catName) &&
+      isValidImage(q.image) && isOptionalText(q.image_credit) && isOptionalText(q.catName) && isOptionalText(q.catNameAr) &&
       WRONG_FIELDS.every((field) => isOptionalText(q[field]));
   }
 
@@ -740,7 +798,7 @@
   /** A cell closed after a Swap: the category and points of the question that replaced it (shown on the board). */
   function isValidUsedSwap(swap) {
     return isPlainObject(swap) && typeof swap.catName === 'string' && swap.catName !== '' &&
-      Number.isInteger(swap.points) && swap.points > 0;
+      isOptionalText(swap.catNameAr) && Number.isInteger(swap.points) && swap.points > 0;
   }
 
   /** Open question: an unused cell, marks only for real contestants, at most one Correct (US-14), valid helper use. */
@@ -787,7 +845,7 @@
 
   function isValidSwap(swap) {
     return isPlainObject(swap) && Number.isInteger(swap.catId) && typeof swap.catName === 'string' &&
-      Number.isInteger(swap.points) && swap.points > 0 && isValidQuestion(swap.question);
+      isOptionalText(swap.catNameAr) && Number.isInteger(swap.points) && swap.points > 0 && isValidQuestion(swap.question);
   }
 
   function isValidGame(g) {
@@ -821,7 +879,7 @@
     if (f.usedIds.length !== f.round - (offer ? 1 : 0)) return false;
     if (offer) return Object.keys(f).length === 3 && isTiedAtTop(g); // only a tie for first is offered
     if (!isPlainObject(f.category) || !Number.isInteger(f.category.id) || typeof f.category.name !== 'string' ||
-        !isValidQuestion(f.question) || typeof f.answerShown !== 'boolean' ||
+        !isOptionalText(f.category.nameAr) || !isValidQuestion(f.question) || typeof f.answerShown !== 'boolean' ||
         !(f.lang === undefined || f.lang === 'en' || (f.lang === 'ar' && hasArabic(f.question))) ||
         !isPlainObject(f.wagers) || !isPlainObject(f.marks) || f.usedIds.indexOf(f.question.id) === -1) return false;
     const ids = g.contestants.map((c) => String(c.id));
@@ -1041,9 +1099,7 @@
   function confirmBackToBoard() {
     const cur = state.game && state.game.current;
     if (!cur) return;
-    const text = Object.keys(cur.marks).length
-      ? 'Leave this question? It will be closed and cannot be opened again.'
-      : 'Leave this question? It will be closed without points and cannot be opened again.';
+    const text = Object.keys(cur.marks).length ? t('question.leaveMarked') : t('question.leaveUnmarked');
     if (!window.confirm(text)) return;
     if (state.game && state.game.current === cur) backToBoard();
   }
@@ -1107,6 +1163,7 @@
       selected: [],       // category ids in the order they were ticked
       loading: true,
       loadError: '',
+      loadErrorShown: null, // the load error on screen, shown again after a language switch (US-49)
       starting: false,
       streak: false,      // Streak Challenge chosen (US-33): its name field replaces the player row
     };
@@ -1125,13 +1182,12 @@
   function renderMode() {
     const mode = currentMode();
     dom.modeInputs.forEach((input) => { input.checked = input.value === state.setup.mode; });
-    dom.entryAdd.textContent = 'Add ' + mode.one;
+    dom.entryAdd.textContent = t('entry.add.' + mode.key);
     dom.entryAdd.disabled = state.setup.entries.length >= mode.limit;
     const extra = state.setup.entries.length - mode.limit;
     if (extra > 0) {
       // D-07: entries are kept; Start stays blocked until the host removes the extras.
-      showMessage(dom.entryLimitMsg, mode.title + ' mode allows at most ' + mode.limit + ' ' + mode.many +
-        '. Remove ' + extra + ' to continue.', 'error');
+      showMessage(dom.entryLimitMsg, t('entry.tooMany.' + mode.key, { limit: mode.limit, extra: extra }), 'error');
     } else {
       clearMessage(dom.entryLimitMsg);
     }
@@ -1142,16 +1198,17 @@
     const entries = state.setup.entries;
     clear(dom.entryList);
     entries.forEach((entry, index) => {
-      const label = mode.label + ' ' + (index + 1);
+      const label = t('entry.label.' + mode.key, { n: index + 1 });
       const inputId = 'entry-name-' + entry.key;
       const errorId = 'entry-error-' + entry.key;
       const color = paletteEntry(entry.color);
+      const colorName = t(color.name);
 
       const swatch = h('button', {
         type: 'button',
         className: 'swatch',
-        title: color.name + ' - click for the next free color',
-        'aria-label': label + ' color ' + color.name + '. Click for the next free color.',
+        title: t('entry.colorTitle', { color: colorName }),
+        'aria-label': t('entry.colorLabel', { label: label, color: colorName }),
         'data-swatch': String(entry.key),
         onclick: () => cycleColor(entry),
       });
@@ -1163,10 +1220,11 @@
         className: 'entry-input',
         value: entry.name,
         maxLength: NAME_MAX,
-        placeholder: label + ' name',
+        placeholder: t('entry.placeholder', { label: label }),
         autocomplete: 'off',
         'aria-describedby': errorId,
       });
+      if (i18n.isArabic()) input.dir = 'auto'; // a Latin name is typed left to right in Arabic too
       if (entry.error) input.setAttribute('aria-invalid', 'true');
       input.addEventListener('input', () => {
         entry.name = input.value;
@@ -1180,29 +1238,30 @@
         h('button', {
           type: 'button',
           className: 'btn btn-small btn-danger',
-          text: 'Remove',
+          text: t('entry.remove'),
           disabled: entries.length <= 1,
-          'aria-label': 'Remove ' + label,
+          'aria-label': t('entry.removeLabel', { label: label }),
           onclick: () => removeEntry(entry),
         }),
-        h('p', { id: errorId, className: 'field-error', text: entry.error, hidden: !entry.error }),
+        h('p', { id: errorId, className: 'field-error', text: entry.error ? t(entry.error) : '', hidden: !entry.error }),
       ]));
     });
     renderMode();
     updateStartButton();
   }
 
-  function setEntryError(entry, message) {
-    entry.error = message;
+  /** errorKey: the string key of the name's error ('entry.required' / 'entry.unique'), or '' for none. */
+  function setEntryError(entry, errorKey) {
+    entry.error = errorKey;
     const input = byId('entry-name-' + entry.key);
     const errorNode = byId('entry-error-' + entry.key);
     if (input) {
-      if (message) input.setAttribute('aria-invalid', 'true');
+      if (errorKey) input.setAttribute('aria-invalid', 'true');
       else input.removeAttribute('aria-invalid');
     }
     if (errorNode) {
-      errorNode.textContent = message;
-      errorNode.hidden = !message;
+      errorNode.textContent = errorKey ? t(errorKey) : '';
+      errorNode.hidden = !errorKey;
     }
   }
 
@@ -1250,11 +1309,11 @@
 
   function renderCategories() {
     const s = state.setup;
-    dom.catLegend.textContent = s.perGame ? 'Select up to ' + plural(s.perGame, 'category', 'categories') : 'Select categories';
+    dom.catLegend.textContent = s.perGame ? tn('cat.legendMax', s.perGame) : t('cat.legend');
     clear(dom.catList);
     clearMessage(dom.catWarning);
     if (s.loading || s.loadError === 'network') {
-      dom.catCount.textContent = s.loading ? 'Loading categories...' : '';
+      dom.catCount.textContent = s.loading ? t('cat.loading') : '';
       return;
     }
     if (s.playable.length) renderSurpriseTile();
@@ -1265,13 +1324,13 @@
       dom.catList.appendChild(h('li', {}, [
         h('label', { className: 'cat-label', htmlFor: inputId, 'data-cat': String(c.id) }, [
           box,
-          h('span', { className: 'cat-name-text', text: c.name }),
+          h('span', { className: 'cat-name-text', text: iso(columnName(c)) }),
           h('span', { className: 'cat-order', 'aria-hidden': 'true' }),
         ]),
       ]));
     });
     if (!s.playable.length) {
-      dom.catList.appendChild(h('li', { className: 'hint', text: 'No playable categories yet.' }));
+      dom.catList.appendChild(h('li', { className: 'hint', text: t('cat.none') }));
     }
     if (s.perGame !== null && !s.playable.length) renderNotEnough();
     renderCategorySelection();
@@ -1300,11 +1359,8 @@
       h('label', { className: 'cat-label cat-surprise', htmlFor: 'cat-surprise', 'data-cat': String(SURPRISE) }, [
         box,
         h('span', { className: 'cat-name-text' }, [
-          document.createTextNode('Surprise me!'),
-          h('span', {
-            className: 'cat-surprise-hint',
-            text: 'Tick alone for ' + SURPRISE_ALONE + ' random categories, or add it to your picks for 1 mystery category.',
-          }),
+          document.createTextNode(t('cat.surprise')),
+          h('span', { className: 'cat-surprise-hint', text: t('cat.surpriseHint', { n: SURPRISE_ALONE }) }),
         ]),
         h('span', { className: 'cat-order', 'aria-hidden': 'true' }),
       ]),
@@ -1314,12 +1370,11 @@
   /** D-11 (amended by D-32): no playable category at all -> message with Admin link, Start disabled. */
   function renderNotEnough() {
     clear(dom.catWarning);
-    dom.catWarning.appendChild(document.createTextNode(
-      'No playable categories ' + String.fromCharCode(0x2014) + ' add questions in '));
+    dom.catWarning.appendChild(document.createTextNode(t('cat.notEnoughStart')));
     // No link to the admin page in the Android app (US-40); the word stays so the sentence reads on
-    dom.catWarning.appendChild(isApp ? document.createTextNode('Admin') : h('a', { href: 'admin.html', text: 'Admin' }));
-    dom.catWarning.appendChild(document.createTextNode(
-      '. A category is playable when it has a question for every enabled point value.'));
+    const admin = t('nav.admin');
+    dom.catWarning.appendChild(isApp ? document.createTextNode(admin) : h('a', { href: 'admin.html', text: admin }));
+    dom.catWarning.appendChild(document.createTextNode(t('cat.notEnoughEnd')));
     dom.catWarning.hidden = false;
   }
 
@@ -1330,8 +1385,8 @@
     const count = s.selected.length;
     const full = s.perGame !== null && count >= s.perGame;
     dom.catCount.textContent = s.perGame
-      ? count + ' of up to ' + s.perGame + ' selected. Columns follow the order you tick them.'
-      : count + ' selected.';
+      ? t('cat.count', { k: count, n: s.perGame })
+      : t('cat.countNoMax', { k: count });
     Array.prototype.forEach.call(dom.catList.querySelectorAll('.cat-label'), (label) => {
       const order = s.selected.indexOf(Number(label.getAttribute('data-cat')));
       label.classList.toggle('is-selected', order !== -1);
@@ -1350,24 +1405,27 @@
     renderCategorySelection();
   }
 
+  /** message: '' (none), a string, or a function giving it (see setText). */
   function setTimerError(message) {
-    dom.timerError.textContent = message;
+    setText(dom.timerError, message);
     dom.timerError.hidden = !message;
     if (message) dom.timerInput.setAttribute('aria-invalid', 'true');
     else dom.timerInput.removeAttribute('aria-invalid');
   }
 
+  /** text: a function giving the message, so a language switch can show it again (refreshSetup). */
   function showLoadError(text, withRetry, withAdminLink) {
+    state.setup.loadErrorShown = { text: text, withRetry: withRetry, withAdminLink: withAdminLink };
     clear(dom.loadMsg);
     dom.loadMsg.className = 'msg msg-error';
-    dom.loadMsg.appendChild(h('span', { text: text + ' ' }));
+    dom.loadMsg.appendChild(h('span', { text: text() + ' ' }));
     // No link to the admin page in the Android app (US-40)
-    if (withAdminLink && !isApp) dom.loadMsg.appendChild(h('a', { href: 'admin.html', text: 'Open Admin' }));
+    if (withAdminLink && !isApp) dom.loadMsg.appendChild(h('a', { href: 'admin.html', text: t('load.openAdmin') }));
     if (withRetry) {
       dom.loadMsg.appendChild(h('button', {
         type: 'button',
         className: 'btn btn-small',
-        text: 'Try again',
+        text: t('common.tryAgain'),
         onclick: loadSetupData,
       }));
     }
@@ -1375,6 +1433,7 @@
   }
 
   function hideLoadError() {
+    if (state.setup) state.setup.loadErrorShown = null;
     clear(dom.loadMsg);
     dom.loadMsg.hidden = true;
   }
@@ -1399,7 +1458,7 @@
       if (state.setup !== s) return; // setup was restarted meanwhile
       const settings = results[0];
       if (!isPlainObject(settings) || !Array.isArray(results[1])) {
-        throw new Error('The server sent an unexpected response.');
+        throw textError('err.response');
       }
       s.perGame = Number.isInteger(settings.categories_per_game) && settings.categories_per_game > 0
         ? settings.categories_per_game : null;
@@ -1410,19 +1469,19 @@
       s.helpersOn = settings.helpers_enabled !== 0; // a missing row means on
       s.finalRoundOn = settings.final_round_enabled === 1; // US-44: a missing row means off
       s.playable = results[1].filter((c) => isPlainObject(c) && Number.isInteger(c.id) && typeof c.name === 'string')
-        .map((c) => ({ id: c.id, name: c.name }));
+        .map((c) => ({ id: c.id, name: c.name, nameAr: isFilled(c.name_ar) ? c.name_ar : null }));
       // Kilo Meshakkal (US-53) stays ticked like Surprise, as long as its tile is shown.
       s.selected = s.selected.filter((id) => id === SURPRISE || (id === MIX && s.playable.length > 0) ||
         s.playable.some((c) => c.id === id));
       if (dom.timerInput.value === '' && s.timerDefault !== null) dom.timerInput.value = String(s.timerDefault);
       if (s.perGame === null) {
         s.loadError = 'settings';
-        showLoadError('The game settings are incomplete (categories per game is missing).', false, true);
+        showLoadError(() => t('load.incomplete'), false, true);
       }
     } catch (err) {
       if (state.setup !== s) return;
       s.loadError = 'network';
-      showLoadError('Could not load the game setup: ' + errorText(err), true, false);
+      showLoadError(() => t('load.failed', { reason: errorText(err) }), true, false);
     }
     s.loading = false;
     renderCategories();
@@ -1462,21 +1521,21 @@
     dom.playedReset.hidden = seen === 0;
     dom.playedTrack.hidden = counts === null;
     if (counts === null) { // not loaded (yet): no total to compare with
-      dom.playedCount.textContent = 'Played ' + plural(seen, 'question', 'questions') + ' on this device.';
+      dom.playedCount.textContent = tn('played.count', seen);
       return;
     }
     const fraction = Math.min(counts.played, counts.total) / counts.total;
     // Rounded down, so 100% only shows once every question was played; "less than 1%" beats a misleading 0%.
     const percent = Math.floor(fraction * 100);
-    const label = counts.played > 0 && percent === 0 ? 'Less than 1%' : percent + '%';
+    const label = counts.played > 0 && percent === 0 ? t('played.lessThan1') : percent + '%';
     dom.playedBar.style.transform = 'scaleX(' + fraction + ')';
     dom.playedTrack.setAttribute('aria-valuenow', String(percent));
-    dom.playedCount.textContent = label + ' of the questions played on this device.';
+    dom.playedCount.textContent = t('played.percent', { label: label });
   }
 
   /** Forget the played questions so every question can come up again. */
   function forgetPlayed() {
-    if (!window.confirm('Forget the played questions? Questions you have already seen can come up again.')) return;
+    if (!window.confirm(t('played.confirm'))) return;
     clearSeen();
     if (state.setup.played) state.setup.played.played = 0;
     renderPlayed();
@@ -1534,8 +1593,8 @@
     entries.forEach((e) => {
       const key = keyOf(e);
       let message = '';
-      if (!key) message = 'Name is required';
-      else if (counts[key] > 1) message = 'Names must be unique';
+      if (!key) message = 'entry.required';
+      else if (counts[key] > 1) message = 'entry.unique';
       setEntryError(e, message);
       if (message) ok = false;
     });
@@ -1550,9 +1609,8 @@
       clearMessage(dom.catError);
       return true;
     }
-    showMessage(dom.catError, count < 1
-      ? 'Select at least 1 category.'
-      : 'Select up to ' + plural(s.perGame, 'category', 'categories') + ' (' + count + ' selected).', 'error');
+    const perGame = s.perGame;
+    showMessage(dom.catError, count < 1 ? () => t('cat.atLeast') : () => tn('cat.tooMany', perGame, { k: count }), 'error');
     return false;
   }
 
@@ -1562,7 +1620,7 @@
     const range = timerRange();
     const value = Number(raw);
     if (dom.timerInput.validity.badInput || !/^\d+$/.test(raw) || value < range.min || value > range.max) {
-      setTimerError('Timer must be a whole number of seconds between ' + range.min + ' and ' + range.max + '.');
+      setTimerError(() => t('timer.invalid', { min: range.min, max: range.max }));
       return null;
     }
     setTimerError('');
@@ -1582,14 +1640,14 @@
     const matches = categories && categories.length === ids.length &&
       categories.every((c, i) => isPlainObject(c) && c.id === ids[i]);
     if (!points || !matches || !isValidBoard(points, categories)) {
-      throw new Error('The server sent an unexpected board.');
+      throw textError('err.board');
     }
     return {
       points: points,
       categories: categories.map((c) => {
         const questions = {};
         points.forEach((p) => { questions[String(p)] = parseQuestion(c.questions[String(p)]); });
-        return { id: c.id, name: c.name, questions: questions };
+        return { id: c.id, name: c.name, nameAr: isFilled(c.name_ar) ? c.name_ar : null, questions: questions };
       }),
     };
   }
@@ -1618,6 +1676,7 @@
       wrong_1_ar: wrongAr ? q.wrong_1_ar : null,
       wrong_2_ar: wrongAr ? q.wrong_2_ar : null,
       catName: isFilled(q.category_name) ? q.category_name : null, // US-53: a Kilo Meshakkal box's source category
+      catNameAr: isFilled(q.category_name_ar) ? q.category_name_ar : null, // and its Arabic name
     };
   }
 
@@ -1646,10 +1705,7 @@
       const ids = free.slice(0, Math.min(SURPRISE_ALONE, s.perGame));
       return { ids: ids, hidden: ids };
     }
-    if (!free.length) {
-      throw new Error('Every playable category is already picked ' + String.fromCharCode(0x2014) +
-        ' untick one, or untick Surprise me!');
-    }
+    if (!free.length) throw textError('cat.allPicked');
     return { ids: s.selected.map((id) => (id === SURPRISE ? free[0] : id)), hidden: [free[0]] };
   }
 
@@ -1665,14 +1721,14 @@
     const categoriesOk = validateCategoryCount();
     const timer = validateTimer();
     if (!namesOk || !categoriesOk || timer === null) {
-      showMessage(dom.startMsg, 'The game cannot start yet. Please fix the errors above.', 'error');
+      showMessage(dom.startMsg, () => t('start.fix'), 'error');
       focusFirstProblem();
       return;
     }
 
     const s = state.setup;
     s.starting = true;
-    dom.startBtn.textContent = 'Starting...';
+    dom.startBtn.textContent = t('setup.starting');
     updateStartButton();
     try {
       const selection = resolveSelection(s);
@@ -1689,10 +1745,10 @@
       beginGame(board, timer);
     } catch (err) {
       // US-06: stay on setup with every input intact.
-      showMessage(dom.startMsg, 'Could not start the game: ' + errorText(err), 'error');
+      showMessage(dom.startMsg, () => t('start.failed', { reason: errorText(err) }), 'error');
     } finally {
       s.starting = false;
-      dom.startBtn.textContent = 'Start Game';
+      dom.startBtn.textContent = t('setup.start');
       updateStartButton();
     }
   }
@@ -1824,11 +1880,11 @@
     const g = state.game;
     const mode = MODES[g.mode];
     dom.boardInfo.textContent = [
-      plural(g.contestants.length, mode.one, mode.many),
-      g.categories.length + ' ' + TIMES + ' ' + g.points.length + ' board',
-      'Played ' + usedCount(g) + ' of ' + totalCells(g),
-      'Timer ' + g.timerSeconds + ' s',
-      'Corrections ' + String.fromCharCode(0x00b1) + scoreStep(),
+      tn('board.contestants.' + mode.key, g.contestants.length),
+      t('board.size', { cols: g.categories.length, rows: g.points.length }),
+      t('board.played', { used: usedCount(g), total: totalCells(g) }),
+      t('board.timer', { s: g.timerSeconds }),
+      t('board.corrections', { step: String.fromCharCode(0x00b1) + scoreStep() }),
     ].join('  ' + DOT + '  ');
   }
 
@@ -1842,7 +1898,7 @@
     dom.board.style.setProperty('--digits', String(digits));
     g.categories.forEach((c) => {
       dom.board.appendChild(h('div', { className: 'board-cat' + (c.hidden ? ' is-mystery' : ''), title: categoryLabel(c) }, [
-        h('span', { className: 'board-cat-name', text: c.hidden ? '?' : c.name }),
+        h('span', { className: 'board-cat-name', text: c.hidden ? '?' : iso(columnName(c)) }),
       ]));
     });
     // US-53: row i of the Kilo Meshakkal column is the box of value order[i] (its emoji is faces[i]).
@@ -1853,7 +1909,21 @@
 
   /** Board name of a category: a "Surprise me!" pick stays a mystery until one of its questions is opened. */
   function categoryLabel(category) {
-    return category.hidden ? 'Surprise category' : category.name;
+    return category.hidden ? t('board.surpriseCat') : iso(columnName(category));
+  }
+
+  /**
+   * A category name in the interface language: its Arabic name (the API's name_ar, kept as nameAr /
+   * catNameAr / category_name_ar) when Arabic is on and it has one, else the English name. Only the
+   * label changes: ids, ticks and saved games never depend on it.
+   */
+  function localName(name, nameAr) {
+    return i18n.isArabic() && isFilled(nameAr) ? nameAr : name;
+  }
+
+  /** A board column's or Setup tile's name; Kilo Meshakkal (US-53) has no DB row, so its names are in the string tables. */
+  function columnName(category) {
+    return category.id === MIX ? t('cat.mixName') : localName(category.name, category.nameAr);
   }
 
   /**
@@ -1864,21 +1934,23 @@
     const g = state.game;
     const key = cellKey(category.id, points);
     const label = h('span', { className: 'cell-points', text: String(points) });
+    const cellLabel = t('cell.label', { cat: categoryLabel(category), points: points });
     if (!hasOwn(g.used, key)) {
       const props = {
         type: 'button',
         className: 'board-cell',
-        'aria-label': categoryLabel(category) + ', ' + points + ' points',
+        'aria-label': cellLabel,
         onclick: () => openQuestion(category.id, points),
       };
       if (!face) return h('button', props, [label]);
-      props['aria-label'] = MIX_NAME + ', mystery value';
+      props['aria-label'] = t('cell.mix', { name: iso(columnName(category)) });
       props.title = props['aria-label'];
       return h('button', props, [h('span', { className: 'cell-points cell-face', text: face, 'aria-hidden': 'true' })]);
     }
     const used = g.used[key];
     const owner = used.owner === null ? null : findContestant(g, used.owner);
     const swap = used.swap;
+    const swapName = swap ? localName(swap.catName, swap.catNameAr) : '';
     const double = key === g.double; // D-40: shown once played, with a small "×2" in the corner
     // After a Swap the old value is struck through and the question that replaced it is shown small.
     if (swap) label.classList.add('is-struck');
@@ -1886,14 +1958,14 @@
       type: 'button',
       className: 'board-cell is-used ' + (owner ? 'is-owned' : 'is-unanswered') + (double ? ' is-double' : ''),
       disabled: true, // disabled buttons ignore clicks
-      'aria-label': categoryLabel(category) + ', ' + points + ' points' + (double ? ', double score' : '') +
-        (swap ? ', swapped to ' + swap.catName + ' ' + EN_DASH + ' ' + swap.points : '') + ', ' +
-        (owner ? 'won by ' + owner.name : 'no correct answer'),
+      'aria-label': cellLabel + (double ? t('cell.double') : '') +
+        (swap ? t('cell.swapped', { swap: iso(swapName) + ' ' + EN_DASH + ' ' + swap.points }) : '') +
+        (owner ? t('cell.won', { name: iso(owner.name) }) : t('cell.none')),
     }, [
       double ? h('span', { className: 'cell-double', text: TIMES + DOUBLE_FACTOR, 'aria-hidden': 'true' }) : null,
       label,
-      swap ? h('span', { className: 'cell-swap', text: swap.catName + ' ' + EN_DASH + ' ' + swap.points }) : null,
-      owner ? h('span', { className: 'cell-owner', text: owner.name }) : null,
+      swap ? ownDirection(h('span', { className: 'cell-swap', text: swapName + ' ' + EN_DASH + ' ' + swap.points })) : null,
+      owner ? ownDirection(h('span', { className: 'cell-owner', text: owner.name })) : null,
     ]);
     if (owner) {
       const color = paletteEntry(owner.color);
@@ -1903,12 +1975,21 @@
     return cell;
   }
 
+  /**
+   * A one-line label cut with "…" (cell owner, swapped-to category): in Arabic it takes the direction
+   * of its own text, so a long Latin name loses its end, not its start (US-49). English: unchanged.
+   */
+  function ownDirection(node) {
+    if (i18n.isArabic()) node.dir = 'auto';
+    return node;
+  }
+
   /** US-10 / D-01: prominent End Game offer once every cell is used. */
   function renderBoardDone() {
     const g = state.game;
     const done = allCellsUsed(g);
     dom.boardDone.hidden = !done;
-    dom.boardDoneText.textContent = done ? 'All ' + totalCells(g) + ' questions have been played.' : '';
+    dom.boardDoneText.textContent = done ? t('board.allPlayed', { n: totalCells(g) }) : '';
   }
 
   /**
@@ -1921,9 +2002,7 @@
     if (!g || state.screen !== 'board') return;
     if (!allCellsUsed(g)) {
       const left = totalCells(g) - usedCount(g);
-      const text = 'End the game now? ' + plural(left, 'question has', 'questions have') +
-        ' not been played and will be ignored.';
-      if (!window.confirm(text)) return;
+      if (!window.confirm(tn('board.endConfirm', left))) return;
     }
     if (g.finalRound === true && isTiedAtTop(g)) { // D-51: Golden Goal only breaks a tie for first
       openFinalOffer(1, []);
@@ -1950,13 +2029,13 @@
         saveState();
       };
       const card = h('li', { className: 'score-card' }, [
-        h('span', { className: 'score-name', text: c.name }),
+        h('span', { className: 'score-name', text: iso(c.name) }),
         h('button', {
           type: 'button',
           className: 'score-btn score-minus',
           text: MINUS,
-          title: MINUS + step,
-          'aria-label': 'Subtract ' + step + ' points from ' + c.name,
+          title: signed(MINUS, step),
+          'aria-label': t('score.minus', { step: step, name: iso(c.name) }),
           onclick: () => adjust(-step),
         }),
         value,
@@ -1964,8 +2043,8 @@
           type: 'button',
           className: 'score-btn score-plus',
           text: '+',
-          title: '+' + step,
-          'aria-label': 'Add ' + step + ' points to ' + c.name,
+          title: signed('+', step),
+          'aria-label': t('score.plus', { step: step, name: iso(c.name) }),
           onclick: () => adjust(step),
         }),
         renderHelpersLeft(c),
@@ -1978,8 +2057,8 @@
 
   /** Scoreboard card line with the helpers a contestant has left; used ones are dimmed (US-32). */
   function renderHelpersLeft(contestant) {
-    const left = HELPER_KEYS.filter((key) => contestant.helpers[key]).map((key) => HELPERS[key].name);
-    const text = left.length ? 'Helpers left: ' + left.join(', ') : 'No helpers left';
+    const left = HELPER_KEYS.filter((key) => contestant.helpers[key]).map(helperName);
+    const text = left.length ? t('helpers.left', { list: left.join(t('list.sep')) }) : t('helpers.none');
     return h('span', { className: 'score-helpers', title: text, hidden: state.game.helpersOff === true }, [
       h('span', { className: 'visually-hidden', text: text }),
     ].concat(HELPER_KEYS.map((key) => h('span', {
@@ -2016,8 +2095,9 @@
   /** D-40: announce the double-score question; its timer waits until the popup is closed. */
   function showDoublePopup() {
     const points = activeQuestion(state.game).points;
-    dom.doubleText.textContent = 'A correct answer earns +' + points * DOUBLE_FACTOR + ' instead of +' + points +
-      '. A wrong answer costs the normal ' + MINUS + points + '.';
+    dom.doubleText.textContent = t('double.text', {
+      win: signed('+', points * DOUBLE_FACTOR), normal: signed('+', points), loss: signed(MINUS, points),
+    });
     pauseTimer();
     stopReading(); // US-48: automatic reading starts once the popup is closed
     dom.doubleOverlay.hidden = false;
@@ -2044,7 +2124,7 @@
     const active = activeQuestion(g);
     const q = active.question;
     setStreakLayout(false);
-    setScoringPanelTexts(SCORING_PANEL_TEXT);
+    setScoringPanelTexts(scoringPanelText());
     renderQuestionHeading(active);
     // Arabic first when the question has an Arabic version; a restored choice is kept.
     if (!hasArabic(q)) cur.lang = 'en';
@@ -2095,15 +2175,15 @@
     const g = state.game;
     const cur = g.current;
     clear(dom.qHeading);
-    dom.qHeading.appendChild(document.createTextNode(active.catName + ' ' + EN_DASH + ' ' + active.points));
+    dom.qHeading.appendChild(document.createTextNode(iso(active.catName) + ' ' + EN_DASH + ' ' + active.points));
     if (isDoubleCurrent(g)) {
-      dom.qHeading.appendChild(h('span', { className: 'question-double', text: TIMES + DOUBLE_FACTOR + ' Double score' }));
+      dom.qHeading.appendChild(h('span', { className: 'question-double', text: t('question.double', { factor: DOUBLE_FACTOR }) }));
     }
     if (cur.swap) {
       const original = findCategory(g, cur.catId);
       dom.qHeading.appendChild(h('span', {
         className: 'question-swap-note',
-        text: 'Swapped from ' + original.name + ' ' + EN_DASH + ' ' + cur.points,
+        text: t('question.swappedFrom', { cat: iso(columnName(original)) + ' ' + EN_DASH + ' ' + cur.points }),
       }));
     }
   }
@@ -2172,13 +2252,17 @@
     dom.qText.style.setProperty('--q-scale', String(questionScale(text)));
   }
 
-  /** The language button, shown when the question has Arabic; it offers the other language. */
+  /**
+   * The language button, shown when the question has Arabic; it offers the other language. Its
+   * label names the language in that language; the aria-label is in the interface language (US-49),
+   * so the button's lang follows the aria-label in the Arabic interface.
+   */
   function renderLangButton(available, arabic) {
     dom.langBtn.hidden = !available;
     dom.langBtn.textContent = arabic ? 'English' : 'العربية';
-    dom.langBtn.lang = arabic ? 'en' : 'ar';
+    dom.langBtn.lang = i18n.isArabic() ? 'ar' : (arabic ? 'en' : 'ar');
     dom.langBtn.translate = arabic;
-    dom.langBtn.setAttribute('aria-label', arabic ? 'Show question in English' : 'Show question in Arabic');
+    dom.langBtn.setAttribute('aria-label', arabic ? t('lang.showEnglish') : t('lang.showArabic'));
   }
 
   /** Wrong options are there for the "3 choices" helper (parseQuestion keeps only complete pairs). */
@@ -2289,7 +2373,7 @@
     clear(dom.scoreRows);
     scoringRows = g.contestants.map((c) => {
       const color = paletteEntry(c.color);
-      const name = h('span', { className: 'srow-name', text: c.name });
+      const name = h('span', { className: 'srow-name', text: iso(c.name) });
       name.style.backgroundColor = color.value;
       name.style.color = color.ink;
       const helperBtns = {};
@@ -2309,22 +2393,22 @@
         correct: h('button', {
           type: 'button',
           className: 'btn btn-correct' + (win !== p ? ' is-double' : ''), // gold on the double (D-40)
-          text: CHECK + ' Correct (+' + win + ')',
-          'aria-label': 'Correct for ' + c.name + ', plus ' + win + ' points' + (win !== p ? ' (double score)' : ''),
+          text: t('score.correctBtn', { amount: signed('+', win) }),
+          'aria-label': t('score.correctLabel', { name: iso(c.name), n: win }) + (win !== p ? t('score.doubleNote') : ''),
           onclick: () => markContestant(c, 'correct'),
         }),
         wrong: h('button', {
           type: 'button',
           className: 'btn btn-wrong',
-          text: CROSS + ' Wrong (' + MINUS + p + ')',
-          'aria-label': 'Wrong for ' + c.name + ', minus ' + p + ' points',
+          text: t('score.wrongBtn', { amount: signed(MINUS, p) }),
+          'aria-label': t('score.wrongLabel', { name: iso(c.name), n: p }),
           onclick: () => markContestant(c, 'wrong'),
         }),
       };
       const chips = h('span', { className: 'srow-helpers', hidden: g.helpersOff === true },
         HELPER_KEYS.map((key) => helperBtns[key]));
       ref.row = h('li', { className: 'srow' }, [name, chips, ref.score, ref.status, ref.correct, ref.wrong]);
-      ref.row.style.borderLeftColor = color.value;
+      ref.row.style.borderInlineStartColor = color.value; // the left edge; the right one in Arabic
       dom.scoreRows.appendChild(ref.row);
       return ref;
     });
@@ -2349,8 +2433,9 @@
       ref.row.classList.toggle('is-scored', mark !== null);
       ref.row.classList.toggle('is-out', out);
       ref.score.textContent = formatScore(ref.contestant.score);
-      ref.status.textContent = mark === 'correct' ? ref.contestant.name + ' marked correct'
-        : mark === 'wrong' ? ref.contestant.name + ' marked wrong' : '';
+      const who = { name: iso(ref.contestant.name) };
+      ref.status.textContent = mark === 'correct' ? t('score.markedCorrect', who)
+        : mark === 'wrong' ? t('score.markedWrong', who) : '';
       HELPER_KEYS.forEach((helper) => updateHelperChip(ref, helper));
     });
   }
@@ -2358,7 +2443,7 @@
   /** Enable a helper chip only when its contestant may use it now; the tooltip says why not. */
   function updateHelperChip(ref, key) {
     const chip = ref.helpers[key];
-    const name = HELPERS[key].name;
+    const name = helperName(key);
     const reason = helperBlockReason(ref.contestant, key);
     const busy = swapping === ref.contestant.id && key === 'swap';
     chip.disabled = reason !== '';
@@ -2366,24 +2451,25 @@
     chip.classList.toggle('is-busy', busy);
     chip.textContent = busy ? ELLIPSIS : HELPERS[key].chip;
     chip.title = name + (reason ? ': ' + reason : '');
-    chip.setAttribute('aria-label', name + ' for ' + ref.contestant.name + (reason ? ' (' + reason + ')' : ''));
+    const who = { helper: name, name: iso(ref.contestant.name), reason: reason };
+    chip.setAttribute('aria-label', reason ? t('helper.chipLabelReason', who) : t('helper.chipLabel', who));
   }
 
   /** Why `contestant` cannot use helper `key` on the open question now, or '' when they can (D-36). */
   function helperBlockReason(contestant, key) {
     const g = state.game;
     const cur = g.current;
-    if (g.helpersOff) return 'helpers are turned off';
+    if (g.helpersOff) return t('helper.off');
     if (swapping !== null) {
-      return swapping === contestant.id && key === 'swap' ? 'loading a new question' : 'wait for the swap';
+      return swapping === contestant.id && key === 'swap' ? t('helper.loading') : t('helper.waitSwap');
     }
-    if (!contestant.helpers[key]) return 'already used in this game';
-    if (cur.answerShown) return 'not after the answer is shown';
-    if (Object.keys(cur.marks).length) return 'not after someone was scored';
+    if (!contestant.helpers[key]) return t('helper.used');
+    if (cur.answerShown) return t('helper.afterAnswer');
+    if (Object.keys(cur.marks).length) return t('helper.afterScore');
     if (cur.by !== undefined && cur.by !== contestant.id) {
-      return 'only ' + findContestant(g, cur.by).name + ' can use helpers on this question';
+      return t('helper.onlyBy', { name: iso(findContestant(g, cur.by).name) });
     }
-    if (key === 'choices' && !hasChoices(activeQuestion(g).question)) return 'this question has no choices yet';
+    if (key === 'choices' && !hasChoices(activeQuestion(g).question)) return t('helper.noChoices');
     return '';
   }
 
@@ -2418,17 +2504,14 @@
   }
 
   function helperConfirmText(contestant, key) {
-    const who = contestant.name;
+    const who = iso(contestant.name);
     const points = activeQuestion(state.game).points;
-    const ask = 'Use ' + HELPERS[key].name + ' for ' + who + '? ';
+    const ask = t('helper.ask', { helper: helperName(key), name: who });
     if (key === 'skip') {
-      return ask + who + ' loses ' + Math.round(points / 2) + ' points (half of ' + points +
-        ') and the question closes for everyone.';
+      return ask + t('helper.askSkip', { name: who, half: Math.round(points / 2), points: points });
     }
-    const what = key === 'swap'
-      ? 'A random question from any category replaces this one, with a new timer.'
-      : 'The answer is shown among 3 choices.';
-    return ask + what + ' Only ' + who + ' can answer this question then.';
+    const what = key === 'swap' ? t('helper.askSwap') : t('helper.askChoices');
+    return ask + what + t('helper.askOnly', { name: who });
   }
 
   /** 3 choices: shuffle once and save the order, so a refresh shows the same A/B/C. */
@@ -2463,20 +2546,18 @@
     swapping = contestant.id; // busy chip; scoring and the other helpers wait
     updateScoringRows();
     let swap = null;
-    let failure = '';
+    let failure = null; // a function giving the message (shown again after a language switch)
     try {
       swap = parseSwap(await apiPost('questions.php?random=1', { exclude: boardQuestionIds(g), seen: loadSeen() }));
     } catch (err) {
-      const reason = errorText(err).trim();
-      failure = 'Could not swap the question: ' + reason + (/[.!?]$/.test(reason) ? '' : '.') +
-        ' The helper was not used.';
+      failure = () => t('swap.failed', { reason: sentence(errorText(err)) });
     }
     swapping = null;
     if (state.game !== g || g.current !== cur) { // the question was closed meanwhile: drop the result
       if (state.game && state.game.current) updateScoringRows();
       return;
     }
-    if (!failure && cur.answerShown) failure = 'The answer was shown meanwhile, so the Swap was not used.';
+    if (!failure && cur.answerShown) failure = () => t('swap.answerShown');
     if (failure) {
       showMessage(dom.helperMsg, failure, 'error');
       updateScoringRows();
@@ -2510,10 +2591,11 @@
     const ok = isPlainObject(data) && isPlainObject(data.category) && Number.isInteger(data.category.id) &&
       typeof data.category.name === 'string' && Number.isInteger(data.points) && data.points > 0 &&
       isValidQuestion(data.question) && Number.isInteger(data.question.id);
-    if (!ok) throw new Error('The server sent an unexpected question.');
+    if (!ok) throw textError('err.question');
     return {
       catId: data.category.id,
       catName: data.category.name,
+      catNameAr: isFilled(data.category.name_ar) ? data.category.name_ar : null,
       points: data.points,
       question: parseQuestion(data.question),
     };
@@ -2537,7 +2619,7 @@
     sendQuestionStat(g, activeQuestion(g).question.id, boardOutcome(cur)); // saved below with the cell
     const cell = { owner: correctContestantId(cur) };
     // A Swap replaced the question: the board shows the old value struck through and the new one small.
-    if (cur.swap) cell.swap = { catName: cur.swap.catName, points: cur.swap.points };
+    if (cur.swap) cell.swap = { catName: cur.swap.catName, catNameAr: cur.swap.catNameAr, points: cur.swap.points };
     g.used[cellKey(cur.catId, cur.points)] = cell;
     g.current = null;
     renderGame();
@@ -2560,7 +2642,7 @@
     timer.totalMs = seconds * 1000;
     timer.remainingMs = remainingMs === undefined ? timer.totalMs : Math.max(0, Math.min(remainingMs, timer.totalMs));
     timer.onExpire = onExpire || null;
-    dom.timerStatus.textContent = '';
+    setTimeUp(false);
     resumeTimer();
   }
 
@@ -2600,7 +2682,7 @@
     const expired = timer.remainingMs === 0;
     if (expired) {
       stopTimer(); // D-03: stop at 0 (silently), nothing is auto-scored or closed
-      dom.timerStatus.textContent = "Time's up!";
+      setTimeUp(true);
     }
     renderTimer();
     if (expired && timer.onExpire) timer.onExpire(); // Streak Challenge: time's up ends the run
@@ -2611,8 +2693,13 @@
     dom.timerValue.textContent = String(Math.ceil(timer.remainingMs / 1000));
     dom.timerBar.style.transform = 'scaleX(' + fraction + ')';
     dom.timerBox.classList.toggle('is-low', timer.remainingMs <= timer.totalMs / 3); // red in the last third
-    dom.timerPause.textContent = timer.running || timer.remainingMs <= 0 ? 'Pause' : 'Resume';
+    dom.timerPause.textContent = timer.running || timer.remainingMs <= 0 ? t('timer.pause') : t('timer.resume');
     dom.timerPause.disabled = timer.remainingMs <= 0;
+  }
+
+  /** The "Time's up!" line under the timer, shown or cleared. */
+  function setTimeUp(on) {
+    setText(dom.timerStatus, on ? () => t('timer.up') : '');
   }
 
   function onPauseClick() {
@@ -2637,12 +2724,6 @@
       .map((item) => item.c);
   }
 
-  /** "X and Y" / "X, Y and Z" (D-10). */
-  function joinNames(names) {
-    if (names.length <= 1) return names.join('');
-    return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
-  }
-
   /** D-10: everyone on the top score (several = a tie), in setup order. Results, Share and Golden Goal use it. */
   function topContestants(g) {
     const ranked = rankedContestants(g);
@@ -2654,8 +2735,8 @@
     const top = ranked[0].score;
     const winners = topContestants(state.game);
     dom.resultsWinner.textContent = winners.length === 1
-      ? winners[0].name + ' wins!'
-      : "It's a tie between " + joinNames(winners.map((c) => c.name));
+      ? t('results.wins', { name: iso(winners[0].name) })
+      : t('results.tie', { names: joinNames(winners.map((c) => c.name)) });
     clear(dom.resultsList);
     ranked.forEach((c) => {
       const isWinner = c.score === top;
@@ -2666,11 +2747,11 @@
       const row = h('li', { className: 'result-row' + (isWinner ? ' is-winner' : '') }, [
         h('span', { className: 'result-rank', text: rank + '.' }),
         swatch,
-        h('span', { className: 'result-name', text: c.name }),
-        isWinner ? h('span', { className: 'result-badge', text: 'Winner' }) : null,
+        h('span', { className: 'result-name', text: iso(c.name) }),
+        isWinner ? h('span', { className: 'result-badge', text: t('results.winner') }) : null,
         h('span', { className: 'result-score', text: formatScore(c.score) }),
       ]);
-      row.style.borderLeftColor = paletteEntry(c.color).value;
+      row.style.borderInlineStartColor = paletteEntry(c.color).value; // the left edge; the right one in Arabic
       dom.resultsList.appendChild(row);
     });
     dom.resultsShareStatus.textContent = '';
@@ -2685,27 +2766,26 @@
   function shareText(text, status) {
     const sharer = window.BrainRushShare;
     if (!sharer || typeof sharer.share !== 'function') {
-      status.textContent = 'Sharing is not available right now.';
+      status.textContent = t('share.unavailable');
       return;
     }
-    sharer.share(text, status).catch(() => { status.textContent = 'Could not share the result.'; });
+    sharer.share(text, status).catch(() => { status.textContent = t('share.failed'); });
   }
 
   /**
    * US-46: "Team Red won BrainRush with 2300! Team Blue 1800, Team Green 900." A tie uses the D-10
    * wording: "It's a tie between Team Red and Team Blue in BrainRush with 2300 each!" and the rest.
-   * Scores use the same minus sign as the screen.
+   * Scores use the same minus sign as the screen. In Arabic the text is Arabic too (US-49).
    */
   function resultsShareText(g) {
     const ranked = rankedContestants(g);
     const top = ranked[0].score;
     const winners = topContestants(g);
-    const others =ranked.filter((c) => c.score !== top).map((c) => c.name + ' ' + formatScore(c.score));
+    const others = ranked.filter((c) => c.score !== top).map((c) => iso(c.name) + ' ' + formatScore(c.score));
     const head = winners.length === 1
-      ? winners[0].name + ' won BrainRush with ' + formatScore(top) + '!'
-      : "It's a tie between " + joinNames(winners.map((c) => c.name)) + ' in BrainRush with ' +
-        formatScore(top) + ' each!';
-    return others.length ? head + ' ' + others.join(', ') + '.' : head;
+      ? t('share.won', { name: iso(winners[0].name), score: formatScore(top) })
+      : t('share.tie', { names: joinNames(winners.map((c) => c.name)), score: formatScore(top) });
+    return others.length ? head + ' ' + others.join(t('list.sep')) + '.' : head;
   }
 
   function onResultsShare() {
@@ -2756,8 +2836,9 @@
     dom.streakOpenBtn.focus();
   }
 
+  /** message: '' (none), a string, or a function giving it (see setText). */
   function setFieldError(input, errorNode, message) {
-    errorNode.textContent = message;
+    setText(errorNode, message);
     errorNode.hidden = !message;
     if (message) input.setAttribute('aria-invalid', 'true');
     else input.removeAttribute('aria-invalid');
@@ -2771,8 +2852,8 @@
   /** Challenger name: required, at most NAME_MAX characters (D-22). Marks the field inline when bad. */
   function validateStreakName() {
     const name = cleanName(dom.streakNameInput.value);
-    const message = !name ? 'Challenger name is required'
-      : name.length > NAME_MAX ? 'Challenger name must be at most ' + NAME_MAX + ' characters' : '';
+    const message = !name ? () => t('streak.nameRequired')
+      : name.length > NAME_MAX ? () => t('streak.nameTooLong', { max: NAME_MAX }) : '';
     setFieldError(dom.streakNameInput, dom.streakNameError, message);
     return message === '';
   }
@@ -2785,14 +2866,14 @@
     const nameOk = validateStreakName();
     const timerSeconds = validateTimer();
     if (!nameOk || timerSeconds === null) {
-      showMessage(dom.startMsg, 'The Streak Challenge cannot start yet. Please fix the errors above.', 'error');
+      showMessage(dom.startMsg, () => t('streak.fix'), 'error');
       const target = [dom.streakNameInput, dom.timerInput]
         .find((input) => input.getAttribute('aria-invalid') === 'true');
       if (target) target.focus();
       return;
     }
     s.starting = true;
-    dom.streakBtn.textContent = 'Starting...';
+    dom.streakBtn.textContent = t('setup.starting');
     updateStartButton();
     try {
       await startStreakRun({
@@ -2802,10 +2883,10 @@
       });
     } catch (err) {
       // Stay on setup with every input intact (as US-06).
-      showMessage(dom.startMsg, 'Could not start the Streak Challenge: ' + errorText(err), 'error');
+      showMessage(dom.startMsg, () => t('streak.failed', { reason: errorText(err) }), 'error');
     } finally {
       s.starting = false;
-      dom.streakBtn.textContent = 'Start Streak Challenge';
+      dom.streakBtn.textContent = t('streak.start');
       updateStartButton();
     }
   }
@@ -2851,7 +2932,7 @@
   /** A streak question: 3 non-empty choices, a valid `correct`, and Arabic choices when it has an Arabic question. */
   function isValidStreakQuestion(q) {
     if (!isPlainObject(q) || !Number.isInteger(q.id) || q.id < 1 || typeof q.category_name !== 'string' ||
-        !Number.isInteger(q.points) || q.points < 1 || typeof q.question !== 'string' ||
+        !isOptionalText(q.category_name_ar) || !Number.isInteger(q.points) || q.points < 1 || typeof q.question !== 'string' ||
         !isOptionalText(q.question_ar) || !isValidImage(q.image) || !isOptionalText(q.image_credit) ||
         !Array.isArray(q.choices) || q.choices.length !== CHOICE_LETTERS.length ||
         !Number.isInteger(q.correct) || q.correct < 0 || q.correct >= CHOICE_LETTERS.length) return false;
@@ -2893,6 +2974,7 @@
     return {
       id: q.id,
       category_name: q.category_name,
+      category_name_ar: isFilled(q.category_name_ar) ? q.category_name_ar : null,
       points: q.points,
       question: q.question,
       question_ar: arabic ? q.question_ar : null,
@@ -2917,7 +2999,7 @@
     const data = await apiPost('questions.php?streak=1', { exclude: exclude, seen: loadSeen() });
     if (!isPlainObject(data) || !Array.isArray(data.questions) ||
         !data.questions.every((q) => isValidStreakQuestion(q))) {
-      throw new Error('The server sent unexpected questions.');
+      throw textError('err.questions');
     }
     return data.questions.map(parseStreakQuestion);
   }
@@ -2961,7 +3043,7 @@
   /** Start a new run with this name and timer. Throws (nothing changes) when no question can be loaded. */
   async function startStreakRun(profile) {
     const questions = await fetchStreakBatch([]);
-    if (!questions.length) throw new Error('There are no questions to play yet.');
+    if (!questions.length) throw textError('err.noQuestions');
     stopTimer();
     state.game = null;
     clearSavedState();
@@ -2989,17 +3071,17 @@
     if (!run || run.over) return;
     if (!run.queue.length) {
       setStreakLoading(true);
-      let failure = '';
+      let failure = null;
       try {
         await requestStreakBatch(run);
       } catch (err) {
-        failure = errorText(err);
+        failure = err;
       }
       if (streak !== run || run.over) return; // ended (End run) while loading
       setStreakLoading(false);
       if (!run.queue.length) {
         if (failure) {
-          showStreakFeedback('Could not load the next question: ' + failure + ' Try Next again.', 'is-bad');
+          showStreakFeedback(t('streak.nextFailed', { reason: errorText(failure) }), 'is-bad');
           return;
         }
         run.over = true; // every question was played in this run: it ends with the full streak
@@ -3038,7 +3120,7 @@
     const cur = run.current;
     const q = cur.q;
     setStreakLayout(true);
-    dom.qHeading.textContent = q.category_name + ' ' + EN_DASH + ' ' + q.points;
+    renderRunHeading(q);
     renderQuestionImage(q);
     renderStreakLang();
     renderStreakPanel();
@@ -3047,7 +3129,7 @@
     onQuestionShown(cur.picked !== null); // US-48: an answered question (after a refresh) is not read again
     if (cur.picked !== null) {
       showTimerAt(run.timerSeconds, cur.leftMs || 0);
-      dom.timerStatus.textContent = cur.picked === STREAK_TIME_UP ? "Time's up!" : '';
+      setTimeUp(cur.picked === STREAK_TIME_UP);
       dom.streakNext.focus();
       return;
     }
@@ -3062,6 +3144,15 @@
     }
     startTimer(run.timerSeconds, left, () => streakAnswer(null));
     dom.qHeading.focus();
+  }
+
+  /** "Category – 300" above a Streak or Daily Challenge question (also the Report form's label). */
+  function runHeading(q) {
+    return iso(localName(q.category_name, q.category_name_ar)) + ' ' + EN_DASH + ' ' + q.points;
+  }
+
+  function renderRunHeading(q) {
+    dom.qHeading.textContent = runHeading(q);
   }
 
   /** Question text, language button and choices in the open question's language. */
@@ -3107,7 +3198,7 @@
       const isRight = answered && index === q.correct;
       const isWrong = answered && index === cur.picked && !isRight;
       const text = arabic ? choice.text_ar : choice.text;
-      const note = isRight ? ', the right answer' : isWrong ? ', your answer' : '';
+      const note = isRight ? t('choice.right') : isWrong ? t('choice.yours') : '';
       list.appendChild(h('li', {}, [
         h('button', {
           type: 'button',
@@ -3128,19 +3219,20 @@
     const run = streak;
     const cur = run.current;
     const lost = cur.picked !== null && cur.picked !== cur.q.correct;
-    setRunPanelTexts(STREAK_PANEL_TEXT.title, STREAK_PANEL_TEXT.label, STREAK_PANEL_TEXT.hint);
-    dom.streakName.textContent = run.name;
-    dom.streakName.style.borderLeftColor = paletteEntry(run.color).value;
+    const texts = streakPanelText();
+    setRunPanelTexts(texts.title, texts.label, texts.hint);
+    dom.streakName.textContent = iso(run.name);
+    dom.streakName.style.borderInlineStartColor = paletteEntry(run.color).value; // the right edge in Arabic
     dom.streakCount.textContent = String(run.count);
     if (cur.picked === null) {
       showStreakFeedback('', '');
     } else if (!lost) {
-      showStreakFeedback('Correct! Your streak is ' + run.count + '.', 'is-good');
+      showStreakFeedback(t('streak.correct', { n: run.count }), 'is-good');
     } else {
       showWrongFeedback(cur.q, cur);
     }
     dom.streakNext.hidden = cur.picked === null;
-    dom.streakNext.textContent = lost ? 'See results' : 'Next question';
+    dom.streakNext.textContent = lost ? t('run.seeResults') : t('run.next');
     dom.streakNext.disabled = finishing;
     dom.streakEnd.hidden = lost;
     dom.streakEnd.disabled = finishing;
@@ -3157,8 +3249,8 @@
   function showWrongFeedback(q, cur) {
     const right = q.choices[q.correct];
     const arabic = cur.lang === 'ar';
-    showStreakFeedback((cur.picked === STREAK_TIME_UP ? "Time's up!" : 'Wrong!') +
-      ' The right answer was ' + CHOICE_LETTERS[q.correct] + ', ', 'is-bad',
+    showStreakFeedback((cur.picked === STREAK_TIME_UP ? t('timer.up') : t('run.wrong')) +
+      t('run.rightWas', { letter: CHOICE_LETTERS[q.correct] }), 'is-bad',
       { text: arabic ? right.text_ar : right.text, arabic: arabic });
   }
 
@@ -3183,7 +3275,7 @@
 
   function setStreakLoading(loading) {
     dom.streakNext.disabled = loading;
-    dom.streakNext.textContent = loading ? 'Loading...' : 'Next question';
+    dom.streakNext.textContent = loading ? t('common.loading') : t('run.next');
   }
 
   /** A tapped choice, or null when the time ran out. Right: +1 and Next; wrong or too late: the run is over. */
@@ -3202,7 +3294,7 @@
       : cur.picked === STREAK_TIME_UP ? STAT.timeout : STAT.wrong);
     saveStreak();
     showTimerAt(run.timerSeconds, cur.leftMs);
-    if (cur.picked === STREAK_TIME_UP) dom.timerStatus.textContent = "Time's up!";
+    if (cur.picked === STREAK_TIME_UP) setTimeUp(true);
     renderStreakChoices();
     renderStreakPanel();
     updateReportButton(); // US-42: Report appears now that it is answered
@@ -3239,9 +3331,7 @@
   function onStreakEnd() {
     const run = streak;
     if (!run || run.over || !streakOnScreen()) return;
-    const text = run.count > 0
-      ? 'End the run now? Your streak of ' + run.count + ' is saved to the leaderboard.'
-      : 'End the run now? You have no streak yet, so nothing is saved.';
+    const text = run.count > 0 ? t('streak.endConfirm', { n: run.count }) : t('streak.endConfirmNone');
     if (!window.confirm(text)) return;
     if (streak !== run || run.over) return; // the time ran out while the confirm was open
     run.over = true;
@@ -3270,11 +3360,11 @@
         const saved = await apiPost('streaks.php', { name: run.name, streak: run.count });
         if (!isPlainObject(saved) || !Number.isInteger(saved.rank) || !Number.isInteger(saved.best) ||
             !(saved.week_rank === undefined || saved.week_rank === null || Number.isInteger(saved.week_rank))) {
-          throw new Error('The server sent an unexpected response.');
+          throw textError('err.response');
         }
         result.saved = saved;
       } catch (err) {
-        result.saveError = errorText(err);
+        result.saveError = err; // shown with errorText(), in the language on screen
       }
       result.saving = false;
     }
@@ -3309,19 +3399,20 @@
 
   // ---------- Streak leaderboard (US-34) ----------
 
-  /** "2026-10-18" -> "18 Oct 2026" (the server date of the run, not "5 days ago"). */
+  /** "2026-10-18" -> "18 Oct 2026" (the server date of the run, not "5 days ago"); Arabic month names in Arabic. */
   function formatRunDate(date) {
     const parts = date.split('-');
-    return Number(parts[2]) + ' ' + MONTHS[Number(parts[1]) - 1] + ' ' + parts[0];
+    const months = t('date.months').split(',');
+    return t('date.format', { d: Number(parts[2]), m: months[Number(parts[1]) - 1], y: parts[0] });
   }
 
   /** The leaderboard screen: after a run (`result`) with headline, rank, Play again and New Game; from setup (null) with Back. */
   function openLeaderboard(result) {
     leaderboardResult = result;
+    lastLeaderboard = null;
     clearMessage(dom.lbMsg);
     renderLeaderboardHead(result);
-    clear(dom.lbList);
-    dom.lbList.appendChild(h('li', { className: 'lb-empty', text: 'Loading the leaderboard...' }));
+    showLeaderboardLoading();
     dom.lbAgain.hidden = !result;
     dom.lbNew.hidden = !result;
     dom.lbBack.hidden = !!result;
@@ -3339,41 +3430,47 @@
     dom.lbNew.disabled = !!result && result.saving;
     if (!result) return;
     dom.lbHeadline.textContent = result.count > 0
-      ? result.name + ': ' + result.count + ' in a row!'
-      : 'No streak this time';
+      ? t('lb.headline', { name: iso(result.name), n: result.count })
+      : t('lb.noStreak');
     if (result.saving) {
-      dom.lbRank.textContent = 'Saving your streak...';
+      dom.lbRank.textContent = t('lb.saving');
     } else if (result.saved) {
       // US-45: both ranks, "You are #2 this week and #7 of all time."
       const saved = result.saved;
-      const best = saved.best > result.count ? 'Your best is still ' + saved.best + '. ' : '';
-      const week = Number.isInteger(saved.week_rank) ? '#' + saved.week_rank + ' this week and ' : '';
-      dom.lbRank.textContent = best + 'You are ' + week + '#' + saved.rank + ' of all time.';
+      const best = saved.best > result.count ? t('lb.best', { best: saved.best }) : '';
+      dom.lbRank.textContent = best + (Number.isInteger(saved.week_rank)
+        ? t('lb.rankWeek', { week: saved.week_rank, rank: saved.rank })
+        : t('lb.rank', { rank: saved.rank }));
     } else if (result.saveError) {
       dom.lbRank.hidden = true;
       clear(dom.lbMsg);
       dom.lbMsg.className = 'msg msg-error';
-      dom.lbMsg.appendChild(h('span', { text: 'Your streak could not be saved: ' + result.saveError + ' ' }));
-      dom.lbMsg.appendChild(h('button', { type: 'button', className: 'btn btn-small', text: 'Try again', onclick: finishStreak }));
+      dom.lbMsg.appendChild(h('span', { text: t('lb.saveFailed', { reason: errorText(result.saveError) }) }));
+      dom.lbMsg.appendChild(h('button', { type: 'button', className: 'btn btn-small', text: t('common.tryAgain'), onclick: finishStreak }));
       dom.lbMsg.hidden = false;
     } else {
-      dom.lbRank.textContent = 'Only streaks of 1 or more go on the leaderboard.';
+      dom.lbRank.textContent = t('lb.onlyOne');
     }
+  }
+
+  function showLeaderboardLoading() {
+    clear(dom.lbList);
+    dom.lbList.appendChild(h('li', { className: 'lb-empty', text: t('lb.loading') }));
   }
 
   /** The "This week" / "All time" tabs (US-45): the shown one is pressed; the list's name follows it. */
   function renderLeaderboardTabs() {
     dom.lbTabs.forEach((tab) => tab.setAttribute('aria-pressed', String(tab.getAttribute('data-period') === lbPeriod)));
-    dom.lbList.setAttribute('aria-label', lbPeriod === 'week' ? 'Top 10 streaks this week' : 'Top 10 streaks of all time');
+    dom.lbList.setAttribute('aria-label', lbPeriod === 'week' ? t('lb.topWeek') : t('lb.topAll'));
   }
 
   function onLeaderboardTab(event) {
     const period = event.currentTarget.getAttribute('data-period');
     if (LB_PERIODS.indexOf(period) === -1 || period === lbPeriod) return;
     lbPeriod = period;
+    lastLeaderboard = null;
     renderLeaderboardTabs();
-    clear(dom.lbList);
-    dom.lbList.appendChild(h('li', { className: 'lb-empty', text: 'Loading the leaderboard...' }));
+    showLeaderboardLoading();
     const result = leaderboardResult;
     if (!result || !result.saving) loadLeaderboardRows(); // a run being saved loads the rows once saved
   }
@@ -3384,17 +3481,18 @@
     const result = leaderboardResult;
     const period = lbPeriod;
     let rows = null;
-    let failure = '';
+    let failure = null;
     try {
       const data = await apiGet('streaks.php?period=' + encodeURIComponent(period));
-      if (!Array.isArray(data)) throw new Error('The server sent an unexpected leaderboard.');
+      if (!Array.isArray(data)) throw textError('err.leaderboard');
       rows = data.filter((r) => isPlainObject(r) && typeof r.name === 'string' &&
         Number.isInteger(r.streak) &&
         typeof r.date === 'string' && DATE_PATTERN.test(r.date));
     } catch (err) {
-      failure = errorText(err);
+      failure = err;
     }
     if (load !== leaderboardLoads || state.screen !== 'leaderboard') return;
+    lastLeaderboard = { rows: rows, result: result, failure: failure, period: period };
     renderLeaderboardRows(rows, result, failure, period);
   }
 
@@ -3406,10 +3504,10 @@
   function renderLeaderboardRows(rows, result, failure, period) {
     clear(dom.lbList);
     if (failure || !rows.length) {
-      const empty = period === 'week' ? 'No streaks this week yet. Be the first!' : 'No streaks yet. Be the first!';
+      const empty = period === 'week' ? t('lb.emptyWeek') : t('lb.empty');
       dom.lbList.appendChild(h('li', {
         className: 'lb-empty',
-        text: failure ? 'Could not load the leaderboard: ' + failure : empty,
+        text: failure ? t('lb.failed', { reason: errorText(failure) }) : empty,
       }));
       return;
     }
@@ -3420,11 +3518,11 @@
       dom.lbList.appendChild(h('li', { className: 'result-row' + (isMe ? ' is-me' : '') }, [
         h('span', { className: 'result-rank', text: (index + 1) + '.' }),
         document.createTextNode(' '),
-        h('span', { className: 'result-name', text: name }),
+        h('span', { className: 'result-name', text: iso(name) }),
         document.createTextNode(' '),
         h('span', {
           className: 'lb-meta',
-          text: DOT + ' ' + plural(r.streak, 'question') + ' ' + DOT + ' ' + formatRunDate(r.date),
+          text: DOT + ' ' + tn('lb.questions', r.streak) + ' ' + DOT + ' ' + formatRunDate(r.date),
         }),
       ]));
     });
@@ -3433,7 +3531,7 @@
   /** Leaving a run whose save failed loses it: ask first. */
   function confirmDropUnsaved() {
     if (!streak) return true;
-    if (!window.confirm('Your streak of ' + streak.count + ' was not saved. Leave it unsaved?')) return false;
+    if (!window.confirm(t('lb.unsaved', { n: streak.count }))) return false;
     streak = null;
     saveStreak();
     return true;
@@ -3445,14 +3543,14 @@
     if (!profile || dom.lbAgain.disabled || !confirmDropUnsaved()) return;
     clearMessage(dom.lbMsg);
     dom.lbAgain.disabled = true;
-    dom.lbAgain.textContent = 'Starting...';
+    dom.lbAgain.textContent = t('setup.starting');
     try {
       await startStreakRun(profile);
     } catch (err) {
-      showMessage(dom.lbMsg, 'Could not start a new run: ' + errorText(err), 'error');
+      showMessage(dom.lbMsg, () => t('lb.againFailed', { reason: errorText(err) }), 'error');
     } finally {
       dom.lbAgain.disabled = false;
-      dom.lbAgain.textContent = 'Play again';
+      dom.lbAgain.textContent = t('lb.again');
     }
   }
 
@@ -3550,7 +3648,7 @@
       Number.isInteger(data.seconds_to_next) && data.seconds_to_next >= 0 && data.seconds_to_next * 1000 <= DAY_MS &&
       Array.isArray(data.questions) && data.questions.length >= 1 && data.questions.length <= DAILY_MAX_QUESTIONS &&
       data.questions.every(isValidStreakQuestion);
-    if (!ok) throw new Error('The server sent an unexpected Daily Challenge.');
+    if (!ok) throw textError('err.daily');
     return {
       date: data.date,
       number: data.number,
@@ -3574,7 +3672,7 @@
     if (!s || s.streak || dom.dailyOpenBtn.disabled) return;
     clearMessage(dom.startMsg);
     s.starting = true;
-    dom.dailyOpenLabel.textContent = 'Loading...';
+    dom.dailyOpenLabel.textContent = t('common.loading');
     updateStartButton();
     try {
       const challenge = await fetchDaily();
@@ -3582,7 +3680,7 @@
       if (!showPlayedDaily(challenge)) {
         const timerSeconds = validateTimer(); // the setup timer, as for the Streak Challenge
         if (timerSeconds === null) {
-          showMessage(dom.startMsg, 'The Daily Challenge cannot start yet. Please fix the errors above.', 'error');
+          showMessage(dom.startMsg, () => t('daily.fix'), 'error');
           dom.timerInput.focus();
           return;
         }
@@ -3590,10 +3688,10 @@
       }
     } catch (err) {
       // Stay on setup with every input intact (as US-06).
-      showMessage(dom.startMsg, 'Could not open the Daily Challenge: ' + errorText(err), 'error');
+      showMessage(dom.startMsg, () => t('daily.failed', { reason: errorText(err) }), 'error');
     } finally {
       s.starting = false;
-      dom.dailyOpenLabel.textContent = 'Daily Challenge';
+      dom.dailyOpenLabel.textContent = t('daily.name');
       updateStartButton();
     }
   }
@@ -3657,7 +3755,7 @@
     const cur = daily.current;
     const q = dailyQuestion();
     setStreakLayout(true);
-    dom.qHeading.textContent = q.category_name + ' ' + EN_DASH + ' ' + q.points;
+    renderRunHeading(q);
     renderQuestionImage(q);
     renderRunLang(q, cur, dailyAnswer);
     renderDailyPanel();
@@ -3666,7 +3764,7 @@
     onQuestionShown(cur.picked !== null); // US-48: an answered question (after a refresh) is not read again
     if (cur.picked !== null) {
       showTimerAt(daily.timerSeconds, cur.leftMs || 0);
-      dom.timerStatus.textContent = cur.picked === STREAK_TIME_UP ? "Time's up!" : '';
+      setTimeUp(cur.picked === STREAK_TIME_UP);
       dom.streakNext.focus();
       return;
     }
@@ -3688,17 +3786,16 @@
     const cur = daily.current;
     const q = dailyQuestion();
     const total = daily.questions.length;
-    setRunPanelTexts('Daily Challenge', 'Question', "Today's " + plural(total, 'question') +
-      (total === 1 ? ' is' : ' are') + " the same for everyone. A wrong answer or time's up scores 0.");
-    dom.streakName.textContent = 'Daily Challenge #' + daily.number;
-    dom.streakName.style.borderLeftColor = 'var(--gold)';
+    setRunPanelTexts(t('daily.name'), t('daily.question'), tn('daily.hint', total));
+    dom.streakName.textContent = t('daily.number', { n: daily.number });
+    dom.streakName.style.borderInlineStartColor = 'var(--gold)'; // the right edge in Arabic
     dom.streakCount.textContent = (cur.index + 1) + '/' + total;
     if (cur.picked === null) showStreakFeedback('', '');
-    else if (cur.picked === q.correct) showStreakFeedback('Correct!', 'is-good');
+    else if (cur.picked === q.correct) showStreakFeedback(t('daily.correct'), 'is-good');
     else showWrongFeedback(q, cur);
     dom.streakNext.hidden = cur.picked === null;
     dom.streakNext.disabled = false;
-    dom.streakNext.textContent = cur.index + 1 >= total ? 'See result' : 'Next question';
+    dom.streakNext.textContent = cur.index + 1 >= total ? t('daily.seeResult') : t('run.next');
     dom.streakEnd.hidden = true;
   }
 
@@ -3724,7 +3821,7 @@
     daily.results.push(cur.picked === q.correct);
     saveDaily();
     showTimerAt(daily.timerSeconds, cur.leftMs);
-    if (cur.picked === STREAK_TIME_UP) dom.timerStatus.textContent = "Time's up!";
+    if (cur.picked === STREAK_TIME_UP) setTimeUp(true);
     renderRunChoices(q, cur, dailyAnswer);
     renderDailyPanel();
     updateReportButton(); // US-42: Report appears now that it is answered
@@ -3746,8 +3843,7 @@
   /** Android Back on an open question (US-40): leave after a confirm; the questions left score 0. */
   function onDailyLeave() {
     if (!dailyOnScreen() || daily.current.picked !== null) return;
-    if (!window.confirm("Leave today's Daily Challenge? The questions you haven't answered score 0, " +
-        'and you can play it only once today.')) return;
+    if (!window.confirm(t('daily.leave'))) return;
     if (!dailyOnScreen() || daily.current.picked !== null) return; // the time ran out meanwhile
     finishDaily();
   }
@@ -3782,24 +3878,28 @@
 
   /** "BrainRush Daily #12: 2/3" */
   function dailyScoreLine(run) {
-    return 'BrainRush Daily #' + run.number + ': ' + dailyRightCount(run) + '/' + run.results.length;
+    return t('daily.score', { n: run.number, right: dailyRightCount(run), total: run.results.length });
   }
 
   function renderDailyResult() {
-    const right = dailyRightCount(daily);
-    const total = daily.results.length;
-    dom.dailyScore.textContent = dailyScoreLine(daily);
     clear(dom.dailySquares);
     daily.results.forEach((ok) => {
       dom.dailySquares.appendChild(h('span', { className: 'daily-square ' + (ok ? 'is-right' : 'is-wrong') }));
     });
-    dom.dailySquares.setAttribute('aria-label', daily.results
-      .map((ok, i) => 'Question ' + (i + 1) + (ok ? ' right' : ' wrong')).join(', '));
-    dom.dailyNote.textContent = (right === total ? 'Perfect! ' : '') +
-      'Everyone gets the same questions today. Share your result and compare with your friends.';
+    renderDailyTexts();
     dom.dailyShareStatus.textContent = '';
     clearMessage(dom.dailyMsg);
     dom.dailyPlay.hidden = true;
+  }
+
+  /** The score line, the squares' label and the note of the result screen. */
+  function renderDailyTexts() {
+    const right = dailyRightCount(daily);
+    const total = daily.results.length;
+    dom.dailyScore.textContent = dailyScoreLine(daily);
+    dom.dailySquares.setAttribute('aria-label', daily.results
+      .map((ok, i) => t(ok ? 'daily.squareRight' : 'daily.squareWrong', { n: i + 1 })).join(t('list.sep')));
+    dom.dailyNote.textContent = (right === total ? t('daily.perfect') : '') + t('daily.note');
   }
 
   /** The shared text: the score line and the squares (js/share.js adds the site link). */
@@ -3833,11 +3933,11 @@
   function tickDailyCountdown() {
     const left = Math.min(daily.nextAt - Date.now(), DAY_MS);
     if (left > 0) {
-      dom.dailyNext.textContent = 'Next Daily Challenge in ' + formatCountdown(left);
+      dom.dailyNext.textContent = t('daily.next', { time: ltr(formatCountdown(left)) });
       return;
     }
     stopDailyCountdown();
-    dom.dailyNext.textContent = 'A new Daily Challenge is ready!';
+    dom.dailyNext.textContent = t('daily.ready');
     dom.dailyPlay.hidden = false;
   }
 
@@ -3846,7 +3946,7 @@
     if (!daily || state.screen !== 'daily' || dom.dailyPlay.disabled) return;
     clearMessage(dom.dailyMsg);
     dom.dailyPlay.disabled = true;
-    dom.dailyPlay.textContent = 'Loading...';
+    dom.dailyPlay.textContent = t('common.loading');
     try {
       const challenge = await fetchDaily();
       if (state.screen !== 'daily') return;
@@ -3859,10 +3959,10 @@
       }
       startDaily(challenge, daily.timerSeconds);
     } catch (err) {
-      showMessage(dom.dailyMsg, 'Could not load the new Daily Challenge: ' + errorText(err), 'error');
+      showMessage(dom.dailyMsg, () => t('daily.newFailed', { reason: errorText(err) }), 'error');
     } finally {
       dom.dailyPlay.disabled = false;
-      dom.dailyPlay.textContent = 'Play the new challenge';
+      dom.dailyPlay.textContent = t('daily.playNew');
     }
   }
 
@@ -3926,18 +4026,23 @@
 
   /** " – round 2" from the second round on; round 1 has no counter. */
   function roundSuffix(round) {
-    return round > 1 ? ' ' + EN_DASH + ' round ' + round : '';
+    return round > 1 ? t('final.round', { n: round }) : '';
+  }
+
+  /** The Golden Goal question's category in the interface language. */
+  function finalCategoryName(f) {
+    return localName(f.category.name, f.category.nameAr);
   }
 
   /** "Golden Goal – round 2 – History" as plain text (Report, labels): no ball (D-50). */
   function finalHeading(f) {
-    return FINAL_NAME + roundSuffix(f.round) + ' ' + EN_DASH + ' ' + f.category.name;
+    return t('final.name') + roundSuffix(f.round) + ' ' + EN_DASH + ' ' + iso(finalCategoryName(f));
   }
 
   /** "<before>Golden Goal ⚽<after>" in `node`; the ball is decorative, so screen readers skip it. */
   function setGoalText(node, before, after) {
     clear(node);
-    node.appendChild(document.createTextNode((before || '') + FINAL_NAME + ' '));
+    node.appendChild(document.createTextNode((before || '') + t('final.name') + ' '));
     node.appendChild(h('span', { text: GOAL_BALL, 'aria-hidden': 'true' }));
     if (after) node.appendChild(document.createTextNode(after));
   }
@@ -3968,21 +4073,18 @@
       const tied = joinNames(top.map((c) => c.name));
       const score = formatScore(top[0].score);
       if (f.round === 1) {
-        setGoalText(dom.finalTitle, "It's a tie! ", '?');
-        dom.finalLead.textContent = tied + ' are tied for first on ' + score + '. One more question decides it: ' +
-          'everyone bets, get it right and win your bet, get it wrong and lose it.';
+        setGoalText(dom.finalTitle, t('final.tieBefore'), t('final.tieAfter'));
+        dom.finalLead.textContent = t('final.lead1', { names: tied, score: score });
       } else {
-        setGoalText(dom.finalTitle, 'Still tied! ', ' again?');
-        dom.finalLead.textContent = tied + ' are still level on ' + score + '. Round ' + f.round +
-          ' brings a new question, and everyone bets again from their current score.';
+        setGoalText(dom.finalTitle, t('final.stillBefore'), t('final.stillAfter'));
+        dom.finalLead.textContent = t('final.lead2', { names: tied, score: score, n: f.round });
       }
-      dom.finalRule.textContent = 'Each ' + MODES[g.mode].one + ' can bet from 0 up to their score or ' +
-        largestPoints(g) + ', whichever is higher. You see the category before you bet.';
+      dom.finalRule.textContent = t('final.rule.' + MODES[g.mode].key, { max: largestPoints(g) });
       setFinalLoading(false);
       return;
     }
     setGoalText(dom.finalTitle, '', roundSuffix(f.round));
-    dom.finalCategory.textContent = f.category.name;
+    dom.finalCategory.textContent = iso(finalCategoryName(f));
     renderWagerList(g);
     renderWagerTurn(g);
   }
@@ -3999,14 +4101,14 @@
       swatch.style.backgroundColor = color.value;
       const item = h('li', { className: 'final-wager-item' + (locked ? ' is-locked' : '') + (c === turn ? ' is-turn' : '') }, [
         swatch,
-        h('span', { className: 'final-wager-name', text: c.name }),
+        h('span', { className: 'final-wager-name', text: iso(c.name) }),
         h('span', { className: 'final-wager-score' }, [
-          h('span', { className: 'visually-hidden', text: 'score ' }),
+          h('span', { className: 'visually-hidden', text: t('final.scoreLabel') }),
           document.createTextNode(formatScore(c.score)),
         ]),
-        h('span', { className: 'final-wager-state', text: locked ? CHECK + ' Bet locked' : c === turn ? 'Your turn' : 'Waiting' }),
+        h('span', { className: 'final-wager-state', text: locked ? t('final.betLocked') : c === turn ? t('final.yourTurn') : t('final.waiting') }),
       ]);
-      item.style.borderLeftColor = color.value;
+      item.style.borderInlineStartColor = color.value; // the left edge; the right one in Arabic
       dom.finalWagerList.appendChild(item);
     });
   }
@@ -4020,9 +4122,13 @@
     dom.finalWagerInput.value = '';
     setWagerMasked(true);
     if (c === null) return;
-    dom.finalWagerLabel.textContent = c.name + ", what's your bet?";
-    dom.finalWagerHint.textContent = 'Your bet (up to ' + wagerLimit(g, c.score) +
-      '). Everyone else, look away!';
+    renderWagerPrompt(g, c);
+  }
+
+  /** "Sara, what's your bet?" and the limit, for the contestant on turn. */
+  function renderWagerPrompt(g, c) {
+    dom.finalWagerLabel.textContent = t('final.ask', { name: iso(c.name) });
+    dom.finalWagerHint.textContent = t('final.betHint', { limit: wagerLimit(g, c.score) });
   }
 
   // Masked entry: dots instead of digits through -webkit-text-security (Chrome, Edge, Safari and
@@ -4043,8 +4149,9 @@
     dom.finalWagerInput.focus();
   }
 
+  /** message: '' (none), a string, or a function giving it (see setText). */
   function setWagerError(message) {
-    dom.finalWagerError.textContent = message;
+    setText(dom.finalWagerError, message);
     dom.finalWagerError.hidden = !message;
     if (message) dom.finalWagerInput.setAttribute('aria-invalid', 'true');
     else dom.finalWagerInput.removeAttribute('aria-invalid');
@@ -4065,7 +4172,7 @@
     const raw = westernDigits(dom.finalWagerInput.value.trim());
     const limit = wagerLimit(g, c.score);
     if (!WAGER_PATTERN.test(raw) || Number(raw) > limit) {
-      setWagerError('Enter a whole number from 0 to ' + limit + '.'); // never repeats what was typed
+      setWagerError(() => t('final.betError', { limit: limit })); // never repeats what was typed
       dom.finalWagerInput.focus();
       return;
     }
@@ -4079,7 +4186,7 @@
   function setFinalLoading(loading) {
     finalLoading = loading;
     dom.finalPlay.disabled = loading;
-    dom.finalPlay.textContent = loading ? 'Loading...' : 'Go for goal';
+    dom.finalPlay.textContent = loading ? t('common.loading') : t('final.play');
   }
 
   /**
@@ -4094,7 +4201,7 @@
     clearMessage(dom.finalMsg);
     setFinalLoading(true);
     let drawn = null;
-    let failure = '';
+    let failure = null; // a function giving the message (shown again after a language switch)
     let noneLeft = false;
     try {
       drawn = parseSwap(await apiPost('questions.php?random=1', {
@@ -4103,9 +4210,7 @@
       }));
     } catch (err) {
       noneLeft = err.status === 409;
-      const reason = errorText(err).trim();
-      failure = 'Could not load the question: ' + reason + (/[.!?]$/.test(reason) ? '' : '.') +
-        ' Try again, or skip to the results.';
+      failure = () => t('final.loadFailed', { reason: sentence(errorText(err)) });
     }
     setFinalLoading(false);
     if (state.game !== g || g.final !== f || state.screen !== 'final') return; // skipped meanwhile
@@ -4122,7 +4227,7 @@
       stage: 'wager',
       round: f.round,
       usedIds: f.usedIds.concat([drawn.question.id]),
-      category: { id: drawn.catId, name: drawn.catName },
+      category: { id: drawn.catId, name: drawn.catName, nameAr: drawn.catNameAr },
       question: drawn.question,
       wagers: {},
       marks: {},
@@ -4157,13 +4262,8 @@
     if (!hasArabic(f.question)) f.lang = 'en';
     else if (f.lang !== 'en' && f.lang !== 'ar') f.lang = 'ar';
     setStreakLayout(false);
-    setScoringPanelTexts({
-      title: FINAL_NAME + roundSuffix(f.round),
-      hint: 'Every ' + MODES[g.mode].one + ' answers, for example on paper. Correct wins their bet, ' +
-        'Wrong loses it. Mark each one once.',
-      back: 'See results', // "Continue" once everyone is marked and the top is still shared (updateFinalRows)
-    });
-    setGoalText(dom.qHeading, '', roundSuffix(f.round) + ' ' + EN_DASH + ' ' + f.category.name);
+    setFinalPanelTexts();
+    setGoalText(dom.qHeading, '', roundSuffix(f.round) + ' ' + EN_DASH + ' ' + iso(finalCategoryName(f)));
     clearMessage(dom.helperMsg);
     renderQuestionImage(f.question);
     renderFinalLang();
@@ -4174,6 +4274,16 @@
     startTimer(g.timerSeconds);
     dom.qHeading.focus();
     onQuestionShown(false); // US-48
+  }
+
+  /** The scoring panel during the final question; Back reads "Continue" or "See results" (updateFinalRows). */
+  function setFinalPanelTexts() {
+    const g = state.game;
+    setScoringPanelTexts({
+      title: t('final.name') + roundSuffix(g.final.round),
+      hint: t('final.hint.' + MODES[g.mode].key),
+      back: t('run.seeResults'),
+    });
   }
 
   function renderFinalLang() {
@@ -4206,7 +4316,7 @@
     clear(dom.scoreRows);
     scoringRows = g.contestants.map((c) => {
       const color = paletteEntry(c.color);
-      const name = h('span', { className: 'srow-name', text: c.name });
+      const name = h('span', { className: 'srow-name', text: iso(c.name) });
       name.style.backgroundColor = color.value;
       name.style.color = color.ink;
       const ref = {
@@ -4217,22 +4327,22 @@
         correct: h('button', {
           type: 'button',
           className: 'btn btn-correct',
-          text: CHECK + ' Correct',
-          'aria-label': 'Correct for ' + c.name + ', plus their bet',
+          text: t('final.correctBtn'),
+          'aria-label': t('final.correctLabel', { name: iso(c.name) }),
           onclick: () => markFinal(c, 'correct'),
         }),
         wrong: h('button', {
           type: 'button',
           className: 'btn btn-wrong',
-          text: CROSS + ' Wrong',
-          'aria-label': 'Wrong for ' + c.name + ', minus their bet',
+          text: t('final.wrongBtn'),
+          'aria-label': t('final.wrongLabel', { name: iso(c.name) }),
           onclick: () => markFinal(c, 'wrong'),
         }),
       };
       // The wager and the score share one block: on phones they stack, so a mark never widens the row (BUG-9-02).
       const tally = h('span', { className: 'srow-tally' }, [ref.wager, ref.score]);
       ref.row = h('li', { className: 'srow' }, [name, tally, ref.status, ref.correct, ref.wrong]);
-      ref.row.style.borderLeftColor = color.value;
+      ref.row.style.borderInlineStartColor = color.value; // the left edge; the right one in Arabic
       dom.scoreRows.appendChild(ref.row);
       return ref;
     });
@@ -4253,15 +4363,16 @@
       ref.wrong.classList.toggle('is-chosen', mark === 'wrong');
       ref.row.classList.toggle('is-scored', mark !== null);
       ref.score.textContent = formatScore(ref.contestant.score);
-      ref.wager.textContent = mark === null ? '' : (mark === 'correct' ? '+' : MINUS) + wager;
+      ref.wager.textContent = mark === null ? '' : signed(mark === 'correct' ? '+' : MINUS, wager);
       ref.wager.className = 'srow-wager' + (mark === null ? '' : ' is-' + mark);
       ref.status.textContent = mark === null ? ''
-        : ref.contestant.name + ' marked ' + mark + ', bet ' + wager + ', score ' + formatScore(ref.contestant.score);
+        : t(mark === 'correct' ? 'final.statusCorrect' : 'final.statusWrong',
+          { name: iso(ref.contestant.name), bet: wager, score: formatScore(ref.contestant.score) });
     });
     const allMarked = g.contestants.every((c) => hasOwn(f.marks, String(c.id)));
     dom.backBtn.disabled = !allMarked;
     // D-51: still level at the top -> Continue to the next round's offer; otherwise the results.
-    dom.backBtn.textContent = allMarked && isTiedAtTop(g) ? 'Continue' : 'See results';
+    dom.backBtn.textContent = allMarked && isTiedAtTop(g) ? t('final.continue') : t('run.seeResults');
   }
 
   function markFinal(contestant, result) {
@@ -4307,8 +4418,7 @@
     if (!finalOnScreen()) return;
     const g = state.game;
     const unscored = g.contestants.some((c) => !hasOwn(g.final.marks, String(c.id)));
-    if (unscored && !window.confirm('Stop ' + FINAL_NAME + ' and show the results? ' + MODES[g.mode].title +
-        ' not marked yet keep their score.')) return;
+    if (unscored && !window.confirm(t('final.leave.' + MODES[g.mode].key))) return;
     finishFinal();
   }
 
@@ -4330,7 +4440,7 @@
       showScreen('board');
       return;
     }
-    if (!window.confirm('Stop ' + FINAL_NAME + ' and show the results? The bets of this round are dropped and no score changes.')) return;
+    if (!window.confirm(t('final.backConfirm'))) return;
     if (state.game !== g || g.final !== f || state.screen !== 'final') return;
     g.final = null;
     showResults();
@@ -4416,8 +4526,8 @@
     dom.questionMain.classList.toggle('can-speak', shown);
     dom.speakBtn.textContent = reading ? STOP_SIGN : SPEAKER;
     dom.speakBtn.setAttribute('aria-pressed', String(reading));
-    dom.speakBtn.setAttribute('aria-label', 'Read the question aloud');
-    dom.speakBtn.title = reading ? 'Stop reading' : 'Read the question aloud';
+    dom.speakBtn.setAttribute('aria-label', t('speak.label'));
+    dom.speakBtn.title = reading ? t('speak.stop') : t('speak.label');
   }
 
   function startReading() {
@@ -4475,12 +4585,12 @@
     if (streakOnScreen()) {
       const cur = streak.current;
       if (cur.picked === null) return null; // a Streak question is reported once it is answered
-      return { id: cur.q.id, label: cur.q.category_name + ' ' + EN_DASH + ' ' + cur.q.points };
+      return { id: cur.q.id, label: runHeading(cur.q) };
     }
     if (dailyOnScreen()) { // Daily Challenge (US-43): also once answered, like the Streak
       if (daily.current.picked === null) return null;
       const q = dailyQuestion();
-      return { id: q.id, label: q.category_name + ' ' + EN_DASH + ' ' + q.points };
+      return { id: q.id, label: runHeading(q) };
     }
     if (finalOnScreen()) { // final round question (US-44), like an open board question
       const f = state.game.final;
@@ -4491,7 +4601,7 @@
     const active = activeQuestion(g);
     // A game saved before the board sent question ids has none to report.
     if (!Number.isInteger(active.question.id) || active.question.id < 1) return null;
-    return { id: active.question.id, label: active.catName + ' ' + EN_DASH + ' ' + active.points };
+    return { id: active.question.id, label: iso(active.catName) + ' ' + EN_DASH + ' ' + active.points };
   }
 
   /** Show Report only when there is a question to report; the heading then leaves room for it (CSS). */
@@ -4534,14 +4644,14 @@
   /** "N / 200": characters as the server counts them (an emoji is one). */
   function updateReportCount() {
     const length = Array.from(dom.reportNote.value.trim()).length;
-    dom.reportCount.textContent = length + ' / ' + REPORT_NOTE_MAX;
+    dom.reportCount.textContent = ltr(length + ' / ' + REPORT_NOTE_MAX); // BUG-13-01: "9 / 200" in Arabic too
     dom.reportCount.classList.toggle('is-full', length >= REPORT_NOTE_MAX);
   }
 
   function setReportSending(sending) {
     if (report) report.sending = sending;
     dom.reportSend.disabled = sending;
-    dom.reportSend.textContent = sending ? 'Sending...' : 'Send report';
+    dom.reportSend.textContent = sending ? t('report.sending') : t('report.send');
   }
 
   function checkedReason() {
@@ -4557,27 +4667,27 @@
     const reason = checkedReason();
     const note = dom.reportNote.value.trim();
     if (!reason) {
-      showMessage(dom.reportError, 'Choose what is wrong with the question.', 'error');
+      showMessage(dom.reportError, t('report.chooseReason'), 'error');
       dom.reportReasons[0].focus();
       return;
     }
     if (Array.from(note).length > REPORT_NOTE_MAX) {
-      showMessage(dom.reportError, 'The note can be at most ' + REPORT_NOTE_MAX + ' characters.', 'error');
+      showMessage(dom.reportError, t('report.noteTooLong', { max: REPORT_NOTE_MAX }), 'error');
       dom.reportNote.focus();
       return;
     }
     setReportSending(true);
-    let failure = '';
+    let failure = null;
     try {
       const saved = await apiPost('reports.php', { question_id: sent.questionId, reason: reason, note: note });
-      if (!isPlainObject(saved) || !Number.isInteger(saved.id)) throw new Error('The server sent an unexpected response.');
+      if (!isPlainObject(saved) || !Number.isInteger(saved.id)) throw textError('err.response');
     } catch (err) {
-      failure = errorText(err);
+      failure = err;
     }
     if (report !== sent) return; // closed meanwhile
     setReportSending(false);
     if (failure) {
-      showMessage(dom.reportError, 'The report could not be sent: ' + failure, 'error');
+      showMessage(dom.reportError, t('report.failed', { reason: errorText(failure) }), 'error');
       return;
     }
     dom.reportForm.hidden = true;
@@ -4594,6 +4704,114 @@
     dom.reportClose.addEventListener('click', closeReport);
   }
 
+  // ---------- Interface language (US-49) ----------
+  // The EN / AR switch in the header: js/i18n.js saves the choice on this device and sets the page's
+  // lang and dir; here the static texts are swapped and the screen on show is drawn again in the new
+  // language. Nothing saved changes (game, Streak run, Daily Challenge), a running timer keeps going,
+  // typed names and bets stay, and an open question keeps the language it is shown in.
+
+  /** The page's own texts (data-i18n), the switch's pressed button and the mode limits. */
+  function applyStaticTexts() {
+    i18n.apply(document);
+    const lang = i18n.lang();
+    dom.uiLangBtns.forEach((btn) => btn.setAttribute('aria-pressed', String(btn.getAttribute('data-ui-lang') === lang)));
+    Object.keys(MODES).forEach((key) => {
+      byId('mode-limit-' + key).textContent = t('mode.limit', { n: MODES[key].limit });
+    });
+    // Names are typed left to right or right to left by their own letters in the Arabic page.
+    if (i18n.isArabic()) dom.streakNameInput.dir = 'auto';
+    else dom.streakNameInput.removeAttribute('dir');
+  }
+
+  function onUiLangClick(event) {
+    i18n.setLang(event.currentTarget.getAttribute('data-ui-lang'));
+  }
+
+  function onLanguageChanged() {
+    applyStaticTexts();
+    refreshTexts(); // messages on screen that were made by a function
+    if (state.setup) refreshSetup(); // also while hidden: Back from the leaderboard shows it as it was
+    refreshScreen();
+  }
+
+  function refreshSetup() {
+    const s = state.setup;
+    renderEntries();
+    renderCategories();
+    renderPlayed();
+    if (s.loadErrorShown) {
+      const shown = s.loadErrorShown;
+      showLoadError(shown.text, shown.withRetry, shown.withAdminLink);
+    }
+  }
+
+  /** Draw the screen on show again; whatever the user typed or chose stays. */
+  function refreshScreen() {
+    const g = state.game;
+    if (g) renderGame(); // the board and scoreboard, also behind a question or Golden Goal
+    if (state.screen === 'question') {
+      refreshQuestion();
+    } else if (state.screen === 'final') {
+      refreshFinal();
+    } else if (state.screen === 'results') {
+      if (g) renderResults();
+    } else if (state.screen === 'leaderboard') {
+      renderLeaderboardHead(leaderboardResult);
+      renderLeaderboardTabs();
+      if (lastLeaderboard) {
+        renderLeaderboardRows(lastLeaderboard.rows, lastLeaderboard.result, lastLeaderboard.failure, lastLeaderboard.period);
+      } else {
+        showLeaderboardLoading(); // the rows on their way replace it
+      }
+    } else if (state.screen === 'daily' && daily) {
+      renderDailyTexts();
+      if (dailyTicker !== null) tickDailyCountdown();
+      else if (!dom.dailyPlay.hidden) dom.dailyNext.textContent = t('daily.ready');
+    }
+  }
+
+  /** The open question (board, Golden Goal, Streak or Daily Challenge), without touching its timer. */
+  function refreshQuestion() {
+    const g = state.game;
+    if (streakOnScreen()) {
+      renderRunHeading(streak.current.q);
+      renderStreakLang();
+      renderStreakPanel();
+    } else if (dailyOnScreen()) {
+      renderRunHeading(dailyQuestion());
+      renderRunLang(dailyQuestion(), daily.current, dailyAnswer);
+      renderDailyPanel();
+    } else if (finalOnScreen()) {
+      setFinalPanelTexts();
+      setGoalText(dom.qHeading, '', roundSuffix(g.final.round) + ' ' + EN_DASH + ' ' + iso(finalCategoryName(g.final)));
+      renderFinalLang();
+      renderFinalRows();
+    } else if (g && g.current) {
+      setScoringPanelTexts(scoringPanelText());
+      renderQuestionHeading(activeQuestion(g));
+      renderQuestionLang(activeQuestion(g).question);
+      renderScoringRows();
+    }
+    renderTimer();
+  }
+
+  /** The Golden Goal screen: the offer, or the bets without clearing what is being typed. */
+  function refreshFinal() {
+    const g = state.game;
+    const f = g && g.final;
+    if (!f) return;
+    if (f.stage === 'offer') {
+      renderFinal();
+      setFinalLoading(finalLoading);
+      return;
+    }
+    setGoalText(dom.finalTitle, '', roundSuffix(f.round));
+    dom.finalCategory.textContent = iso(finalCategoryName(f));
+    renderWagerList(g);
+    const c = nextWagerContestant(g);
+    if (c) renderWagerPrompt(g, c);
+  }
+
   // ---------- Startup ----------
 
   /** Fresh, empty setup with current settings (one empty entry, Players mode). */
@@ -4604,8 +4822,8 @@
     setTimerError('');
     clearMessage(dom.catError);
     clearMessage(dom.startMsg);
-    dom.startBtn.textContent = 'Start Game';
-    dom.streakBtn.textContent = 'Start Streak Challenge';
+    dom.startBtn.textContent = t('setup.start');
+    dom.streakBtn.textContent = t('streak.start');
     dom.streakNameInput.value = '';
     setFieldError(dom.streakNameInput, dom.streakNameError, '');
     renderEntries();
@@ -4656,6 +4874,8 @@
     bindDailyEvents();
     bindReportEvents();
     bindFinalEvents();
+    dom.uiLangBtns.forEach((btn) => btn.addEventListener('click', onUiLangClick)); // US-49
+    i18n.onChange(onLanguageChanged);
   }
 
   /** US-17: reopen the saved screen. An open question restarts its timer at full length (D-04). */
@@ -4683,9 +4903,7 @@
   }
 
   function init() {
-    Object.keys(MODES).forEach((key) => {
-      byId('mode-limit-' + key).textContent = '(max ' + MODES[key].limit + ')';
-    });
+    applyStaticTexts();
     bindEvents();
     initReadAloud();
     initApp();

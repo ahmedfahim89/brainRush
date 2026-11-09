@@ -9,7 +9,7 @@
 // POST   /api/questions.php?played=1                 body { categories: "3,1,2", seen?: [id, ...] }
 //                                                          -> { played, total } for the setup progress bar
 // POST   /api/questions.php?random=1                 body { exclude?: [id, ...], seen?: [id, ...] }
-//                                                          -> { category: {id, name}, points, question }
+//                                                          -> { category: {id, name, name_ar}, points, question }
 //                                                          for the Swap helper (US-32); 409 if none left
 // POST   /api/questions.php?streak=1                 body { exclude?: [id, ...], seen?: [id, ...] }
 //                                                          -> { questions: [streak_question(), ...] }, up to
@@ -33,6 +33,10 @@
 // Kilo Meshakkal (US-53 / D-53): the board's `categories` may also list MIX_ID (-1) once. It is a
 // built-in column with no row in `categories`: each of its cells is a random question from any
 // playable category at that value (see mix_column()), and carries its source `category_name`.
+//
+// Arabic category names: every category the game shows also carries its optional Arabic name
+// (categories.name_ar, null when none): `name_ar` on a board column and the Swap's category,
+// `category_name_ar` next to `category_name` (Kilo Meshakkal cells, Streak and Daily questions).
 require_once __DIR__ . '/db.php';
 
 const QUESTION_TEXT_MAX = 5000;
@@ -310,7 +314,7 @@ function random_key(array $items)
 }
 
 /**
- * Board payload: { points: [...asc], categories: [{id, name, questions: {<points>: board_cell()}}] }
+ * Board payload: { points: [...asc], categories: [{id, name, name_ar, questions: {<points>: board_cell()}}] }
  * Every cell (category x point value) gets one random question from that cell's unseen
  * questions (US-30); when all of them are in $seen (oldest first), the one seen longest
  * ago. Cells hold different questions, so a board never repeats one.
@@ -352,6 +356,7 @@ function category_columns(PDO $pdo, array $ids, array $points, array $seenRank):
     if ($unknown) {
         bad_request('Unknown category id(s): ' . implode(', ', $unknown));
     }
+    $namesAr = arabic_names($pdo);
 
     $stmt = $pdo->prepare(
         'SELECT ' . CELL_COLUMNS . " FROM questions WHERE category_id IN ($placeholders) ORDER BY id ASC"
@@ -378,9 +383,21 @@ function category_columns(PDO $pdo, array $ids, array $points, array $seenRank):
             bad_request("Category \"{$names[$id]}\" is missing questions for: " . implode(', ', $missing));
         }
         // Cast to object so it always encodes as a JSON object keyed by points.
-        $categories[] = ['id' => $id, 'name' => $names[$id], 'questions' => (object) $questions];
+        $categories[] = [
+            'id'        => $id,
+            'name'      => $names[$id],
+            'name_ar'   => $namesAr[$id] ?? null,
+            'questions' => (object) $questions,
+        ];
     }
     return $categories;
+}
+
+/** Arabic names of the categories that have one (categories.name_ar not blank), keyed by id. */
+function arabic_names(PDO $pdo): array
+{
+    return $pdo->query("SELECT id, name_ar FROM categories WHERE TRIM(COALESCE(name_ar, '')) <> ''")
+        ->fetchAll(PDO::FETCH_KEY_PAIR);
 }
 
 /** Names of the playable categories (PLAYABLE_HAVING, as categories.php?playable=1), keyed by id. */
@@ -396,8 +413,8 @@ function playable_names(PDO $pdo): array
 }
 
 /**
- * The Kilo Meshakkal column (US-53 / D-53): {id: MIX_ID, name: MIX_NAME, mix: true, questions:
- * {<points>: board_cell() + category_name}}. Each cell is a question at that value from any playable
+ * The Kilo Meshakkal column (US-53 / D-53): {id: MIX_ID, name: MIX_NAME, name_ar: null (the game
+ * has its Arabic name), mix: true, questions: {<points>: board_cell() + category_name + category_name_ar}}. Each cell is a question at that value from any playable
  * category, never one of $exclude (the questions already on the board). For each value it prefers a
  * category not used yet in this column (so the cells spread over different topics), then one that
  * still has an unseen question there (US-30), and draws by the board rule (draw_from_pool). The
@@ -407,7 +424,7 @@ function playable_names(PDO $pdo): array
  */
 function mix_column(PDO $pdo, array $points, array $exclude, array $seenRank): array
 {
-    $column = ['id' => MIX_ID, 'name' => MIX_NAME, 'mix' => true, 'questions' => (object) []];
+    $column = ['id' => MIX_ID, 'name' => MIX_NAME, 'name_ar' => null, 'mix' => true, 'questions' => (object) []];
     if (!$points) {
         return $column; // no enabled point value: no rows, as for the other columns
     }
@@ -463,20 +480,24 @@ function mix_column(PDO $pdo, array $points, array $exclude, array $seenRank): a
     foreach ($stmt->fetchAll() as $r) {
         $rows[(int) $r['id']] = $r;
     }
+    $namesAr = arabic_names($pdo);
     $questions = [];
     foreach ($points as $p) {
         [$id, $categoryId] = $picked[$p];
         if (!isset($rows[$id])) { // deleted by the admin a moment ago
             conflict('The questions changed meanwhile. Please try again.');
         }
-        $questions[$p] = board_cell($rows[$id]) + ['category_name' => $names[$categoryId]];
+        $questions[$p] = board_cell($rows[$id]) + [
+            'category_name'    => $names[$categoryId],
+            'category_name_ar' => $namesAr[$categoryId] ?? null,
+        ];
     }
     $column['questions'] = (object) $questions;
     return $column;
 }
 
 /**
- * Swap helper (US-32): { category: {id, name}, points, question: board_cell() } from the whole
+ * Swap helper (US-32): { category: {id, name, name_ar}, points, question: board_cell() } from the whole
  * bank. A random playable category (PLAYABLE_HAVING, as categories.php?playable=1), then a random
  * enabled point value of it, then that cell's question by the board rule (draw_from_pool).
  * Excluded ids (the questions on the running board) are never drawn. Cells that still have an
@@ -528,7 +549,11 @@ function random_question(PDO $pdo, array $exclude, array $seen): array
         conflict('The question changed meanwhile. Please try again.');
     }
     return [
-        'category' => ['id' => $categoryId, 'name' => $names[$categoryId]],
+        'category' => [
+            'id'      => $categoryId,
+            'name'    => $names[$categoryId],
+            'name_ar' => arabic_names($pdo)[$categoryId] ?? null,
+        ],
         'points'   => $points,
         'question' => board_cell($row),
     ];
@@ -546,6 +571,7 @@ function streak_batch(PDO $pdo, array $exclude, array $seen): array
     $seenRank = array_flip($seen);
     $excluded = array_flip($exclude);
     $names = $pdo->query('SELECT id, name FROM categories')->fetchAll(PDO::FETCH_KEY_PAIR);
+    $namesAr = arabic_names($pdo);
     $rows = $pdo->query(
         'SELECT ' . CELL_COLUMNS . ' FROM questions
           WHERE points IN (SELECT points FROM point_values WHERE enabled = 1) ORDER BY id ASC'
@@ -574,20 +600,25 @@ function streak_batch(PDO $pdo, array $exclude, array $seen): array
         $kind = $r['image'] === '' ? 'text' : 'picture';
         $choices = streak_choices($r, [$byCategory[$kind][(int) $r['category_id']], $byKind[$kind]]);
         if ($choices !== null) {
-            $batch[] = streak_question($r, $names[(int) $r['category_id']] ?? '', $choices);
+            $categoryId = (int) $r['category_id'];
+            $batch[] = streak_question($r, $names[$categoryId] ?? '', $choices, $namesAr[$categoryId] ?? null);
         }
     }
     return $batch;
 }
 
-/** A streak question: the board_cell() fields it needs, its category and points, the choices and `correct`. */
-function streak_question(array $r, string $categoryName, array $choices): array
+/**
+ * A streak question: the board_cell() fields it needs, its category (and the category's Arabic name,
+ * null when none) and points, the choices and `correct`.
+ */
+function streak_question(array $r, string $categoryName, array $choices, ?string $categoryNameAr = null): array
 {
     $cell = board_cell($r);
     return [
-        'id'            => $cell['id'],
-        'category_name' => $categoryName,
-        'points'        => (int) $r['points'],
+        'id'               => $cell['id'],
+        'category_name'    => $categoryName,
+        'category_name_ar' => $categoryNameAr === null || trim($categoryNameAr) === '' ? null : $categoryNameAr,
+        'points'           => (int) $r['points'],
         'question'      => $cell['question'],
         'question_ar'   => has_arabic($r) ? $cell['question_ar'] : null,
         'image'         => $cell['image'],
