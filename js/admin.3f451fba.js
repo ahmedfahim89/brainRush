@@ -45,7 +45,7 @@
   const state = {
     settings: null,    // { categories_per_game, timer_seconds, banner_enabled, banner_text, ..., ads_enabled, ads_client, ads_slot }
     points: [],        // [{ id, points, enabled, question_count }] ascending
-    categories: [],    // [{ id, name, question_count }] sorted by name
+    categories: [],    // [{ id, name, name_ar, question_count }] sorted by name; name_ar = Arabic name or null
     questions: [],     // [{ id, category_id, category_name, points, question, answer, question_ar, answer_ar, image, image_credit,
                        //    wrong_1, wrong_2, wrong_1_ar, wrong_2_ar, attempts, percent_correct,
                        //    stats: {correct, wrong, nobody, timeout} }]; the stats fields are null without
@@ -61,6 +61,7 @@
     openLog: null,     // name of the log file shown in the viewer, or null
     renamingId: null,  // category currently being renamed inline
     renameDraft: '',
+    renameDraftAr: '', // the Arabic name being typed in the rename row
     editing: null,     // question being edited, or null when the form is in "add" mode
     filtersDefaulted: false, // question filters start on the first category and lowest points, once
   };
@@ -89,6 +90,7 @@
     pointsList: byId('points-list'),
     categoryForm: byId('category-form'),
     categoryNew: byId('category-new'),
+    categoryNewAr: byId('category-new-ar'),
     categoriesMsg: byId('categories-msg'),
     categoriesSummary: byId('categories-summary'),
     categoriesBody: byId('categories-body'),
@@ -534,7 +536,7 @@
     clear(dom.categoriesBody);
     if (!state.categories.length) {
       dom.categoriesBody.appendChild(h('tr', {}, [
-        h('td', { className: 'empty-row', colSpan: 4, text: 'No categories yet.' }),
+        h('td', { className: 'empty-row', colSpan: 5, text: 'No categories yet.' }),
       ]));
       return null;
     }
@@ -568,9 +570,17 @@
     ];
   }
 
+  /** The Arabic name cell: right to left, or "-" when the category has none. */
+  function arabicNameCell(c) {
+    return c.name_ar
+      ? h('td', { className: 'name-cell', dir: 'rtl', lang: 'ar', text: c.name_ar })
+      : h('td', { className: 'name-cell', text: '-' });
+  }
+
   function categoryRow(c) {
     return h('tr', {}, [
       h('td', { className: 'name-cell', text: c.name }),
+      arabicNameCell(c),
     ].concat(categoryCells(c), [
       h('td', { className: 'row-actions' }, [
         h('button', {
@@ -599,20 +609,33 @@
       maxLength: 100,
       'aria-label': 'New name for category ' + c.name,
     });
+    const inputAr = h('input', {
+      type: 'text',
+      className: 'rename-input',
+      value: state.renameDraftAr,
+      maxLength: 100,
+      dir: 'rtl',
+      lang: 'ar',
+      autocomplete: 'off',
+      placeholder: 'Arabic name (optional)',
+      'aria-label': 'Arabic name for category ' + c.name + ' (optional)',
+    });
     const save = h('button', { type: 'button', className: 'btn btn-small btn-primary', text: 'Save' });
     const cancel = h('button', { type: 'button', className: 'btn btn-small', text: 'Cancel', onclick: cancelRename });
-    save.onclick = () => saveRename(c, input, save);
+    save.onclick = () => saveRename(c, input, inputAr, save);
     input.addEventListener('input', () => { state.renameDraft = input.value; });
-    input.addEventListener('keydown', (event) => {
+    inputAr.addEventListener('input', () => { state.renameDraftAr = inputAr.value; });
+    [input, inputAr].forEach((field) => field.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
         event.preventDefault();
-        saveRename(c, input, save);
+        saveRename(c, input, inputAr, save);
       } else if (event.key === 'Escape') {
         cancelRename();
       }
-    });
+    }));
     const tr = h('tr', { className: 'is-editing' }, [
       h('td', { className: 'name-cell' }, [input]),
+      h('td', { className: 'name-cell' }, [inputAr]),
     ].concat(categoryCells(c), [
       h('td', { className: 'row-actions' }, [save, cancel]),
     ]));
@@ -623,6 +646,7 @@
     clearMessage(dom.categoriesMsg);
     state.renamingId = c.id;
     state.renameDraft = c.name;
+    state.renameDraftAr = c.name_ar || '';
     const input = renderCategories();
     if (input) {
       input.focus();
@@ -636,22 +660,27 @@
     renderCategories();
   }
 
-  function saveRename(c, input, saveButton) {
+  /** Save the rename row: the English name (required) and the optional Arabic name. */
+  function saveRename(c, input, inputAr, saveButton) {
     const name = input.value.trim();
+    const nameAr = inputAr.value.trim();
     if (!name) {
       showError(dom.categoriesMsg, 'Category name is required.');
       input.focus();
       return;
     }
-    if (name === c.name) {
+    const renamed = name !== c.name;
+    if (!renamed && nameAr === (c.name_ar || '')) {
       cancelRename();
       return;
     }
     runAction(dom.categoriesMsg, [saveButton], async () => {
-      await api('categories.php?id=' + encodeURIComponent(c.id), 'PUT', { name: name });
+      await api('categories.php?id=' + encodeURIComponent(c.id), 'PUT', { name: name, name_ar: nameAr });
       state.renamingId = null;
       await refreshData();
-      showSuccess(dom.categoriesMsg, 'Category renamed to "' + name + '".');
+      showSuccess(dom.categoriesMsg, renamed
+        ? 'Category renamed to "' + name + '".'
+        : 'Arabic name of "' + name + '" saved.');
     });
   }
 
@@ -665,8 +694,9 @@
     }
     const submit = dom.categoryForm.querySelector('button[type="submit"]');
     runAction(dom.categoriesMsg, [submit], async () => {
-      await api('categories.php', 'POST', { name: name });
+      await api('categories.php', 'POST', { name: name, name_ar: dom.categoryNewAr.value.trim() });
       dom.categoryNew.value = '';
+      dom.categoryNewAr.value = '';
       await refreshData();
       showSuccess(dom.categoriesMsg, 'Category "' + name + '" added.');
     });

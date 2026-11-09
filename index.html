@@ -48,28 +48,32 @@
   <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="css/style.4a59deab.css">
+  <link rel="stylesheet" href="css/style.4958c2c2.css">
+  <!-- Interface language (US-49): loaded first, so an Arabic page is right to left from its first paint -->
+  <script src="js/i18n.6f7ba094.js"></script>
 </head>
 <body class="game">
   <header class="page-header">
     <h1><img class="brand-logo" src="img/logo.svg" alt="" width="36" height="36">BrainRush</h1>
-    <nav><a class="nav-link" href="how-to-play.html" target="_blank" rel="noopener">How to play</a> &middot; <a class="nav-link" href="terms.html" target="_blank" rel="noopener">Terms</a> &middot; <a class="nav-link" href="privacy.html" target="_blank" rel="noopener">Privacy</a> &middot; <a class="nav-link" href="admin.html">Admin</a></nav>
+    <nav><a class="nav-link" href="how-to-play.html" target="_blank" rel="noopener" data-i18n="nav.howToPlay">How to play</a> &middot; <a class="nav-link" href="terms.html" target="_blank" rel="noopener" data-i18n="nav.terms">Terms</a> &middot; <a class="nav-link" href="privacy.html" target="_blank" rel="noopener" data-i18n="nav.privacy">Privacy</a> &middot; <a class="nav-link" href="admin.html" data-i18n="nav.admin">Admin</a></nav>
+    <!-- Interface language (US-49): EN / AR, saved on this device; each button is named in its own language -->
+    <div class="ui-lang" role="group" aria-label="Language" data-i18n-attr="aria-label:lang.group"><button type="button" class="ui-lang-btn" data-ui-lang="en" lang="en" aria-label="English" aria-pressed="true">EN</button><button type="button" class="ui-lang-btn" data-ui-lang="ar" lang="ar" aria-label="العربية" aria-pressed="false">عربي</button></div>
   </header>
 
   <!-- Maintenance mode: shown when the admin hides the Start Game button (Admin > Game settings) -->
   <div id="maintenance-overlay" class="maintenance-overlay" role="alertdialog" aria-modal="true" aria-labelledby="maintenance-text" hidden>
     <div class="maintenance-card">
       <img class="maintenance-img" src="img/maintenance.jpg" alt="" width="1024" height="559">
-      <p id="maintenance-text">Poor AI agents are working late tonight to deliver the cool features you asked for. The game will be playable again within 24 hours.</p>
+      <p id="maintenance-text" data-i18n="maintenance.text">Poor AI agents are working late tonight to deliver the cool features you asked for. The game will be playable again within 24 hours.</p>
     </div>
   </div>
 
   <!-- Double score (D-40): shown when the host opens the game's hidden double-score cell -->
   <div id="double-overlay" class="double-overlay" role="alertdialog" aria-modal="true" aria-labelledby="double-title" aria-describedby="double-text" hidden>
     <div class="double-card">
-      <p id="double-title" class="double-title">&times;2 Double score!</p>
+      <p id="double-title" class="double-title" data-i18n="double.title">&times;2 Double score!</p>
       <p id="double-text"></p>
-      <button type="button" id="double-ok" class="btn btn-primary btn-large">Let's play</button>
+      <button type="button" id="double-ok" class="btn btn-primary btn-large" data-i18n="double.ok">Let's play</button>
     </div>
   </div>
 
@@ -77,32 +81,32 @@
        the timer or changes the score; only the question id, reason, note and time are saved. -->
   <div id="report-overlay" class="report-overlay" role="dialog" aria-modal="true" aria-labelledby="report-title" aria-describedby="report-about" hidden>
     <div class="report-card">
-      <h2 id="report-title" class="report-title">Report this question</h2>
+      <h2 id="report-title" class="report-title" data-i18n="report.title">Report this question</h2>
       <p id="report-about" class="hint report-about"></p>
       <form id="report-form" novalidate>
         <fieldset class="report-reasons">
-          <legend>What is wrong?</legend>
-          <label class="report-reason"><input type="radio" name="report-reason" value="wrong_answer"> Wrong answer</label>
-          <label class="report-reason"><input type="radio" name="report-reason" value="typo"> Typo</label>
-          <label class="report-reason"><input type="radio" name="report-reason" value="translation"> Translation</label>
-          <label class="report-reason"><input type="radio" name="report-reason" value="outdated"> Outdated</label>
-          <label class="report-reason"><input type="radio" name="report-reason" value="picture"> Picture problem</label>
-          <label class="report-reason"><input type="radio" name="report-reason" value="other"> Other</label>
+          <legend data-i18n="report.legend">What is wrong?</legend>
+          <label class="report-reason"><input type="radio" name="report-reason" value="wrong_answer"> <span data-i18n="report.reason.wrong_answer">Wrong answer</span></label>
+          <label class="report-reason"><input type="radio" name="report-reason" value="typo"> <span data-i18n="report.reason.typo">Typo</span></label>
+          <label class="report-reason"><input type="radio" name="report-reason" value="translation"> <span data-i18n="report.reason.translation">Translation</span></label>
+          <label class="report-reason"><input type="radio" name="report-reason" value="outdated"> <span data-i18n="report.reason.outdated">Outdated</span></label>
+          <label class="report-reason"><input type="radio" name="report-reason" value="picture"> <span data-i18n="report.reason.picture">Picture problem</span></label>
+          <label class="report-reason"><input type="radio" name="report-reason" value="other"> <span data-i18n="report.reason.other">Other</span></label>
         </fieldset>
-        <label for="report-note">Note (optional)</label>
+        <label for="report-note" data-i18n="report.note">Note (optional)</label>
         <textarea id="report-note" class="report-note" rows="2" maxlength="200" dir="auto" autocomplete="off" aria-describedby="report-note-count report-privacy"></textarea>
         <p id="report-note-count" class="hint report-count" aria-live="polite">0 / 200</p>
-        <p id="report-privacy" class="hint report-privacy">Only the question, the reason, your note and the time are saved: no name.</p>
+        <p id="report-privacy" class="hint report-privacy" data-i18n="report.privacy">Only the question, the reason, your note and the time are saved: no name.</p>
         <p id="report-error" class="msg msg-error" role="alert" hidden></p>
         <div class="actions">
-          <button type="submit" id="report-send" class="btn btn-primary">Send report</button>
-          <button type="button" id="report-cancel" class="btn">Cancel</button>
+          <button type="submit" id="report-send" class="btn btn-primary" data-i18n="report.send">Send report</button>
+          <button type="button" id="report-cancel" class="btn" data-i18n="report.cancel">Cancel</button>
         </div>
       </form>
       <div id="report-done" class="report-done" hidden>
-        <p class="msg msg-success">Thank you! Your report was sent to the admin.</p>
+        <p class="msg msg-success" data-i18n="report.thanks">Thank you! Your report was sent to the admin.</p>
         <div class="actions">
-          <button type="button" id="report-close" class="btn btn-primary">Close</button>
+          <button type="button" id="report-close" class="btn btn-primary" data-i18n="report.close">Close</button>
         </div>
       </div>
     </div>
@@ -113,32 +117,32 @@
     <section id="screen-setup" class="screen setup" aria-labelledby="setup-title">
       <!-- "New questions" banner: text and on/off are set in Admin > Game settings -->
       <p id="new-banner" class="new-banner" role="status" hidden></p>
-      <h2 id="setup-title">New game</h2>
+      <h2 id="setup-title" data-i18n="setup.title">New game</h2>
       <!-- Home intro (D-42): visible text that tells players and search engines what BrainRush is -->
-      <p class="site-intro">Free Jeopardy-style trivia quiz game for parties, classrooms and family nights: questions in English and Arabic, players or teams on one shared screen. <a href="how-to-play.html" target="_blank" rel="noopener">How to play</a></p>
+      <p class="site-intro"><span data-i18n="setup.intro">Free Jeopardy-style trivia quiz game for parties, classrooms and family nights: questions in English and Arabic, players or teams on one shared screen.</span> <a href="how-to-play.html" target="_blank" rel="noopener" data-i18n="nav.howToPlay">How to play</a></p>
       <div id="setup-load-msg" class="msg" role="alert" hidden></div>
 
       <form id="setup-form" novalidate>
         <fieldset id="players-block" class="setup-block">
-          <legend>Who is playing?</legend>
+          <legend data-i18n="setup.who">Who is playing?</legend>
           <div class="mode-row">
-            <div class="mode-toggle" role="radiogroup" aria-label="Play mode">
+            <div class="mode-toggle" role="radiogroup" aria-label="Play mode" data-i18n-attr="aria-label:setup.playMode">
               <label class="mode-option">
                 <input type="radio" name="mode" value="players" checked>
-                <span>Players <small id="mode-limit-players" class="mode-limit"></small></span>
+                <span><span data-i18n="mode.players">Players</span> <small id="mode-limit-players" class="mode-limit"></small></span>
               </label>
               <label class="mode-option">
                 <input type="radio" name="mode" value="teams">
-                <span>Teams <small id="mode-limit-teams" class="mode-limit"></small></span>
+                <span><span data-i18n="mode.teams">Teams</span> <small id="mode-limit-teams" class="mode-limit"></small></span>
               </label>
             </div>
             <!-- Streak Challenge (US-33): Players mode with exactly 1 player; next to the mode
                  toggle so it is seen without scrolling, also on small screens -->
-            <button type="button" id="streak-open-btn" class="btn btn-streak" hidden>💀 Sudden Death Streak <small class="mode-limit">(solo)</small></button>
+            <button type="button" id="streak-open-btn" class="btn btn-streak" hidden>💀 <span data-i18n="streak.openBtn">Sudden Death Streak</span> <small class="mode-limit" data-i18n="streak.solo">(solo)</small></button>
             <!-- Daily Challenge (US-43, D-46): the same questions for everyone today, with the setup timer -->
-            <button type="button" id="daily-open-btn" class="btn btn-daily" hidden><span aria-hidden="true">📅</span> <span id="daily-open-label">Daily Challenge</span></button>
+            <button type="button" id="daily-open-btn" class="btn btn-daily" hidden><span aria-hidden="true">📅</span> <span id="daily-open-label" data-i18n="daily.name">Daily Challenge</span></button>
           </div>
-          <p class="hint">Click a color circle to switch to the next free color.</p>
+          <p class="hint" data-i18n="setup.colorHint">Click a color circle to switch to the next free color.</p>
           <ol id="entry-list" class="entry-list"></ol>
           <p id="entry-limit-msg" class="msg msg-error" role="alert" hidden></p>
           <button type="button" id="entry-add" class="btn">Add player</button>
@@ -146,17 +150,17 @@
 
         <!-- Streak Challenge (US-33): replaces the player row and the category picker while chosen -->
         <fieldset id="streak-block" class="setup-block" hidden>
-          <legend>Streak Challenge</legend>
-          <p class="hint">Questions come from every category. Pick 1 of 3 answers before the time runs out: one wrong answer or time's up ends the run. Your streak goes on the shared leaderboard with your name.</p>
+          <legend data-i18n="streak.legend">Streak Challenge</legend>
+          <p class="hint" data-i18n="streak.setupHint">Questions come from every category. Pick 1 of 3 answers before the time runs out: one wrong answer or time's up ends the run. Your streak goes on the shared leaderboard with your name.</p>
           <div class="field streak-name-field">
-            <label for="streak-name">Challenger name</label>
+            <label for="streak-name" data-i18n="streak.nameLabel">Challenger name</label>
             <input id="streak-name" type="text" maxlength="30" autocomplete="off" aria-describedby="streak-name-error">
             <p id="streak-name-error" class="field-error" hidden></p>
           </div>
           <div class="actions">
-            <button type="button" id="streak-cancel" class="btn">Back to a normal game</button>
+            <button type="button" id="streak-cancel" class="btn" data-i18n="streak.cancel">Back to a normal game</button>
             <!-- US-34: the only way to the leaderboard from setup -->
-            <button type="button" id="streak-board-btn" class="btn btn-leaderboard"><span aria-hidden="true">🏆</span> Streak leaderboard</button>
+            <button type="button" id="streak-board-btn" class="btn btn-leaderboard"><span aria-hidden="true">🏆</span> <span data-i18n="streak.leaderboard">Streak leaderboard</span></button>
           </div>
         </fieldset>
 
@@ -170,33 +174,33 @@
 
         <div class="setup-pair">
           <fieldset class="setup-block">
-            <legend>Timer</legend>
-            <label for="timer-input">Seconds per question (this game only)</label>
+            <legend data-i18n="timer.legend">Timer</legend>
+            <label for="timer-input" data-i18n="timer.label">Seconds per question (this game only)</label>
             <input id="timer-input" class="timer-input" type="number" min="5" max="600" step="1" aria-describedby="timer-error">
             <p id="timer-error" class="field-error" hidden></p>
             <!-- Read aloud (US-48): an on-device choice (saved in this browser); hidden when the browser has no speech -->
             <div id="read-aloud-field" class="read-aloud-field" hidden>
               <label class="check-label" for="read-aloud">
                 <input id="read-aloud" type="checkbox" aria-describedby="read-aloud-hint">
-                Read questions automatically
+                <span data-i18n="readAloud.label">Read questions automatically</span>
               </label>
-              <p id="read-aloud-hint" class="hint">On this device, when a question opens. The &#128266; button on a question reads it any time.</p>
+              <p id="read-aloud-hint" class="hint" data-i18n="readAloud.hint">On this device, when a question opens. The &#128266; button on a question reads it any time.</p>
             </div>
           </fieldset>
 
           <fieldset class="setup-block">
-            <legend>Played questions</legend>
-            <div id="played-track" class="played-track" role="progressbar" aria-label="Questions played"
+            <legend data-i18n="played.legend">Played questions</legend>
+            <div id="played-track" class="played-track" role="progressbar" aria-label="Questions played" data-i18n-attr="aria-label:played.bar"
                  aria-valuemin="0" aria-valuemax="100"><div id="played-bar" class="played-bar"></div></div>
             <p id="played-count" class="hint" aria-live="polite"></p>
-            <button type="button" id="played-reset" class="btn" hidden>Forget played questions</button>
+            <button type="button" id="played-reset" class="btn" hidden data-i18n="played.reset">Forget played questions</button>
           </fieldset>
         </div>
 
         <div class="actions start-row">
-          <button type="submit" id="start-btn" class="btn btn-primary btn-large" disabled>Start Game</button>
+          <button type="submit" id="start-btn" class="btn btn-primary btn-large" disabled data-i18n="setup.start">Start Game</button>
           <!-- Streak Challenge (US-33): takes Start Game's place while the streak setup is open -->
-          <button type="button" id="streak-btn" class="btn btn-primary btn-large" hidden>Start Streak Challenge</button>
+          <button type="button" id="streak-btn" class="btn btn-primary btn-large" hidden data-i18n="streak.start">Start Streak Challenge</button>
         </div>
         <p id="start-msg" class="msg msg-error" role="alert" hidden></p>
       </form>
@@ -205,18 +209,18 @@
     <!-- Board + scoreboard (US-07, US-08, US-09, US-10) -->
     <section id="screen-board" class="screen" aria-labelledby="board-title" hidden>
       <div class="board-bar">
-        <h2 id="board-title" class="visually-hidden">Game board</h2>
+        <h2 id="board-title" class="visually-hidden" data-i18n="board.title">Game board</h2>
         <p id="board-info" class="hint board-info"></p>
-        <button type="button" id="end-btn" class="btn btn-end">End Game</button>
+        <button type="button" id="end-btn" class="btn btn-end" data-i18n="board.end">End Game</button>
       </div>
       <!-- US-10 / D-01: shown when every cell of the board has been played -->
       <div id="board-done" class="board-done" role="status" hidden>
         <p id="board-done-text" class="board-done-text"></p>
-        <button type="button" id="board-done-btn" class="btn btn-primary btn-large">End Game and show results</button>
+        <button type="button" id="board-done-btn" class="btn btn-primary btn-large" data-i18n="board.doneBtn">End Game and show results</button>
       </div>
       <div id="board" class="board"></div>
       <section class="scoreboard" aria-labelledby="scoreboard-title">
-        <h2 id="scoreboard-title" class="visually-hidden">Scoreboard</h2>
+        <h2 id="scoreboard-title" class="visually-hidden" data-i18n="board.scoreboard">Scoreboard</h2>
         <ul id="scoreboard" class="scoreboard-list"></ul>
       </section>
     </section>
@@ -231,32 +235,32 @@
                Streak question -->
           <div class="question-tools">
             <button type="button" id="speak-btn" class="btn btn-small speak-btn" aria-pressed="false" hidden></button>
-            <button type="button" id="report-btn" class="btn btn-small report-btn" aria-label="Report a problem with this question" aria-haspopup="dialog" hidden>Report</button>
+            <button type="button" id="report-btn" class="btn btn-small report-btn" aria-label="Report a problem with this question" aria-haspopup="dialog" hidden data-i18n="report.button" data-i18n-attr="aria-label:report.buttonLabel">Report</button>
           </div>
           <!-- Picture questions only; the generic alt text must not give the answer away -->
-          <img id="question-image" class="question-image" alt="Question picture" hidden>
+          <img id="question-image" class="question-image" alt="Question picture" hidden data-i18n-attr="alt:question.picture">
           <!-- Photo credit of the picture (e.g. CC BY-SA attribution); empty credit = no caption -->
           <p id="question-credit" class="question-credit" dir="ltr" lang="en" hidden></p>
           <p id="question-text" class="question-text"></p>
           <button type="button" id="lang-btn" class="btn lang-btn" hidden></button>
           <!-- "3 choices" helper (US-32): the answer and two wrong options, A/B/C, in the question's language -->
-          <ol id="question-choices" class="question-choices" aria-label="Choices" hidden></ol>
+          <ol id="question-choices" class="question-choices" aria-label="Choices" hidden data-i18n-attr="aria-label:question.choices"></ol>
 
           <div id="timer" class="timer" role="timer" aria-labelledby="timer-label">
-            <span id="timer-label" class="visually-hidden">Seconds left</span>
+            <span id="timer-label" class="visually-hidden" data-i18n="timer.secondsLeft">Seconds left</span>
             <span id="timer-value" class="timer-value"></span>
             <div class="timer-track" aria-hidden="true"><div id="timer-bar" class="timer-bar"></div></div>
             <div class="timer-controls">
-              <button type="button" id="timer-pause" class="btn">Pause</button>
-              <button type="button" id="timer-reset" class="btn">Reset</button>
+              <button type="button" id="timer-pause" class="btn" data-i18n="timer.pause">Pause</button>
+              <button type="button" id="timer-reset" class="btn" data-i18n="timer.reset">Reset</button>
             </div>
             <p id="timer-status" class="timer-status" aria-live="polite"></p>
           </div>
 
           <div class="answer-block">
-            <button type="button" id="answer-btn" class="btn btn-primary">Show Answer</button>
+            <button type="button" id="answer-btn" class="btn btn-primary" data-i18n="answer.show">Show Answer</button>
             <p id="answer-text" class="answer-text" tabindex="-1" hidden>
-              <span class="answer-label">Answer</span>
+              <span class="answer-label" data-i18n="answer.label">Answer</span>
               <span id="answer-value"></span>
             </p>
           </div>
@@ -264,27 +268,27 @@
 
         <section class="scoring" aria-labelledby="scoring-title">
           <!-- game.js sets the final round's title and hint (US-44) and puts these back -->
-          <h3 id="scoring-title">Scoring</h3>
-          <p id="scoring-hint" class="hint">Each player or team can be scored once. Only one can be correct.
+          <h3 id="scoring-title" data-i18n="scoring.title">Scoring</h3>
+          <p id="scoring-hint" class="hint" data-i18n="scoring.hint">Each player or team can be scored once. Only one can be correct.
             Helpers, once per game before anyone is scored: ABC 3 choices, &#8644; swap, &frac12; skip for half the points.</p>
           <p id="helper-msg" class="msg msg-error" role="alert" hidden></p>
           <ul id="score-rows" class="score-rows"></ul>
-          <button type="button" id="back-btn" class="btn btn-primary btn-large btn-block">Back to Board</button>
+          <button type="button" id="back-btn" class="btn btn-primary btn-large btn-block" data-i18n="scoring.back">Back to Board</button>
         </section>
 
         <!-- Streak Challenge (US-33) and Daily Challenge (US-43): replaces the scoring panel while a run is
              played; game.js sets the texts of the Daily Challenge (title, "Question 2/3", hint) -->
         <section id="streak-panel" class="streak-panel" aria-labelledby="streak-panel-title" hidden>
-          <h3 id="streak-panel-title" class="visually-hidden">Streak Challenge</h3>
+          <h3 id="streak-panel-title" class="visually-hidden" data-i18n="streak.legend">Streak Challenge</h3>
           <div class="streak-head">
             <p id="streak-run-name" class="streak-name"></p>
-            <p class="streak-count-line"><span id="streak-count-label">Streak</span> <span id="streak-count" class="streak-count" aria-live="polite"></span></p>
+            <p class="streak-count-line"><span id="streak-count-label" data-i18n="streak.count">Streak</span> <span id="streak-count" class="streak-count" aria-live="polite"></span></p>
           </div>
-          <p id="streak-hint" class="hint">Pick the right answer before the time runs out. One wrong answer ends the run.</p>
-          <ol id="streak-choices" class="streak-choices" aria-label="Choices"></ol>
+          <p id="streak-hint" class="hint" data-i18n="streak.hint">Pick the right answer before the time runs out. One wrong answer ends the run.</p>
+          <ol id="streak-choices" class="streak-choices" aria-label="Choices" data-i18n-attr="aria-label:question.choices"></ol>
           <p id="streak-feedback" class="streak-feedback" role="status" aria-live="polite"></p>
-          <button type="button" id="streak-next" class="btn btn-primary btn-large btn-block" hidden>Next question</button>
-          <button type="button" id="streak-end" class="btn btn-end btn-block">End run</button>
+          <button type="button" id="streak-next" class="btn btn-primary btn-large btn-block" hidden data-i18n="run.next">Next question</button>
+          <button type="button" id="streak-end" class="btn btn-end btn-block" data-i18n="streak.end">End run</button>
         </section>
       </div>
     </section>
@@ -295,100 +299,100 @@
          and the wager as their "bet" (D-50); the ball is decorative (aria-hidden). game.js sets the
          title and the lead per round. -->
     <section id="screen-final" class="screen final" aria-labelledby="final-title" hidden>
-      <h2 id="final-title" tabindex="-1">Golden Goal <span aria-hidden="true">&#9917;</span></h2>
+      <h2 id="final-title" tabindex="-1"><span data-i18n="final.name">Golden Goal</span> <span aria-hidden="true">&#9917;</span></h2>
       <div id="final-offer">
         <p id="final-lead" class="final-lead"></p>
         <p id="final-rule" class="hint"></p>
         <div id="final-msg" class="msg" role="alert" hidden></div>
         <div class="actions start-row">
-          <button type="button" id="final-play" class="btn btn-primary btn-large">Go for goal</button>
-          <button type="button" id="final-skip" class="btn btn-large">Skip to results</button>
+          <button type="button" id="final-play" class="btn btn-primary btn-large" data-i18n="final.play">Go for goal</button>
+          <button type="button" id="final-skip" class="btn btn-large" data-i18n="final.skip">Skip to results</button>
         </div>
       </div>
       <div id="final-wagers" hidden>
-        <p class="final-category"><span class="final-category-label">Category</span> <span id="final-category-name"></span></p>
-        <ul id="final-wager-list" class="final-wager-list" aria-label="Bets"></ul>
+        <p class="final-category"><span class="final-category-label" data-i18n="final.category">Category</span> <span id="final-category-name"></span></p>
+        <ul id="final-wager-list" class="final-wager-list" aria-label="Bets" data-i18n-attr="aria-label:final.bets"></ul>
         <form id="final-wager-form" class="final-wager-form" novalidate>
           <label id="final-wager-label" class="final-wager-label" for="final-wager-input"></label>
           <p id="final-wager-hint" class="hint"></p>
           <div class="final-wager-row">
             <input id="final-wager-input" class="final-wager-input" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="final-wager-hint final-wager-error">
-            <button type="button" id="final-wager-show" class="btn" aria-pressed="false" aria-controls="final-wager-input">Show</button>
-            <button type="submit" id="final-wager-lock" class="btn btn-primary">Lock in bet</button>
+            <button type="button" id="final-wager-show" class="btn" aria-pressed="false" aria-controls="final-wager-input" data-i18n="final.show">Show</button>
+            <button type="submit" id="final-wager-lock" class="btn btn-primary" data-i18n="final.lock">Lock in bet</button>
           </div>
           <p id="final-wager-error" class="field-error" role="alert" hidden></p>
         </form>
         <div id="final-ready" class="final-ready" hidden>
-          <p class="final-ready-text">All bets are in!</p>
-          <button type="button" id="final-open" class="btn btn-primary btn-large">Show the question</button>
+          <p class="final-ready-text" data-i18n="final.allIn">All bets are in!</p>
+          <button type="button" id="final-open" class="btn btn-primary btn-large" data-i18n="final.open">Show the question</button>
         </div>
       </div>
     </section>
 
     <!-- Results screen (US-15, US-16) -->
     <section id="screen-results" class="screen results" aria-labelledby="results-title" hidden>
-      <h2 id="results-title">Results</h2>
+      <h2 id="results-title" data-i18n="results.title">Results</h2>
       <p id="results-winner" class="results-winner"></p>
       <ol id="results-list" class="results-list"></ol>
       <div class="actions start-row">
-        <button type="button" id="new-game-btn" class="btn btn-primary btn-large">New Game</button>
-        <!-- US-46: the final standings plus the site link, via js/share.28bcd18c.js -->
-        <button type="button" id="results-share" class="btn btn-large">Share</button>
+        <button type="button" id="new-game-btn" class="btn btn-primary btn-large" data-i18n="common.newGame">New Game</button>
+        <!-- US-46: the final standings plus the site link, via js/share.5abe8c66.js -->
+        <button type="button" id="results-share" class="btn btn-large" data-i18n="common.share">Share</button>
         <span id="results-share-status" class="share-status" role="status"></span>
       </div>
     </section>
 
     <!-- Streak leaderboard (US-34): after a run, or from the setup screen -->
     <section id="screen-leaderboard" class="screen leaderboard" aria-labelledby="leaderboard-title" hidden>
-      <h2 id="leaderboard-title" tabindex="-1">Streak leaderboard</h2>
+      <h2 id="leaderboard-title" tabindex="-1" data-i18n="streak.leaderboard">Streak leaderboard</h2>
       <p id="lb-headline" class="lb-headline" hidden></p>
       <p id="lb-rank" class="lb-rank" hidden></p>
       <div id="lb-msg" class="msg" role="alert" hidden></div>
       <!-- US-45: this week's top 10 (Monday to Sunday, UTC) or the all-time one -->
-      <div class="lb-tabs" role="group" aria-label="Leaderboard period">
-        <button type="button" class="lb-tab" data-period="week" aria-pressed="false">This week</button>
-        <button type="button" class="lb-tab" data-period="all" aria-pressed="true">All time</button>
+      <div class="lb-tabs" role="group" aria-label="Leaderboard period" data-i18n-attr="aria-label:lb.period">
+        <button type="button" class="lb-tab" data-period="week" aria-pressed="false" data-i18n="lb.week">This week</button>
+        <button type="button" class="lb-tab" data-period="all" aria-pressed="true" data-i18n="lb.all">All time</button>
       </div>
       <ol id="lb-list" class="results-list lb-list" aria-label="Top 10 streaks of all time"></ol>
       <div class="actions start-row">
-        <button type="button" id="lb-again" class="btn btn-primary btn-large">Play again</button>
-        <button type="button" id="lb-new" class="btn btn-large">New Game</button>
-        <button type="button" id="lb-back" class="btn btn-primary btn-large">Back</button>
+        <button type="button" id="lb-again" class="btn btn-primary btn-large" data-i18n="lb.again">Play again</button>
+        <button type="button" id="lb-new" class="btn btn-large" data-i18n="common.newGame">New Game</button>
+        <button type="button" id="lb-back" class="btn btn-primary btn-large" data-i18n="common.back">Back</button>
       </div>
       <!-- Ads (D-41): filled by game.js when the admin turned ads on; the only ad screen -->
-      <aside id="ad-leaderboard" class="ad-slot" aria-label="Advertisement" hidden><span class="ad-label">Advertisement</span></aside>
+      <aside id="ad-leaderboard" class="ad-slot" aria-label="Advertisement" hidden data-i18n-attr="aria-label:ad.label"><span class="ad-label" data-i18n="ad.label">Advertisement</span></aside>
     </section>
 
     <!-- Daily Challenge result (US-43, D-46): after the run, and whenever this device opens the
          Daily Challenge again on the same day; the countdown runs to the next one (midnight UTC) -->
     <section id="screen-daily" class="screen daily" aria-labelledby="daily-title" hidden>
-      <h2 id="daily-title" tabindex="-1">Daily Challenge</h2>
+      <h2 id="daily-title" tabindex="-1" data-i18n="daily.name">Daily Challenge</h2>
       <p id="daily-score" class="daily-score"></p>
       <p id="daily-squares" class="daily-squares" role="img"></p>
       <p id="daily-note" class="hint daily-note"></p>
       <div class="actions start-row">
-        <button type="button" id="daily-share" class="btn btn-primary btn-large">Share</button>
-        <button type="button" id="daily-new" class="btn btn-large">New Game</button>
+        <button type="button" id="daily-share" class="btn btn-primary btn-large" data-i18n="common.share">Share</button>
+        <button type="button" id="daily-new" class="btn btn-large" data-i18n="common.newGame">New Game</button>
         <span id="daily-share-status" class="share-status" role="status"></span>
       </div>
       <p id="daily-next" class="daily-next"></p>
       <div id="daily-msg" class="msg" role="alert" hidden></div>
-      <button type="button" id="daily-play" class="btn btn-primary btn-large" hidden>Play the new challenge</button>
+      <button type="button" id="daily-play" class="btn btn-primary btn-large" hidden data-i18n="daily.playNew">Play the new challenge</button>
     </section>
   </main>
 
   <!-- Site footer (US-41): the same links on every public page; new tabs here so a running game is never left, as in the header. Hidden on the board and question screens. -->
   <footer class="site-footer">
-    <nav aria-label="Site"><a href="how-to-play.html" target="_blank" rel="noopener">How to play</a> &middot; <a href="about.html" target="_blank" rel="noopener">About</a> &middot; <a href="contact.html" target="_blank" rel="noopener">Contact</a> &middot; <a href="privacy.html" target="_blank" rel="noopener">Privacy</a> &middot; <a href="terms.html" target="_blank" rel="noopener">Terms</a></nav>
+    <nav aria-label="Site" data-i18n-attr="aria-label:nav.site"><a href="how-to-play.html" target="_blank" rel="noopener" data-i18n="nav.howToPlay">How to play</a> &middot; <a href="about.html" target="_blank" rel="noopener" data-i18n="nav.about">About</a> &middot; <a href="contact.html" target="_blank" rel="noopener" data-i18n="nav.contact">Contact</a> &middot; <a href="privacy.html" target="_blank" rel="noopener" data-i18n="nav.privacy">Privacy</a> &middot; <a href="terms.html" target="_blank" rel="noopener" data-i18n="nav.terms">Terms</a></nav>
     <p>&copy; 2026 BrainRush &middot; Ahmed Fahim</p>
   </footer>
 
   <!-- Android app mode (US-40, D-43): loaded before game.js, which reads it -->
   <script src="js/app.05c6d08d.js"></script>
   <!-- Sharing (US-43, US-46): loaded before game.js, which uses it -->
-  <script src="js/share.28bcd18c.js"></script>
+  <script src="js/share.5abe8c66.js"></script>
   <!-- Read aloud (US-48): loaded before game.js, which uses it -->
   <script src="js/speech.852d2b55.js"></script>
-  <script src="js/game.30601c74.js"></script>
+  <script src="js/game.d86b2e7e.js"></script>
 </body>
 </html>

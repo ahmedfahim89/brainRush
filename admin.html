@@ -8,7 +8,7 @@
   <link rel="icon" href="img/logo.svg" type="image/svg+xml">
   <link rel="icon" href="img/favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.4a59deab.css">
+  <link rel="stylesheet" href="css/style.4958c2c2.css">
 </head>
 <body class="admin">
   <header class="page-header">
@@ -93,14 +93,17 @@
       <form id="category-form" class="inline-form" novalidate>
         <label for="category-new" class="visually-hidden">New category name</label>
         <input id="category-new" type="text" maxlength="100" placeholder="New category name" required>
+        <label for="category-new-ar" class="visually-hidden">Arabic name (optional)</label>
+        <input id="category-new-ar" type="text" maxlength="100" placeholder="Arabic name (optional)" dir="rtl" lang="ar" autocomplete="off" aria-describedby="category-ar-hint">
         <button type="submit" class="btn btn-primary">Add</button>
       </form>
+      <p id="category-ar-hint" class="hint">The Arabic name is shown in the game when its interface is Arabic. Without one, the game shows the English name.</p>
       <p id="categories-msg" class="msg" role="status" aria-live="polite" hidden></p>
       <p id="categories-summary" class="hint"></p>
       <div class="table-wrap">
         <table class="data-table">
           <thead>
-            <tr><th scope="col">Name</th><th scope="col">Questions</th><th scope="col">Status</th><th scope="col">Actions</th></tr>
+            <tr><th scope="col">Name</th><th scope="col">Arabic name</th><th scope="col">Questions</th><th scope="col">Status</th><th scope="col">Actions</th></tr>
           </thead>
           <tbody id="categories-body"></tbody>
         </table>
@@ -257,6 +260,6 @@
     </section>
   </main>
 
-  <script src="js/admin.15ab8dd0.js"></script>
+  <script src="js/admin.3f451fba.js"></script>
 </body>
 </html>

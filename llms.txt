@@ -11,6 +11,7 @@
 - Playing alone, the Streak Challenge asks multiple-choice questions from every category until the first wrong answer or time's up; the longest streaks go on a shared top-10 leaderboard under the challenger name the player enters, for this week (Monday to Sunday, UTC) and of all time.
 - The Daily Challenge gives everyone the same 3 multiple-choice questions each day (a new set at midnight UTC); the result, such as "BrainRush Daily #12: 2/3" with a row of green and red squares, can be shared, as can the final standings of a board game.
 - Many questions are in Arabic and English, and some show a picture, such as a flag or a famous place.
+- The game itself can be shown in English or Arabic (right to left) with the EN / AR switch in its header; the choice is saved on the device.
 - Each device remembers which questions it has played, so new games pick unseen questions first.
 - No sign-up or install. It works best on a TV or big screen with the host at the keyboard.
 

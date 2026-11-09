@@ -1,9 +1,12 @@
 <?php
-// GET    /api/categories.php             -> [{ id, name, question_count }] sorted by name
+// GET    /api/categories.php             -> [{ id, name, name_ar, question_count }] sorted by name
 // GET    /api/categories.php?playable=1  -> only playable categories: at least one question for
 //                                        every enabled point value (D-31 amended)
-// POST   /api/categories.php             body { name } -> 201 created category
-// PUT    /api/categories.php?id=<id>     body { name } -> 200 renamed category
+// POST   /api/categories.php             body { name, name_ar? } -> 201 created category
+// PUT    /api/categories.php?id=<id>     body { name, name_ar? } -> 200 renamed category
+//                                        (name_ar left out = unchanged; null or "" = none)
+// name_ar is the optional Arabic name the game shows when its interface is Arabic (null = none).
+// It needs the categories.name_ar column (sql/migrate-add-category-name-ar.sql, run before this code).
 // DELETE /api/categories.php?id=<id>     -> 200 (its questions are deleted by FK cascade)
 // Writes need admin access (require_admin: 401/403 otherwise).
 require_once __DIR__ . '/db.php';
@@ -17,8 +20,34 @@ function category_row(array $r): array
     return [
         'id'             => (int) $r['id'],
         'name'           => $r['name'],
+        'name_ar'        => arabic_name_or_null($r['name_ar']),
         'question_count' => (int) $r['question_count'],
     ];
+}
+
+/** Stored Arabic name as the JSON sends it: null when there is none (NULL or blank). */
+function arabic_name_or_null(?string $nameAr): ?string
+{
+    return $nameAr === null || trim($nameAr) === '' ? null : $nameAr;
+}
+
+/** Optional Arabic name: null/empty -> null; otherwise trimmed, one line, at most CATEGORY_NAME_MAX. */
+function optional_arabic_name($value): ?string
+{
+    if ($value !== null && !is_string($value)) {
+        bad_request('Arabic name must be text');
+    }
+    $text = trim((string) $value);
+    if ($text === '') {
+        return null;
+    }
+    if (text_length($text) > CATEGORY_NAME_MAX) {
+        bad_request('Arabic name must be at most ' . CATEGORY_NAME_MAX . ' characters');
+    }
+    if (preg_match('/[\x00-\x1F\x7F]/', $text)) {
+        bad_request('Arabic name must be a single line of text');
+    }
+    return $text;
 }
 
 function list_categories(PDO $pdo, bool $playableOnly): array
@@ -26,11 +55,11 @@ function list_categories(PDO $pdo, bool $playableOnly): array
     // Playable = a question for every enabled point value (PLAYABLE_HAVING in db.php).
     $having = $playableOnly ? PLAYABLE_HAVING : '';
     $rows = $pdo->query(
-        "SELECT c.id, c.name, COUNT(q.id) AS question_count
+        "SELECT c.id, c.name, c.name_ar, COUNT(q.id) AS question_count
            FROM categories c
            LEFT JOIN questions q ON q.category_id = c.id
            LEFT JOIN point_values pv ON pv.points = q.points
-          GROUP BY c.id, c.name
+          GROUP BY c.id, c.name, c.name_ar
           $having
           ORDER BY c.name ASC"
     )->fetchAll();
@@ -41,11 +70,11 @@ function list_categories(PDO $pdo, bool $playableOnly): array
 function find_category(PDO $pdo, int $id): ?array
 {
     $stmt = $pdo->prepare(
-        'SELECT c.id, c.name, COUNT(q.id) AS question_count
+        'SELECT c.id, c.name, c.name_ar, COUNT(q.id) AS question_count
            FROM categories c
            LEFT JOIN questions q ON q.category_id = c.id
           WHERE c.id = :id
-          GROUP BY c.id, c.name'
+          GROUP BY c.id, c.name, c.name_ar'
     );
     $stmt->execute([':id' => $id]);
     $row = $stmt->fetch();
@@ -74,19 +103,23 @@ function save_category_name(PDOStatement $stmt, array $params, string $name): vo
 function create_category(PDO $pdo, array $body): void
 {
     $name = require_text($body['name'] ?? null, 'Name', CATEGORY_NAME_MAX);
-    $stmt = $pdo->prepare('INSERT INTO categories (name) VALUES (:name)');
-    save_category_name($stmt, [':name' => $name], $name);
+    $nameAr = optional_arabic_name($body['name_ar'] ?? null);
+    $stmt = $pdo->prepare('INSERT INTO categories (name, name_ar) VALUES (:name, :name_ar)');
+    save_category_name($stmt, [':name' => $name, ':name_ar' => $nameAr], $name);
     json_response(find_category($pdo, (int) $pdo->lastInsertId()), 201);
 }
 
 function rename_category(PDO $pdo, int $id, array $body): void
 {
     $name = require_text($body['name'] ?? null, 'Name', CATEGORY_NAME_MAX);
-    if (find_category($pdo, $id) === null) {
+    $existing = find_category($pdo, $id);
+    if ($existing === null) {
         not_found('Category not found');
     }
-    $stmt = $pdo->prepare('UPDATE categories SET name = :name WHERE id = :id');
-    save_category_name($stmt, [':name' => $name, ':id' => $id], $name);
+    // A client that sends only the name keeps the Arabic name.
+    $nameAr = array_key_exists('name_ar', $body) ? optional_arabic_name($body['name_ar']) : $existing['name_ar'];
+    $stmt = $pdo->prepare('UPDATE categories SET name = :name, name_ar = :name_ar WHERE id = :id');
+    save_category_name($stmt, [':name' => $name, ':name_ar' => $nameAr, ':id' => $id], $name);
     json_response(find_category($pdo, $id));
 }
 
