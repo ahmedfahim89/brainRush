@@ -522,7 +522,55 @@ body[data-screen="board"] .site-footer, body[data-screen="question"] .site-foote
 }
 @keyframes banner-pulse { 50% { transform: scale(1.1); } }
 @keyframes banner-shine { 0% { left: -40%; } 60%, 100% { left: 120%; } }
+/* Result effects on the host Correct / Wrong buttons: sparks (correct) and a boom (wrong), ~1.2 s, drawn in CSS.
+   JS (playResultFx) adds .fx-spark / .fx-boom and removes it when the animation ends. */
+.btn-correct.fx-spark, .btn-wrong.fx-boom { position: relative; overflow: visible; }
+.btn-correct.fx-spark::before, .btn-correct.fx-spark::after,
+.btn-wrong.fx-boom::before, .btn-wrong.fx-boom::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  border-radius: 50%;
+  opacity: 0;
+}
+/* ring + glow */
+.btn-correct.fx-spark::before { inset: -6px; border-radius: 10px; box-shadow: 0 0 0 2px var(--success), 0 0 14px var(--success); animation: fx-ring 0.9s ease-out; }
+.btn-wrong.fx-boom::before { inset: -6px; border-radius: 10px; box-shadow: 0 0 0 3px var(--danger), 0 0 18px var(--danger); animation: fx-ring 0.7s ease-out; }
+/* eight sparks / debris dots flying outward */
+.btn-correct.fx-spark::after {
+  inset: -14px -18px;
+  background:
+    radial-gradient(circle at 50% 0%, var(--gold) 0 2.5px, transparent 3px),
+    radial-gradient(circle at 50% 100%, var(--success) 0 2.5px, transparent 3px),
+    radial-gradient(circle at 0% 50%, var(--gold) 0 2.5px, transparent 3px),
+    radial-gradient(circle at 100% 50%, var(--success) 0 2.5px, transparent 3px),
+    radial-gradient(circle at 12% 12%, var(--success) 0 2px, transparent 2.5px),
+    radial-gradient(circle at 88% 12%, var(--gold) 0 2px, transparent 2.5px),
+    radial-gradient(circle at 12% 88%, var(--gold) 0 2px, transparent 2.5px),
+    radial-gradient(circle at 88% 88%, var(--success) 0 2px, transparent 2.5px);
+  animation: fx-burst 1.2s ease-out;
+}
+.btn-wrong.fx-boom::after {
+  inset: -14px -18px;
+  background:
+    radial-gradient(circle at 50% 0%, var(--danger) 0 3px, transparent 3.5px),
+    radial-gradient(circle at 50% 100%, #ff9f43 0 3px, transparent 3.5px),
+    radial-gradient(circle at 0% 50%, #ff9f43 0 3px, transparent 3.5px),
+    radial-gradient(circle at 100% 50%, var(--danger) 0 3px, transparent 3.5px),
+    radial-gradient(circle at 12% 12%, var(--danger) 0 2px, transparent 2.5px),
+    radial-gradient(circle at 88% 12%, #ff9f43 0 2px, transparent 2.5px),
+    radial-gradient(circle at 12% 88%, #ff9f43 0 2px, transparent 2.5px),
+    radial-gradient(circle at 88% 88%, var(--danger) 0 2px, transparent 2.5px);
+  animation: fx-burst 1s cubic-bezier(0.1, 0.8, 0.3, 1);
+}
+.btn-wrong.fx-boom { animation: fx-shake 0.4s ease-in-out; }
+@keyframes fx-ring { 0% { opacity: 0.9; transform: scale(0.9); } 100% { opacity: 0; transform: scale(1.35); } }
+@keyframes fx-burst { 0% { opacity: 1; transform: scale(0.35); } 70% { opacity: 1; } 100% { opacity: 0; transform: scale(1.25); } }
+@keyframes fx-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-4px); } 40% { transform: translateX(4px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
 @media (prefers-reduced-motion: reduce) {
+  .btn-correct.fx-spark::before, .btn-correct.fx-spark::after,
+  .btn-wrong.fx-boom::before, .btn-wrong.fx-boom::after { display: none; }
+  .btn-wrong.fx-boom { animation: none; }
   .new-banner::before { animation: none; }
   .new-banner::after { display: none; }
   .double-card .double-title { animation: none; }
