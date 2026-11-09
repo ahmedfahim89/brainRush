@@ -2487,7 +2487,18 @@
     contestant.score += result === 'correct' ? correctPoints(state.game) : -points;
     updateScoringRows();
     saveState();
+    const ref = scoringRows.find((r) => r.contestant === contestant);
+    if (ref) playResultFx(result === 'correct' ? ref.correct : ref.wrong, result);
     focusNextScoringButton();
+  }
+
+  /** Short sparks (correct) / boom (wrong) around the clicked button; purely visual, never saved. */
+  function playResultFx(btn, result) {
+    const cls = result === 'correct' ? 'fx-spark' : 'fx-boom';
+    btn.classList.remove('fx-spark', 'fx-boom');
+    void btn.offsetWidth; // restart the animation if it is already running
+    btn.classList.add(cls);
+    setTimeout(() => btn.classList.remove(cls), 1300);
   }
 
   // ---------- Helpers: 3 choices, Swap, Skip (US-32, D-36) ----------
