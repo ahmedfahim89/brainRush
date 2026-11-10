@@ -23,7 +23,7 @@ Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..U
 | 9 | Final round with wagers (Golden Goal ⚽ tiebreaker), read aloud (US-44, US-48) | Accepted by the PO 2026-11-02, re-accepted 2026-11-03 after the D-51 change; Done and merged to `main` (PR #89, `c0eb4c9`); hosted and device steps (FU-32) open |
 | 10 | Kilo Meshakkal category (US-53) | Accepted by the PO 2026-11-03 (D-54; BUG-10-01 fixed), pending the owner's local Chrome check and commit (FU-36) and the hosted and device steps (FU-37); not committed |
 | 11 | Question difficulty stats (US-47) | Planned |
-| 12 | Custom category for one game (US-50) | Planned (later) |
+| 12 | Custom category for one game (US-50) | Cancelled by the owner 2026-11-11 |
 | 13 | Arabic interface (US-49) | Accepted by the PO 2026-11-09 (ran before Sprint 12); pending the owner's local Chrome check and commit (FU-47), the hosted and device steps (FU-49) and the native review of the strings (FU-48); not committed. CR "Arabic category names" accepted 2026-11-09 (D-61); hosted migration before the code (FU-53) |
 | 14 | Phone buzzers (US-52), spike first | Planned (later; not committed until the FU-24 spike) |
 | 15 | Rewarded second chance in Streak (US-51) | Planned (later; blocked by FU-23) |
@@ -539,7 +539,7 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 
 ---
 
-## Sprint 12 — Custom category for one game (US-50) — later
+## Sprint 12 — Custom category for one game (US-50) — CANCELLED 2026-11-11 (owner)
 
 **Goal:** The host can add their own category (name plus one question and answer per enabled point value) to tonight's game, kept in the browser only. (Owner: later, its own sprint.)
 **Stories:** US-50
@@ -666,7 +666,7 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 | 9 | US-44, US-48 (accepted 2026-11-02, re-accepted 2026-11-03 after D-51; merged, PR #89; owner step FU-32 still open) |
 | 10 | US-53 (accepted 2026-11-03, pending owner checks FU-36 and FU-37) |
 | 11 | US-47 (planned) |
-| 12 | US-50 (planned, later) |
+| 12 | US-50 (cancelled 2026-11-11) |
 | 13 | US-49 (done, accepted 2026-11-09) |
 | 14 | US-52 (planned, later; spike first, not committed) |
 | 15 | US-51 (planned, later; blocked by FU-23) |
