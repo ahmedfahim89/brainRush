@@ -80,7 +80,7 @@ You are called in one of three modes, named in the brief.
    Leave the worktree in place. No commit, no push, nothing loaded into `brainrush`.
 
 ## Mode "review" (the owner has read the batch)
-1. **Removals.** For every question the owner removes:
+1. **Removals.** The owner names questions by their review-doc ID (e.g. `1110-03`) or by their text. For every question the owner removes:
    - delete it from the seed rows in the SQL file;
    - move it in the review doc to a "Removed by the owner (YYYY-MM-DD)" list;
    - add it to the right category table in `rejected-answers.md`;

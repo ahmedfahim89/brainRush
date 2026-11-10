@@ -134,6 +134,8 @@ Unknown: the owner removed 19 AI suggestions on 2026-10-19 (all 5 at 500), and o
 | The Hundred Acre Wood | 400 | Forest where Winnie-the-Pooh, Piglet and their friends live (Yogi Bear's replacement) | 2026-11-01 | auto-2026-11-01-review.md |
 | The Omnitrix | 400 | Watch-like alien device that lets Ben Tennyson turn into aliens in "Ben 10" (2005) | 2026-11-03 | auto-2026-11-03-review.md |
 | Huey, Dewey and Louie | 400 | Scrooge McDuck's three grand-nephews in "DuckTales" (1987) | 2026-11-03 | auto-2026-11-03-review.md |
+| Boots | 400 | Dora's monkey best friend in "Dora the Explorer" (2000) | 2026-11-10 | auto-2026-11-06-review.md |
+| Mr. Potato Head | 500 | 1952 toy of plastic face parts pushed into a real vegetable, first toy advertised on US TV | 2026-11-10 | auto-2026-11-06-review.md |
 
 ## Egyptians
 
@@ -437,3 +439,5 @@ Notes: Gutenberg and Ada Lovelace were removed twice: the seed questions (points
 | Hippocrates | 200 | Ancient physician from Kos, "Father of Medicine", the Hippocratic Oath | 2026-11-03 | auto-2026-11-03-review.md |
 | Ibn Khaldun | 400 | 14th-century historian born in Tunis, the "Muqaddimah", judge under the Mamluks | 2026-11-03 | auto-2026-11-03-review.md |
 | Roald Amundsen | 500 | Polar explorer, first to the South Pole (December 1911) ahead of Scott | 2026-11-03 | auto-2026-11-03-review.md |
+| Frida Kahlo | 400 | Painter of self-portraits with joined eyebrows, bus accident at 18, married Diego Rivera twice | 2026-11-10 | auto-2026-11-06-review.md |
+| Mansa Musa | 500 | 14th-century Mali Empire ruler whose 1324 pilgrimage gold lowered its value in Cairo | 2026-11-10 | auto-2026-11-06-review.md |
