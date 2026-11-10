@@ -149,6 +149,34 @@ CREATE TABLE IF NOT EXISTS question_stats (
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
+-- Integration Quiz (integration-quiz.html): a team quiz that plays like the Streak Challenge with
+-- its own questions and its own leaderboard. integration_questions is loaded by SQL file only
+-- (sql/add-integration-quiz-questions.example.sql): each question has its answer and 2 wrong
+-- choices; enabled = 0 keeps it out of the quiz; uq_integration_question blocks the same text
+-- twice (case-insensitive, first 191 characters). integration_scores has the same columns, keys
+-- and rules as streaks.
+CREATE TABLE IF NOT EXISTS integration_questions (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  question   TEXT         NOT NULL,
+  answer     VARCHAR(255) NOT NULL,
+  wrong_1    VARCHAR(255) NOT NULL,
+  wrong_2    VARCHAR(255) NOT NULL,
+  enabled    TINYINT(1)   NOT NULL DEFAULT 1,
+  created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_integration_question (question(191))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
+CREATE TABLE IF NOT EXISTS integration_scores (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name       VARCHAR(30)  NOT NULL,
+  streak     INT UNSIGNED NOT NULL,
+  created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_integration_scores_name (name),
+  KEY idx_integration_scores_streak (streak)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
 -- ---------------------------------------------------------------------------
 -- Seed data
 -- ---------------------------------------------------------------------------

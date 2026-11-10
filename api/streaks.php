@@ -13,12 +13,25 @@
 // them (read_json_body() forces a CORS preflight); the full list and DELETE are admin only
 // (require_admin), so the admin can remove junk or offensive names. Accepted limitation (D-37): the
 // answers are in the question payload and the POST is public, so a determined user can fake a score.
+// The Integration Quiz (api/integration-quiz.php) includes this file for its own leaderboard: every
+// function takes the table (one of STREAK_TABLES), and streak_board_request() is the shared routing.
 require_once __DIR__ . '/db.php';
 
 const STREAK_NAME_MAX = 30;  // NAME_MAX in js/game.js (D-22)
 const STREAK_MAX = 100000;
 const STREAK_TOP = 10;
 const STREAK_PERIODS = ['all', 'week']; // GET ?period= (US-45); no period means 'all'
+// The leaderboard tables, with the same columns: the public Streak Challenge and the Integration Quiz.
+const STREAK_TABLES = ['streaks', 'integration_scores'];
+
+/** $table as it goes into the SQL; a table name cannot be a bound parameter, so only STREAK_TABLES pass. */
+function streak_table(string $table): string
+{
+    if (!in_array($table, STREAK_TABLES, true)) {
+        throw new InvalidArgumentException('Unknown leaderboard table');
+    }
+    return $table;
+}
 
 /**
  * Best run per person, as [sql, params]: ROW_NUMBER() 1 = the highest streak, the earliest run on
@@ -26,14 +39,14 @@ const STREAK_PERIODS = ['all', 'week']; // GET ?period= (US-45); no period means
  * person. With $week ([from, to) as Unix times) only the runs of that week count. created_at is
  * stored in the database session's time zone, which FROM_UNIXTIME() also uses, so the bounds match.
  */
-function best_runs(?array $week): array
+function best_runs(string $table, ?array $week): array
 {
     $where = $week ? ' WHERE created_at >= FROM_UNIXTIME(:week_from) AND created_at < FROM_UNIXTIME(:week_to)' : '';
     $sql = 'SELECT id, name, streak, created_at, UNIX_TIMESTAMP(created_at) AS created_ts
               FROM (SELECT id, name, streak, created_at,
                            ROW_NUMBER() OVER (PARTITION BY name
                                               ORDER BY streak DESC, created_at ASC, id ASC) AS run_order
-                      FROM streaks' . $where . ') runs
+                      FROM ' . streak_table($table) . $where . ') runs
              WHERE run_order = 1';
     return [$sql, $week ? [':week_from' => $week[0], ':week_to' => $week[1]] : []];
 }
@@ -51,9 +64,9 @@ function current_week(): array
  * always shows a date inside that week, whatever the database's time zone. UNIX_TIMESTAMP() reads
  * created_at in the session time zone it was stored in. The ranking itself is unchanged (D-37).
  */
-function top_streaks(PDO $pdo, ?array $week): array
+function top_streaks(PDO $pdo, string $table, ?array $week): array
 {
-    [$sql, $params] = best_runs($week);
+    [$sql, $params] = best_runs($table, $week);
     $stmt = $pdo->prepare($sql . ' ORDER BY streak DESC, created_at ASC, id ASC LIMIT ' . STREAK_TOP);
     $stmt->execute($params);
     return array_map(fn(array $r): array => [
@@ -74,9 +87,9 @@ function read_period(): string
 }
 
 /** Every saved run for the admin list, newest first. */
-function all_streaks(PDO $pdo): array
+function all_streaks(PDO $pdo, string $table): array
 {
-    $rows = $pdo->query('SELECT id, name, streak, created_at FROM streaks ORDER BY created_at DESC, id DESC')->fetchAll();
+    $rows = $pdo->query('SELECT id, name, streak, created_at FROM ' . streak_table($table) . ' ORDER BY created_at DESC, id DESC')->fetchAll();
     return array_map(fn(array $r): array => [
         'id'         => (int) $r['id'],
         'name'       => $r['name'],
@@ -99,12 +112,12 @@ function streak_name($value): string
  * This person's place among the best runs (of all time, or of $week) and their best streak there,
  * as [rank, best]; null when they have no run in that period.
  */
-function person_rank(PDO $pdo, string $name, ?array $week): ?array
+function person_rank(PDO $pdo, string $table, string $name, ?array $week): ?array
 {
     // This person's best run in the period (the one just saved, or an earlier better or equal one).
     $where = $week ? ' AND created_at >= FROM_UNIXTIME(:week_from) AND created_at < FROM_UNIXTIME(:week_to)' : '';
     $stmt = $pdo->prepare(
-        'SELECT id, streak, created_at FROM streaks
+        'SELECT id, streak, created_at FROM ' . streak_table($table) . '
           WHERE name = :name' . $where . '
           ORDER BY streak DESC, created_at ASC, id ASC LIMIT 1'
     );
@@ -115,7 +128,7 @@ function person_rank(PDO $pdo, string $name, ?array $week): ?array
     }
 
     // Rank = 1 + the people whose best run ranks above it (same order as the top 10).
-    [$sql, $params] = best_runs($week);
+    [$sql, $params] = best_runs($table, $week);
     $stmt = $pdo->prepare(
         'SELECT COUNT(*) FROM (' . $sql . ') best
           WHERE best.streak > :streak
@@ -137,7 +150,7 @@ function person_rank(PDO $pdo, string $name, ?array $week): ?array
  * of all time and of this week (US-45). The week values are null only if the run fell outside the
  * week the server computed (a run saved on the stroke of Monday 00:00 UTC).
  */
-function save_streak(PDO $pdo, array $body): array
+function save_streak(PDO $pdo, string $table, array $body): array
 {
     $name = streak_name($body['name'] ?? null);
     $streak = parse_int($body['streak'] ?? null);
@@ -145,17 +158,17 @@ function save_streak(PDO $pdo, array $body): array
         bad_request('streak must be a whole number from 1 to ' . STREAK_MAX);
     }
 
-    $stmt = $pdo->prepare('INSERT INTO streaks (name, streak) VALUES (:name, :streak)');
+    $stmt = $pdo->prepare('INSERT INTO ' . streak_table($table) . ' (name, streak) VALUES (:name, :streak)');
     $stmt->execute([':name' => $name, ':streak' => $streak]);
 
-    [$rank, $best] = person_rank($pdo, $name, null);
-    $week = person_rank($pdo, $name, current_week());
+    [$rank, $best] = person_rank($pdo, $table, $name, null);
+    $week = person_rank($pdo, $table, $name, current_week());
     return ['rank' => $rank, 'best' => $best, 'week_rank' => $week[0] ?? null, 'week_best' => $week[1] ?? null];
 }
 
-function delete_streak(PDO $pdo, int $id): void
+function delete_streak(PDO $pdo, string $table, int $id): void
 {
-    $stmt = $pdo->prepare('DELETE FROM streaks WHERE id = :id');
+    $stmt = $pdo->prepare('DELETE FROM ' . streak_table($table) . ' WHERE id = :id');
     $stmt->execute([':id' => $id]);
     if ($stmt->rowCount() === 0) {
         not_found('Streak run not found');
@@ -163,27 +176,38 @@ function delete_streak(PDO $pdo, int $id): void
     json_response(['deleted' => $id]);
 }
 
-switch ($_SERVER['REQUEST_METHOD']) {
-    case 'GET':
-        if (($_GET['all'] ?? '') === '1') {
+/** The leaderboard requests of the header (top 10, save a run, the admin list and DELETE) on $table. */
+function streak_board_request(string $table): void
+{
+    switch ($_SERVER['REQUEST_METHOD']) {
+        case 'GET':
+            if (($_GET['all'] ?? '') === '1') {
+                require_admin();
+                json_response(all_streaks(db(), $table));
+            }
+            $period = read_period();
+            json_response(top_streaks(db(), $table, $period === 'week' ? current_week() : null));
+            break;
+
+        case 'POST':
+            $body = read_json_body();
+            json_response(save_streak(db(), $table, $body), 201);
+            break;
+
+        case 'DELETE':
             require_admin();
-            json_response(all_streaks(db()));
-        }
-        $period = read_period();
-        json_response(top_streaks(db(), $period === 'week' ? current_week() : null));
-        break;
+            $id = require_query_id();
+            delete_streak(db(), $table, $id);
+            break;
 
-    case 'POST':
-        $body = read_json_body();
-        json_response(save_streak(db(), $body), 201);
-        break;
-
-    case 'DELETE':
-        require_admin();
-        $id = require_query_id();
-        delete_streak(db(), $id);
-        break;
-
-    default:
-        method_not_allowed(['GET', 'POST', 'DELETE']);
+        default:
+            method_not_allowed(['GET', 'POST', 'DELETE']);
+    }
 }
+
+// Included for its functions only (api/integration-quiz.php): handle no request.
+if (defined('STREAKS_INCLUDE_ONLY')) {
+    return;
+}
+
+streak_board_request('streaks');

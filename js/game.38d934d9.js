@@ -62,9 +62,17 @@
   const CHOICES_SHORT_CHARS = 24; // text question: 3 choices this short sit side by side
   const WRONG_FIELDS = ['wrong_1', 'wrong_2', 'wrong_1_ar', 'wrong_2_ar'];
 
+  // Integration Quiz (integration-quiz.html, <body data-quiz="integration">): the Streak Challenge
+  // with its own questions and leaderboard (api/integration-quiz.php). Its run has its own saved key;
+  // its question ids are not the public bank's, so it skips the played list, the question stats and
+  // Report; it never reads or clears the board game's saved state. The page has only the run's markup.
+  const INTEGRATION = document.body.dataset.quiz === 'integration';
+
   // Streak Challenge (US-33, US-34, D-37): saved under its own key, so the board game's saved
   // state and its validation stay as they are.
-  const STREAK_KEY = 'brainrush.streak';
+  const STREAK_KEY = INTEGRATION ? 'brainrush.integrationQuiz' : 'brainrush.streak';
+  const STREAK_API = INTEGRATION ? 'integration-quiz.php' : 'streaks.php'; // the leaderboard
+  const STREAK_START = INTEGRATION ? 'iq.start' : 'streak.start';         // the start button's text
   const STREAK_VERSION = 1;
   const STREAK_REFILL_AT = 5;   // ask for the next batch once fewer questions are queued
   const STREAK_MAX_QUEUE = 100; // a saved queue is never longer (batches are 20)
@@ -353,9 +361,28 @@
     reportClose: byId('report-close'),
     uiLangBtns: Array.prototype.slice.call(document.querySelectorAll('[data-ui-lang]')), // US-49
   };
+  if (INTEGRATION) addStandIns(dom);
+
+  /**
+   * Integration Quiz: the board game's elements the page leaves out become detached, hidden stand-ins,
+   * so the shared code (bindings, showScreen, setup buttons) runs unchanged. Hidden matters: closed
+   * popups and messages read as closed.
+   */
+  function addStandIns(group) {
+    Object.keys(group).forEach((key) => {
+      const node = group[key];
+      if (node === null) {
+        group[key] = document.createElement('div');
+        group[key].hidden = true;
+      } else if (Object.getPrototypeOf(node) === Object.prototype) {
+        addStandIns(node); // dom.screens, dom.adSlots
+      }
+    });
+  }
+
   // The streak panel's texts; the Daily Challenge sets its own and puts these back.
   function streakPanelText() {
-    return { title: t('streak.legend'), label: t('streak.count'), hint: t('streak.hint') };
+    return { title: t(INTEGRATION ? 'iq.title' : 'streak.legend'), label: t('streak.count'), hint: t('streak.hint') };
   }
   // The scoring panel's texts and the Back to Board label; the final round sets its own (US-44).
   function scoringPanelText() {
@@ -581,6 +608,7 @@
   // Only a started game is stored (D-24), together with the screen it is on.
 
   function saveState() {
+    if (INTEGRATION) return; // the quiz has no board game: a saved one (index.html's) stays as it is
     try {
       if (!state.game) {
         window.localStorage.removeItem(STORAGE_KEY);
@@ -659,6 +687,7 @@
   }
 
   function clearSavedState() {
+    if (INTEGRATION) return; // as saveState()
     try {
       window.localStorage.removeItem(STORAGE_KEY);
     } catch (err) {
@@ -1000,7 +1029,7 @@
 
   /** Show the banner when an ad screen (the Leaderboard) opens; the screen must be visible first. */
   async function showAd(name) {
-    if (isApp) return; // no ads in the Android app (D-43): the script is never loaded there
+    if (isApp || INTEGRATION) return; // no ads in the Android app (D-43) or the Integration Quiz
     const slot = dom.adSlots[name];
     if (!slot) return;
     const config = await loadAdConfig();
@@ -1043,7 +1072,7 @@
   const back = { armed: false, handling: false, leaving: false };
 
   function atBackRoot() {
-    return state.screen === 'setup' && !(state.setup && state.setup.streak);
+    return state.screen === 'setup' && (INTEGRATION || !(state.setup && state.setup.streak));
   }
 
   /** After a screen change: add our history entry, or drop it at the root. */
@@ -1447,6 +1476,7 @@
 
   /** Load settings and playable categories from the API (GET only). */
   async function loadSetupData() {
+    if (INTEGRATION) return loadQuizSetup();
     const s = state.setup;
     s.loading = true;
     s.loadError = '';
@@ -1487,6 +1517,31 @@
     renderCategories();
     updateStartButton();
     loadPlayed();
+  }
+
+  /**
+   * Integration Quiz setup: only the default timer comes from the settings. No categories, played
+   * bar, banner, ads or maintenance screen (the page has none of them).
+   */
+  async function loadQuizSetup() {
+    const s = state.setup;
+    s.loading = true;
+    s.loadError = '';
+    hideLoadError();
+    updateStartButton();
+    try {
+      const settings = await apiGet('settings.php');
+      if (state.setup !== s) return; // setup was restarted meanwhile
+      if (!isPlainObject(settings)) throw textError('err.response');
+      s.timerDefault = Number.isInteger(settings.timer_seconds) ? settings.timer_seconds : null;
+      if (dom.timerInput.value === '' && s.timerDefault !== null) dom.timerInput.value = String(s.timerDefault);
+    } catch (err) {
+      if (state.setup !== s) return;
+      s.loadError = 'network';
+      showLoadError(() => t('load.failed', { reason: errorText(err) }), true, false);
+    }
+    s.loading = false;
+    updateStartButton();
   }
 
   /**
@@ -2859,6 +2914,7 @@
   }
 
   function onStreakCancel() {
+    if (INTEGRATION) return; // no normal game to go back to
     state.setup.streak = false;
     clearMessage(dom.startMsg);
     renderSetupMode();
@@ -2895,7 +2951,7 @@
     const nameOk = validateStreakName();
     const timerSeconds = validateTimer();
     if (!nameOk || timerSeconds === null) {
-      showMessage(dom.startMsg, () => t('streak.fix'), 'error');
+      showMessage(dom.startMsg, () => t(INTEGRATION ? 'iq.fix' : 'streak.fix'), 'error');
       const target = [dom.streakNameInput, dom.timerInput]
         .find((input) => input.getAttribute('aria-invalid') === 'true');
       if (target) target.focus();
@@ -2912,10 +2968,10 @@
       });
     } catch (err) {
       // Stay on setup with every input intact (as US-06).
-      showMessage(dom.startMsg, () => t('streak.failed', { reason: errorText(err) }), 'error');
+      showMessage(dom.startMsg, () => t(INTEGRATION ? 'iq.failed' : 'streak.failed', { reason: errorText(err) }), 'error');
     } finally {
       s.starting = false;
-      dom.streakBtn.textContent = t('streak.start');
+      dom.streakBtn.textContent = t(STREAK_START);
       updateStartButton();
     }
   }
@@ -3023,9 +3079,14 @@
     return state.screen === 'question' && !state.game && !!streak && !!streak.current;
   }
 
-  /** Up to 20 questions from every category, none of `exclude`, unseen first. Throws on errors. */
+  /**
+   * Up to 20 questions from every category, none of `exclude`, unseen first (the Integration Quiz:
+   * its own questions in random order; the played list holds public ids only). Throws on errors.
+   */
   async function fetchStreakBatch(exclude) {
-    const data = await apiPost('questions.php?streak=1', { exclude: exclude, seen: loadSeen() });
+    const data = INTEGRATION
+      ? await apiPost('integration-quiz.php?batch=1', { exclude: exclude })
+      : await apiPost('questions.php?streak=1', { exclude: exclude, seen: loadSeen() });
     if (!isPlainObject(data) || !Array.isArray(data.questions) ||
         !data.questions.every((q) => isValidStreakQuestion(q))) {
       throw textError('err.questions');
@@ -3090,7 +3151,7 @@
     };
     lastStreakProfile = profile;
     addToQueue(streak, questions);
-    postGameLog({ mode: 'streak', players: [streak.name] });
+    postGameLog({ mode: INTEGRATION ? 'integration' : 'streak', players: [streak.name] });
     nextStreakQuestion();
   }
 
@@ -3126,7 +3187,7 @@
       deadline: Date.now() + run.timerSeconds * 1000,
       picked: null,
     };
-    markSeen(q.id); // later boards and runs avoid it too
+    if (!INTEGRATION) markSeen(q.id); // later boards and runs avoid it too
     saveStreak();
     showStreakQuestion();
     refillStreak(run);
@@ -3180,8 +3241,11 @@
     return iso(localName(q.category_name, q.category_name_ar)) + ' ' + EN_DASH + ' ' + q.points;
   }
 
+  /** The question's heading; the Integration Quiz has no categories or points: "Question 4". */
   function renderRunHeading(q) {
-    dom.qHeading.textContent = runHeading(q);
+    dom.qHeading.textContent = INTEGRATION
+      ? t('iq.question', { n: streak.usedIds.indexOf(q.id) + 1 })
+      : runHeading(q);
   }
 
   /** Question text, language button and choices in the open question's language. */
@@ -3319,8 +3383,10 @@
     if (cur.picked === cur.q.correct) run.count += 1;
     else run.over = true;
     // US-47 / D-55 f: right -> correct, wrong -> wrong, time's up -> timeout (End run sends nothing).
-    sendQuestionStat(run, cur.q.id, cur.picked === cur.q.correct ? STAT.correct
-      : cur.picked === STREAK_TIME_UP ? STAT.timeout : STAT.wrong);
+    if (!INTEGRATION) {
+      sendQuestionStat(run, cur.q.id, cur.picked === cur.q.correct ? STAT.correct
+        : cur.picked === STREAK_TIME_UP ? STAT.timeout : STAT.wrong);
+    }
     saveStreak();
     showTimerAt(run.timerSeconds, cur.leftMs);
     if (cur.picked === STREAK_TIME_UP) setTimeUp(true);
@@ -3386,7 +3452,7 @@
     openLeaderboard(result);
     if (result.saving) {
       try {
-        const saved = await apiPost('streaks.php', { name: run.name, streak: run.count });
+        const saved = await apiPost(STREAK_API, { name: run.name, streak: run.count });
         if (!isPlainObject(saved) || !Number.isInteger(saved.rank) || !Number.isInteger(saved.best) ||
             !(saved.week_rank === undefined || saved.week_rank === null || Number.isInteger(saved.week_rank))) {
           throw textError('err.response');
@@ -3512,7 +3578,7 @@
     let rows = null;
     let failure = null;
     try {
-      const data = await apiGet('streaks.php?period=' + encodeURIComponent(period));
+      const data = await apiGet(STREAK_API + '?period=' + encodeURIComponent(period));
       if (!Array.isArray(data)) throw textError('err.leaderboard');
       rows = data.filter((r) => isPlainObject(r) && typeof r.name === 'string' &&
         Number.isInteger(r.streak) &&
@@ -4610,7 +4676,8 @@
 
   /** The question that Report would report now, as { id, label }, or null when there is none. */
   function reportTarget() {
-    if (state.screen !== 'question') return null;
+    // The Integration Quiz has no Report: api/reports.php takes the public bank's question ids only.
+    if (state.screen !== 'question' || INTEGRATION) return null;
     if (streakOnScreen()) {
       const cur = streak.current;
       if (cur.picked === null) return null; // a Streak question is reported once it is answered
@@ -4745,7 +4812,8 @@
     const lang = i18n.lang();
     dom.uiLangBtns.forEach((btn) => btn.setAttribute('aria-pressed', String(btn.getAttribute('data-ui-lang') === lang)));
     Object.keys(MODES).forEach((key) => {
-      byId('mode-limit-' + key).textContent = t('mode.limit', { n: MODES[key].limit });
+      const limit = byId('mode-limit-' + key); // none in the Integration Quiz
+      if (limit) limit.textContent = t('mode.limit', { n: MODES[key].limit });
     });
     // Names are typed left to right or right to left by their own letters in the Arabic page.
     if (i18n.isArabic()) dom.streakNameInput.dir = 'auto';
@@ -4852,12 +4920,13 @@
     clearMessage(dom.catError);
     clearMessage(dom.startMsg);
     dom.startBtn.textContent = t('setup.start');
-    dom.streakBtn.textContent = t('streak.start');
+    dom.streakBtn.textContent = t(STREAK_START);
     dom.streakNameInput.value = '';
     setFieldError(dom.streakNameInput, dom.streakNameError, '');
     renderEntries();
     renderSetupMode();
     showScreen('setup');
+    if (INTEGRATION) onStreakOpen(); // the quiz is the streak setup only
     loadSetupData();
   }
 
@@ -4937,7 +5006,8 @@
     initReadAloud();
     initApp();
     registerServiceWorker();
-    const saved = loadState();
+    // The Integration Quiz restores only its own run: the board game and the Daily Challenge are index.html's.
+    const saved = INTEGRATION ? null : loadState();
     if (saved) {
       try {
         restoreGame(saved);
@@ -4960,7 +5030,7 @@
         saveStreak();
       }
     }
-    if (restoreSavedDaily()) return;
+    if (!INTEGRATION && restoreSavedDaily()) return;
     startSetup();
   }
 

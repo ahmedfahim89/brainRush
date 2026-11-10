@@ -69,11 +69,11 @@ Upload only what the website needs. Keep the folder structure:
 | Upload | Do **not** upload |
 |---|---|
 | `.htaccess` (a hidden file; make sure your FTP client or File Manager shows hidden files) | `sql/` (import it through phpMyAdmin instead) |
-| `index.html`, `admin.html`, `how-to-play.html`, `llms.txt`, `terms.html` | `docs/`, `.claude/`, `.git/`, `.gitignore`, `README.md` |
+| `index.html`, `admin.html`, `how-to-play.html`, `llms.txt`, `terms.html`, `integration-quiz.html` (the hidden Integration Quiz page, section 13) | `docs/`, `.claude/`, `.git/`, `.gitignore`, `README.md` |
 | `css/` (whole folder) | **`api/config.php` from your computer** (it holds your *local* database settings; create a new one on the server in step 5) |
 | `img/` (whole folder, including `img/questions/` with the question pictures) | |
 | `js/` (whole folder, including `js/share.*.js` and `js/speech.*.js`) | **`password.txt`**, and any other local file with passwords or notes (never, under any name) |
-| `api/` (all `.php` files: `auth.php`, `categories.php`, `config.example.php`, `daily.php`, `db.php`, `game-log.php`, `points.php`, `question-stats.php`, `questions.php`, `reports.php`, `settings.php`, `streaks.php`) | `logs/` (the server writes its own daily `logs/game-YYYY-MM-DD.log`) |
+| `api/` (all `.php` files: `auth.php`, `categories.php`, `config.example.php`, `daily.php`, `db.php`, `game-log.php`, `points.php`, `question-stats.php`, `questions.php`, `reports.php`, `settings.php`, `streaks.php`, `integration-quiz.php`) | `logs/` (the server writes its own daily `logs/game-YYYY-MM-DD.log`) |
 | `manifest.webmanifest`, `sw.js`, `offline.html`, and the hidden folder `.well-known/` (with `assetlinks.json`), for the Android app (section 11) | `android/` (the Android app project; it is built on your computer, never served) |
 
 In hPanel, **Files → File Manager** can upload a `.zip` and extract it. Zip the files from the left column, upload the zip into `public_html`, extract it, then delete the zip. Build the zip from the left column only. Do **not** zip the whole project folder: that would pull in `password.txt` and your local `api/config.php`.
@@ -163,6 +163,7 @@ The database content and `api/config.php` belong to the live site. A redeploy on
      - `js/app.*.js` is used by all of them except `admin.html`.
      - `css/guide.*.css` is used by `how-to-play.html`, `about.html`, `contact.html`, `privacy.html` and `terms.html`.
      - `js/game.*.js`, `js/share.*.js` and `js/speech.*.js` are used by `index.html`; `js/admin.*.js` is used by `admin.html`.
+     - The hidden `integration-quiz.html` (section 13) also uses `css/style.*.css`, `js/i18n.*.js`, `js/speech.*.js` and `js/game.*.js`: upload it whenever one of them changes.
      - Delete the old `js/`/`css/` file only **after** every page that used it is uploaded: a page still on the old name loses its styling or script (404). To check, search the pages for the old name, or compare their `<link>`/`<script>` names with `main`.
      - Question pictures in `img/questions/` are **not** content-hashed: upload new ones as they are, and give a changed picture a **new file name** (and update its question in Admin), because browsers and the CDN may keep showing the old copy of an unchanged name for days.
      - **Never** upload or overwrite `api/config.php`, never upload `password.txt` or other local credential files, and never delete the whole `api/` folder.
@@ -216,6 +217,7 @@ The database content and `api/config.php` belong to the live site. A redeploy on
      4. Update the code (step 3). With File Manager/FTP upload `api/categories.php`, `api/questions.php`, `api/daily.php`, the new hashed `js/game.*.js`, `js/admin.*.js`, `js/share.*.js` and `css/style.*.css`, the new hashed `js/i18n.*.js` (new in Sprint 13), `llms.txt`, and **all seven pages that point at them**: `index.html`, `admin.html`, `how-to-play.html`, `about.html`, `contact.html`, `privacy.html` and `terms.html`. Delete the old js/css files only after all seven are uploaded. No `.htaccess` change is needed. Check that the live pages point at the new js/css names (including `js/i18n.*.js` in `index.html`), then purge the CDN cache (step 6).
      5. Smoke check: `https://your-domain.example/api/categories.php?playable=1` lists `"name_ar"` for every category (for example `"Geography"` with `"جغرافيا"`). On the game page click **عربي**: the Setup tiles, the board column headers and the question heading show the Arabic names ("كيلو مشكّل" for Kilo Meshakkal); click **EN** and everything is English again. In Admin, **Categories** has an **Arabic name** column, and **Rename** shows an Arabic field next to the name.
      6. A game, Streak run or Daily Challenge saved in a browser before this deploy keeps going (no saved-game version change); in Arabic it shows the English category names until a new game is started.
+   - **Integration Quiz (owner request 2026-11-10): import `sql/migrate-add-integration-quiz.sql` once, BEFORE the code update in step 3.** It only creates two new tables, `integration_questions` and `integration_scores`; nothing else changes. The steps, loading the questions and the checks are in section 13.
    - **Sprint 6 (question bank): import `sql/migrate-question-bank.sql` once.** Questions keep their point value, but a category may now hold several questions per value, and each new game draws one at random for every board cell. Do this right after the code update in step 3. Until then the old one-per-slot key still blocks a second question at the same category and point value; the game keeps working.
      1. Back up first (step 2). The migration changes the `questions` table.
      2. In phpMyAdmin, click your database in the left sidebar so it is selected, open **Import**, choose **`sql/migrate-question-bank.sql`** and click **Import** (or **Go**). The file has no `CREATE DATABASE`/`USE`, so it runs on the selected database.
@@ -287,6 +289,17 @@ The Android app is a Trusted Web Activity: it opens this site full screen in Chr
 1. **Deploy the code** (section 8, step 3). With File Manager/FTP upload the new `about.html` and `contact.html`, the changed `index.html`, `how-to-play.html`, `terms.html`, `privacy.html`, `sitemap.xml` and `llms.txt`, and the new hashed `css/style.*.css` (delete the old one). No database change.
 2. Check that `https://brainrush.integration.ninja/about.html` and `/contact.html` open, and that the footer links work on the game's setup screen and on the guide.
 3. In Google Search Console, **Sitemaps** → open `sitemap.xml` → it is read again on its own; to speed it up, use **URL inspection** → **Request indexing** for the two new pages.
+
+## 13. Integration Quiz (hidden team page)
+
+`integration-quiz.html` is a Sudden Death quiz with its own questions and its own leaderboard, for the team. It is not in `sitemap.xml` or `llms.txt`, nothing links to it, and it has `noindex`: share the link `https://brainrush.integration.ninja/integration-quiz.html` yourself. Do not submit it in Search Console.
+
+1. **Back up** the database (section 8, step 2).
+2. **Create the tables, BEFORE the code.** In phpMyAdmin, select your database, open **Import**, choose **`sql/migrate-add-integration-quiz.sql`** and click **Import** (or **Go**). Expected result: a green success message and two new, empty tables: `integration_questions` (`id`, `question`, `answer`, `wrong_1`, `wrong_2`, `enabled`, `created_at`) and `integration_scores` (`id`, `name`, `streak`, `created_at`). Safe to import again. Deployed without them, the page opens but **Start the quiz** shows "The Integration Quiz is not set up on this server yet."
+3. **Deploy the code** (section 8, step 3). With File Manager/FTP upload `integration-quiz.html` (new), `api/integration-quiz.php` (new), `api/streaks.php`, `api/game-log.php`, the new hashed `js/game.*.js` and `js/i18n.*.js`, and the two pages that point at them, `index.html` and `integration-quiz.html`. Delete the old js files only after both are uploaded, then purge the CDN cache (section 6). No `.htaccess` change is needed.
+4. **Load the questions.** Copy `sql/add-integration-quiz-questions.example.sql` on your computer, replace its two placeholder rows with your questions (the file explains the format: question, answer and two wrong choices per row), and import your copy the same way as step 2. `INSERT IGNORE` skips a question text that is already there, so you can add rows to the same file and import it again. There is no Admin tab for these questions: to change or remove one, edit it in phpMyAdmin (`integration_questions` → **Browse**), or set `enabled` to `0` to keep it out of the quiz.
+5. **Smoke check:** open the page, enter a challenger name, answer one question right and one wrong, and check that **See results** shows the run on the **Integration Quiz leaderboard** (This week and All time). Open the public game: its **Streak leaderboard** does not show that name. `https://your-domain.example/api/integration-quiz.php?period=bogus` must answer 400.
+6. **Remove a junk name** from the quiz leaderboard: as admin, `DELETE https://your-domain.example/api/integration-quiz.php?id=<id>` (the ids come from `GET …/api/integration-quiz.php?all=1`, also admin only; both ask for the admin login), or delete the row in phpMyAdmin (`integration_scores` → **Browse** → **Delete**). Admin's **Streak leaderboard** panel lists the public runs only.
 
 ## Troubleshooting
 
