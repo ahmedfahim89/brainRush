@@ -76,7 +76,7 @@ A brief that starts with `AUTO BATCH` comes from the **question-bank-manager** (
 
 ## Output
 - `sql/add-<set>-questions.sql`, plus any `img/questions/*` files for picture questions.
-- `docs/question-sets/<set>-review.md` for the owner to review: a table of points | question | answer | Arabic question | Arabic answer | wrong options (EN / AR) | host note (near-miss answers to reject or accept), followed by the fact-check sources per question.
+- `docs/question-sets/<set>-review.md` for the owner to review: a table of ID | points | question | answer | Arabic question | Arabic answer | wrong options (EN / AR) | host note (near-miss answers to reject or accept), followed by the fact-check sources per question. The ID is the batch date as `MMDD` plus a 2-digit number, e.g. `1110-01`, `1110-02`, numbered top to bottom. Every question in the doc gets one, so the owner can remove questions by ID. Use the same ID in the fact-check log, and add it as a `-- <ID>` comment at the end of the question's seed row in the SQL file.
 - A short reply: count per point value, local DB totals before and after, and anything dropped or reworded during fact-checking.
 
 Do not run git commands — the orchestrator commits after the owner has reviewed the set.
