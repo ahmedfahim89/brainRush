@@ -5,6 +5,8 @@
 // data-i18n-attr="attr:key;attr:key"). Strings are plain text: callers render them with
 // textContent, never innerHTML (DoD 4). The choice is saved on this device only.
 // The guide, Terms, Privacy, About, Contact and Admin pages stay English and do not load this file.
+// A page with <html data-fixed-lang="en"> (the Integration Quiz) always shows that language: it has
+// no EN / AR switch and ignores the choice saved on this device.
 'use strict';
 
 (function () {
@@ -262,6 +264,15 @@
       'lb.unsaved': 'Your streak of {n} was not saved. Leave it unsaved?',
       'lb.againFailed': 'Could not start a new run: {reason}',
       'ad.label': 'Advertisement',
+
+      // Integration Quiz (integration-quiz.html): English only, the page has no Arabic
+      'iq.title': 'Integration Quiz',
+      'iq.setupHint': "Questions on software integration and APIs. Pick 1 of 3 answers before the time runs out: one wrong answer or time's up ends the run. Your streak goes on the Integration Quiz leaderboard with your name.",
+      'iq.leaderboard': 'Integration Quiz leaderboard',
+      'iq.start': 'Start the quiz',
+      'iq.question': 'Question {n}',
+      'iq.fix': 'The quiz cannot start yet. Please fix the errors above.',
+      'iq.failed': 'Could not start the Integration Quiz: {reason}',
 
       // Daily Challenge (US-43)
       'daily.name': 'Daily Challenge',
@@ -678,9 +689,13 @@
 
   const pluralRules = {};
   const listeners = [];
+  // <html data-fixed-lang="en">: this page always shows that language (null = the device's choice).
+  const fixedAttr = document.documentElement.getAttribute('data-fixed-lang');
+  const fixedLang = LANGS.indexOf(fixedAttr) === -1 ? null : fixedAttr;
   let lang = loadLang();
 
   function loadLang() {
+    if (fixedLang) return fixedLang;
     try {
       const saved = window.localStorage.getItem(KEY);
       return LANGS.indexOf(saved) === -1 ? 'en' : saved;
@@ -772,7 +787,7 @@
 
   /** Switch the interface language: saved on this device, the page's lang/dir set, listeners told. */
   function setLang(next) {
-    if (LANGS.indexOf(next) === -1 || next === lang) return;
+    if (LANGS.indexOf(next) === -1 || next === lang || fixedLang) return;
     lang = next;
     saveLang();
     applyDocument();

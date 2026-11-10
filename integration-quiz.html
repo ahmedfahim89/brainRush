@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en" data-fixed-lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BrainRush Integration Quiz</title>
+  <!-- Integration Quiz: a hidden team page. Not in sitemap.xml or llms.txt and linked from nowhere;
+       noindex keeps it out of search results if the link is shared. English only (data-fixed-lang). -->
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#0b1026">
+  <link rel="icon" href="img/logo.svg" type="image/svg+xml">
+  <link rel="icon" href="img/favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/style.f36528ff.css">
+  <script src="js/i18n.cb6631f3.js"></script>
+</head>
+<!-- data-quiz="integration": js/game.js plays the Streak Challenge with api/integration-quiz.php
+     (its own questions and leaderboard). Only the run's markup is here: setup, question, leaderboard. -->
+<body class="game" data-quiz="integration">
+  <header class="page-header">
+    <h1><img class="brand-logo" src="img/logo.svg" alt="" width="36" height="36">BrainRush</h1>
+  </header>
+
+  <main class="game-main">
+    <!-- Setup: the challenger name and the timer -->
+    <section id="screen-setup" class="screen setup" aria-labelledby="setup-title">
+      <h2 id="setup-title" data-i18n="iq.title">Integration Quiz</h2>
+      <div id="setup-load-msg" class="msg" role="alert" hidden></div>
+
+      <form id="setup-form" novalidate>
+        <fieldset id="streak-block" class="setup-block">
+          <legend class="visually-hidden" data-i18n="iq.title">Integration Quiz</legend>
+          <p class="hint" data-i18n="iq.setupHint">Questions on software integration and APIs. Pick 1 of 3 answers before the time runs out: one wrong answer or time's up ends the run. Your streak goes on the Integration Quiz leaderboard with your name.</p>
+          <div class="field streak-name-field">
+            <label for="streak-name" data-i18n="streak.nameLabel">Challenger name</label>
+            <input id="streak-name" type="text" maxlength="30" autocomplete="off" aria-describedby="streak-name-error">
+            <p id="streak-name-error" class="field-error" hidden></p>
+          </div>
+          <div class="actions">
+            <button type="button" id="streak-board-btn" class="btn btn-leaderboard"><span aria-hidden="true">🏆</span> <span data-i18n="iq.leaderboard">Integration Quiz leaderboard</span></button>
+          </div>
+        </fieldset>
+
+        <fieldset class="setup-block">
+          <legend data-i18n="timer.legend">Timer</legend>
+          <label for="timer-input" data-i18n="timer.label">Seconds per question (this game only)</label>
+          <input id="timer-input" class="timer-input" type="number" min="5" max="600" step="1" aria-describedby="timer-error">
+          <p id="timer-error" class="field-error" hidden></p>
+          <!-- Read aloud (US-48): an on-device choice (saved in this browser); hidden when the browser has no speech -->
+          <div id="read-aloud-field" class="read-aloud-field" hidden>
+            <label class="check-label" for="read-aloud">
+              <input id="read-aloud" type="checkbox" aria-describedby="read-aloud-hint">
+              <span data-i18n="readAloud.label">Read questions automatically</span>
+            </label>
+            <p id="read-aloud-hint" class="hint" data-i18n="readAloud.hint">On this device, when a question opens. The &#128266; button on a question reads it any time.</p>
+          </div>
+        </fieldset>
+
+        <div class="actions start-row">
+          <button type="button" id="streak-btn" class="btn btn-primary btn-large" data-i18n="iq.start">Start the quiz</button>
+        </div>
+        <p id="start-msg" class="msg msg-error" role="alert" hidden></p>
+      </form>
+    </section>
+
+    <!-- Question screen: the question, its timer and the streak panel with the 3 choices -->
+    <section id="screen-question" class="screen question" aria-labelledby="question-title" hidden>
+      <div class="question-layout">
+        <div id="question-main" class="question-main">
+          <h2 id="question-title" class="question-heading" tabindex="-1"></h2>
+          <!-- Read aloud (US-48), shown when a voice for the question's language is installed -->
+          <div class="question-tools">
+            <button type="button" id="speak-btn" class="btn btn-small speak-btn" aria-pressed="false" hidden></button>
+          </div>
+          <!-- Unused by the quiz (no pictures), but game.js draws every run question through them -->
+          <img id="question-image" class="question-image" alt="Question picture" hidden data-i18n-attr="alt:question.picture">
+          <p id="question-credit" class="question-credit" dir="ltr" lang="en" hidden></p>
+          <p id="question-text" class="question-text"></p>
+          <button type="button" id="lang-btn" class="btn lang-btn" hidden></button>
+          <ol id="question-choices" class="question-choices" aria-label="Choices" hidden data-i18n-attr="aria-label:question.choices"></ol>
+
+          <div id="timer" class="timer" role="timer" aria-labelledby="timer-label">
+            <span id="timer-label" class="visually-hidden" data-i18n="timer.secondsLeft">Seconds left</span>
+            <span id="timer-value" class="timer-value"></span>
+            <div class="timer-track" aria-hidden="true"><div id="timer-bar" class="timer-bar"></div></div>
+            <!-- Hidden in a run (CSS); game.js still sets their state -->
+            <div class="timer-controls">
+              <button type="button" id="timer-pause" class="btn" data-i18n="timer.pause">Pause</button>
+              <button type="button" id="timer-reset" class="btn" data-i18n="timer.reset">Reset</button>
+            </div>
+            <p id="timer-status" class="timer-status" aria-live="polite"></p>
+          </div>
+        </div>
+
+        <section id="streak-panel" class="streak-panel" aria-labelledby="streak-panel-title" hidden>
+          <h3 id="streak-panel-title" class="visually-hidden" data-i18n="iq.title">Integration Quiz</h3>
+          <div class="streak-head">
+            <p id="streak-run-name" class="streak-name"></p>
+            <p class="streak-count-line"><span id="streak-count-label" data-i18n="streak.count">Streak</span> <span id="streak-count" class="streak-count" aria-live="polite"></span></p>
+          </div>
+          <p id="streak-hint" class="hint" data-i18n="streak.hint">Pick the right answer before the time runs out. One wrong answer ends the run.</p>
+          <ol id="streak-choices" class="streak-choices" aria-label="Choices" data-i18n-attr="aria-label:question.choices"></ol>
+          <p id="streak-feedback" class="streak-feedback" role="status" aria-live="polite"></p>
+          <button type="button" id="streak-next" class="btn btn-primary btn-large btn-block" hidden data-i18n="run.next">Next question</button>
+          <button type="button" id="streak-end" class="btn btn-end btn-block" data-i18n="streak.end">End run</button>
+        </section>
+      </div>
+    </section>
+
+    <!-- Integration Quiz leaderboard: after a run, or from the setup screen -->
+    <section id="screen-leaderboard" class="screen leaderboard" aria-labelledby="leaderboard-title" hidden>
+      <h2 id="leaderboard-title" tabindex="-1" data-i18n="iq.leaderboard">Integration Quiz leaderboard</h2>
+      <p id="lb-headline" class="lb-headline" hidden></p>
+      <p id="lb-rank" class="lb-rank" hidden></p>
+      <div id="lb-msg" class="msg" role="alert" hidden></div>
+      <!-- This week's top 10 (Monday to Sunday, UTC) or the all-time one -->
+      <div class="lb-tabs" role="group" aria-label="Leaderboard period" data-i18n-attr="aria-label:lb.period">
+        <button type="button" class="lb-tab" data-period="week" aria-pressed="false" data-i18n="lb.week">This week</button>
+        <button type="button" class="lb-tab" data-period="all" aria-pressed="true" data-i18n="lb.all">All time</button>
+      </div>
+      <ol id="lb-list" class="results-list lb-list" aria-label="Top 10 streaks of all time"></ol>
+      <div class="actions start-row">
+        <button type="button" id="lb-again" class="btn btn-primary btn-large" data-i18n="lb.again">Play again</button>
+        <button type="button" id="lb-new" class="btn btn-large" data-i18n="common.newGame">New Game</button>
+        <button type="button" id="lb-back" class="btn btn-primary btn-large" data-i18n="common.back">Back</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <nav aria-label="Site" data-i18n-attr="aria-label:nav.site"><a href="privacy.html" target="_blank" rel="noopener" data-i18n="nav.privacy">Privacy</a> &middot; <a href="terms.html" target="_blank" rel="noopener" data-i18n="nav.terms">Terms</a></nav>
+    <p>&copy; 2026 BrainRush &middot; Ahmed Fahim</p>
+  </footer>
+
+  <!-- Read aloud (US-48): loaded before game.js, which uses it -->
+  <script src="js/speech.852d2b55.js"></script>
+  <script src="js/game.38d934d9.js"></script>
+</body>
+</html>
