@@ -1940,7 +1940,7 @@
         type: 'button',
         className: 'board-cell',
         'aria-label': cellLabel,
-        onclick: () => openQuestion(category.id, points),
+        onclick: (e) => openCellWithFx(e.currentTarget, category.id, points),
       };
       if (!face) return h('button', props, [label]);
       props['aria-label'] = t('cell.mix', { name: iso(columnName(category)) });
@@ -2069,6 +2069,24 @@
   }
 
   // ---------- Question screen (US-11, US-13, US-14) ----------
+
+  let cellOpening = false;
+
+  /** A short pop + flash on the clicked cell (~0.4 s), then the question opens. Instant under reduced motion. */
+  function openCellWithFx(cell, categoryId, points) {
+    if (cellOpening) return;
+    if (!cell || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      openQuestion(categoryId, points);
+      return;
+    }
+    cellOpening = true;
+    cell.classList.add('is-opening');
+    setTimeout(() => {
+      cellOpening = false;
+      cell.classList.remove('is-opening');
+      openQuestion(categoryId, points);
+    }, 400);
+  }
 
   /** US-11: open an unused cell. Used cells are disabled, and this guard ignores them anyway. */
   function openQuestion(categoryId, points) {
