@@ -665,6 +665,27 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
   cursor: pointer;
 }
 @media (hover: hover) { .board-cell:hover:not(:disabled) { border-color: var(--gold); filter: brightness(1.2); } }
+/* Cell click: pop up, gold glow and a light sweep across the cell (~0.4 s) before the question opens.
+   Only transform/opacity animate; the glow is inset because the cell clips its overflow. */
+.board-cell.is-opening { position: relative; z-index: 2; border-color: var(--gold); animation: cell-pop 0.4s ease-out; }
+.board-cell.is-opening::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: -60%;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  transform: skewX(-20deg);
+  pointer-events: none;
+  animation: cell-sweep 0.4s ease-out;
+}
+@keyframes cell-pop {
+  0% { transform: scale(1); box-shadow: inset 0 0 0 0 var(--gold); }
+  45% { transform: scale(1.12); box-shadow: inset 0 0 18px 4px var(--gold); }
+  100% { transform: scale(1.04); box-shadow: inset 0 0 8px 2px var(--gold); }
+}
+@keyframes cell-sweep { to { inset-inline-start: 130%; } }
+@media (prefers-reduced-motion: reduce) { .board-cell.is-opening, .board-cell.is-opening::after { animation: none; } }
 /* Used cells (US-08): owner color is set inline by JS; no correct answer = grey */
 .board-cell.is-used { cursor: default; background-image: none; border-color: rgba(0, 0, 0, 0.35); }
 .board-cell.is-owned { box-shadow: inset 0 -4px 0 rgba(0, 0, 0, 0.25); }
