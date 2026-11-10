@@ -4444,6 +4444,13 @@
     updateFinalRows();
   }
 
+  /** A marked wager as "+400" / "−400"; a bet of 0 is plain "0" (FU-33); nothing before the mark. */
+  function finalDelta(mark, wager) {
+    if (mark === null) return '';
+    if (wager === 0) return ltr('0');
+    return signed(mark === 'correct' ? '+' : MINUS, wager);
+  }
+
   /** Once per contestant, any number Correct; See results once everyone is scored. */
   function updateFinalRows() {
     const g = state.game;
@@ -4458,7 +4465,7 @@
       ref.wrong.classList.toggle('is-chosen', mark === 'wrong');
       ref.row.classList.toggle('is-scored', mark !== null);
       ref.score.textContent = formatScore(ref.contestant.score);
-      ref.wager.textContent = mark === null ? '' : signed(mark === 'correct' ? '+' : MINUS, wager);
+      ref.wager.textContent = finalDelta(mark, wager);
       ref.wager.className = 'srow-wager' + (mark === null ? '' : ' is-' + mark);
       ref.status.textContent = mark === null ? ''
         : t(mark === 'correct' ? 'final.statusCorrect' : 'final.statusWrong',

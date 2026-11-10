@@ -12,6 +12,7 @@
 - The Daily Challenge gives everyone the same 3 multiple-choice questions each day (a new set at midnight UTC); the result, such as "BrainRush Daily #12: 2/3" with a row of green and red squares, can be shared, as can the final standings of a board game.
 - Many questions are in Arabic and English, and some show a picture, such as a flag or a famous place.
 - The game itself can be shown in English or Arabic (right to left) with the EN / AR switch in its header; the choice is saved on the device.
+- A wrong or unclear question can be reported from the game with the Report button on the question screen (in the Streak Challenge and the Daily Challenge, once the question is answered).
 - Each device remembers which questions it has played, so new games pick unseen questions first.
 - No sign-up or install. It works best on a TV or big screen with the host at the keyboard.
 
