@@ -296,10 +296,13 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 
 /* FU-55: Categories on a phone. The add form stacks; each table row becomes a small card (name and
    Arabic name, count and status, then the buttons), so Rename, Delete, Save and Cancel are on screen
-   without scrolling the table sideways, and every control is at least 40px tall. Desktop unchanged. */
+   without scrolling the table sideways, and every control is at least 40px tall. Desktop unchanged.
+   FU-59: the cards are used up to 800px (the table needs about 775px, so it scrolled sideways from 601px). */
 @media (max-width: 600px) {
   #category-form { flex-wrap: wrap; }
   #category-form input, #category-form .btn { flex: 1 1 100%; min-height: 40px; }
+}
+@media (max-width: 800px) {
   #categories-panel .data-table thead { display: none; }
   #categories-panel .data-table, #categories-panel .data-table tbody { display: block; }
   #categories-panel .data-table tr {
@@ -394,6 +397,79 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 .sort-btn[data-dir="ascending"]::after { content: " \2191"; content: " \2191" / ""; opacity: 1; }
 .sort-btn[data-dir="descending"]::after { content: " \2193"; content: " \2193" / ""; opacity: 1; }
 .sort-btn.is-sorted { color: var(--gold); }
+
+/* FU-59: the Questions, Reports, Streaks and Logs tables as cards up to 800px wide (the same idea as the
+   categories above). Each cell shows its column name above the value (data-label, set by admin.js); short
+   values sit side by side, long text and the buttons take the full width; buttons are at least 40px tall.
+   The Questions table keeps its sort buttons as a "Sort by" bar above the cards. These rules come after
+   the Questions rules above so they win over them at the same specificity. */
+@media (max-width: 800px) {
+  .card-table thead { display: none; }
+  .card-table, .card-table tbody { display: block; }
+  .card-table tr {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+    gap: 0.5rem 0.75rem;
+    padding: 0.7rem 0.2rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .card-table td { display: block; min-width: 0; padding: 0; border: 0; overflow-wrap: anywhere; }
+  .data-table.card-table td.text-cell, .data-table.card-table td.name-cell { min-width: 0; max-width: none; }
+  .data-table.card-table td.num, .card-table .badge { white-space: normal; }
+  .card-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .card-table td.card-wide, .card-table td.empty-row, .card-table td.row-actions { grid-column: 1 / -1; }
+  .card-table td.row-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; white-space: normal; }
+  .data-table.card-table td.row-actions .btn { flex: 1 1 auto; min-height: 40px; margin: 0; }
+  .card-table tr.is-editing, .card-table tr.is-open { padding: 0.7rem; background: rgba(245, 197, 24, 0.08); }
+  .data-table.card-table tr.is-editing td, .data-table.card-table tr.is-open td { background: none; }
+  .card-table .link-btn { min-height: 40px; overflow-wrap: anywhere; }
+
+  #questions-panel .data-table.card-table td { padding: 0; }
+  #questions-panel .data-table.card-table td.name-cell { min-width: 0; }
+  #questions-table td.card-wide { order: -1; } /* question and answer first, then the short values */
+  #questions-table thead { display: block; }
+  #questions-table thead tr { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0 0 0.6rem; }
+  #questions-table thead tr::before { content: "Sort by"; color: var(--muted); font-size: 0.9rem; }
+  #questions-table thead th { display: none; }
+  #questions-table thead th[aria-sort] { display: block; padding: 0; border: 0; }
+  #questions-table .sort-btn {
+    min-height: 40px;
+    padding: 0 0.75rem;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+}
+/* FU-59: in the card range the small buttons of the admin panels (point values, Reload, Reset all stats)
+   are 40px tall too */
+@media (max-width: 800px) {
+  .admin main .btn-small { min-height: 40px; }
+}
+
+/* FU-44: above 800px and up to 1200px the Questions table hides its Arabic, Picture? and Choices columns,
+   so the Question and Answer columns get room and the rows stay low; the toggle button brings them back.
+   Outside this range the button is hidden and the table is unchanged. The outer query is the exact
+   opposite of the card query (max-width: 800px), so at fractional widths (zoom, high-DPI screens) such
+   as 800.5px one of the two always applies. */
+.cols-toggle { display: none; }
+@media not all and (max-width: 800px) {
+  @media (max-width: 1200px) {
+    .cols-toggle { display: inline-block; min-height: 40px; }
+    #questions-table:not(.show-extra) .col-extra { display: none; }
+    /* Edit above Delete: a narrower Actions column leaves more room for the text */
+    #questions-table td.row-actions { white-space: normal; }
+    #questions-table td.row-actions .btn { display: block; width: 100%; }
+    #questions-table td.row-actions .btn + .btn { margin: 0.35rem 0 0; }
+  }
+}
 
 /* ---------- Game page ---------- */
 .game-main { padding: 1.25rem 1.5rem 1rem; }
