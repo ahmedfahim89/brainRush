@@ -1,4 +1,4 @@
-// BrainRush game page: setup, dynamic board, question + timer, scoring, results
+// Mokh Rush game page: setup, dynamic board, question + timer, scoring, results
 // and localStorage persistence (survives a page refresh).
 // The page only uses public endpoints (GETs, the board POST, the game log, reports and question
 // stats), so it works on the hosted site without the admin login.
@@ -14,6 +14,7 @@
   const tn = i18n.n;
   const iso = i18n.iso;
   const ltr = i18n.ltr;
+  const PAGE_TITLE = document.title; // the page's own English tab title (D-64: Arabic shows app.name)
   const API_BASE = 'api/';
   const STORAGE_KEY = 'brainrush.game';
   // v4 adds the final round (US-44); v3 (helpers, US-32), v2 (used cells + open question) and
@@ -2894,8 +2895,8 @@
   }
 
   /**
-   * US-46: "Team Red won BrainRush with 2300! Team Blue 1800, Team Green 900." A tie uses the D-10
-   * wording: "It's a tie between Team Red and Team Blue in BrainRush with 2300 each!" and the rest.
+   * US-46: "Team Red won Mokh Rush with 2300! Team Blue 1800, Team Green 900." A tie uses the D-10
+   * wording: "It's a tie between Team Red and Team Blue in Mokh Rush with 2300 each!" and the rest.
    * Scores use the same minus sign as the screen. In Arabic the text is Arabic too (US-49).
    */
   function resultsShareText(g) {
@@ -3758,7 +3759,7 @@
   // The same questions for everyone on a day (UTC). api/daily.php makes the set on the day's first
   // request; the run is played like a Streak question (3 choices, the setup timer, no Pause, Reset
   // or helpers), but a wrong answer or time's up only scores 0 and the run moves on. The result
-  // ("BrainRush Daily #N: 2/3" and a row of squares) stays on this device: opening the Daily
+  // ("Mokh Rush Daily #N: 2/3" and a row of squares) stays on this device: opening the Daily
   // Challenge again the same day shows it with a countdown to the next one.
 
   function saveDaily() {
@@ -4062,7 +4063,7 @@
     return run.results.filter(Boolean).length;
   }
 
-  /** "BrainRush Daily #12: 2/3" */
+  /** "Mokh Rush Daily #12: 2/3" */
   function dailyScoreLine(run) {
     return t('daily.score', { n: run.number, right: dailyRightCount(run), total: run.results.length });
   }
@@ -4911,6 +4912,8 @@
   /** The page's own texts (data-i18n), the switch's pressed button and the mode limits. */
   function applyStaticTexts() {
     i18n.apply(document);
+    // The tab title: the brand alone in Arabic (no Arabic tagline yet), the page's own title in English.
+    document.title = i18n.isArabic() ? t('app.name') : PAGE_TITLE;
     const lang = i18n.lang();
     dom.uiLangBtns.forEach((btn) => btn.setAttribute('aria-pressed', String(btn.getAttribute('data-ui-lang') === lang)));
     Object.keys(MODES).forEach((key) => {
