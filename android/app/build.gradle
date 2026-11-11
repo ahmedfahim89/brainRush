@@ -24,8 +24,8 @@ def twaManifest = [
     applicationId: 'ninja.integration.brainrush',
     hostName: 'brainrush.integration.ninja', // The domain being opened in the TWA.
     launchUrl: '/?source=twa', // The start path for the TWA. Must be relative to the domain.
-    name: 'BrainRush', // The application name.
-    launcherName: 'BrainRush', // The name shown on the Android Launcher.
+    name: 'Mokh Rush', // The application name.
+    launcherName: 'Mokh Rush', // The name shown on the Android Launcher.
     themeColor: '#0B1026', // The color used for the status bar.
     themeColorDark: '#000000', // The color used for the dark status bar.
     navigationColor: '#000000', // The color used for the navigation bar.

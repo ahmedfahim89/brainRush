@@ -1,4 +1,4 @@
-// BrainRush read aloud (US-48): a thin layer over the browser's built-in speech synthesis.
+// Mokh Rush read aloud (US-48): a thin layer over the browser's built-in speech synthesis.
 // No server work and no external service of our own. game.js decides what to read and when;
 // this file picks a voice per language and starts or stops the reading.
 //   window.BrainRushSpeech = { supported(), hasVoice(lang), speak(parts, onDone), stop(), onVoicesChanged(cb) }
