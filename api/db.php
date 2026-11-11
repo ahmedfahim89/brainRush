@@ -184,6 +184,13 @@ const PLAYABLE_HAVING =
         AND COUNT(DISTINCT CASE WHEN pv.enabled = 1 THEN q.points END) =
             (SELECT COUNT(*) FROM point_values WHERE enabled = 1)';
 
+// Kilo Meshakkal (US-53 / D-53, FU-38): the built-in mixed column. It has no row in `categories`,
+// so it has a reserved id (real ids are positive, Surprise is 0 in the game) and a fixed name.
+// Board and played requests (questions.php), the game log (game-log.php) and the reserved category
+// name (categories.php) all use this pair. The game keeps its own copy: MIX / MIX_NAME in js/game.js.
+const MIX_ID = -1;
+const MIX_NAME = 'Kilo Meshakkal';
+
 // ---------------------------------------------------------------------------
 // Game day (D-46)
 // ---------------------------------------------------------------------------

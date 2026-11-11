@@ -12,8 +12,6 @@
 require_once __DIR__ . '/db.php';
 
 const CATEGORY_NAME_MAX = 100;
-// Kilo Meshakkal (US-53 / D-53): MIX_NAME in api/questions.php and js/game.js.
-const CATEGORY_MIX_NAME = 'Kilo Meshakkal';
 
 function category_row(array $r): array
 {
@@ -83,11 +81,11 @@ function find_category(PDO $pdo, int $id): ?array
 
 /**
  * Run an INSERT/UPDATE on the name, mapping the unique-key error to 409. The built-in Kilo Meshakkal
- * name (BUG-10-01, US-53) is taken too, so Setup never shows two tiles with that name.
+ * name (MIX_NAME in db.php, BUG-10-01, US-53) is taken too, so Setup never shows two tiles with that name.
  */
 function save_category_name(PDOStatement $stmt, array $params, string $name): void
 {
-    if (mb_strtolower($name) === mb_strtolower(CATEGORY_MIX_NAME)) {
+    if (mb_strtolower($name) === mb_strtolower(MIX_NAME)) {
         conflict("\"$name\" is the name of a built-in category");
     }
     try {

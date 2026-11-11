@@ -25,7 +25,8 @@
   const NAME_MAX = 30;
   const SURPRISE = 0;       // "Surprise me!" tile in the selected list (real category ids are positive)
   const SURPRISE_ALONE = 3; // random categories when "Surprise me!" is the only tick
-  // Kilo Meshakkal (US-53 / D-53): a built-in category with no DB row (MIX_ID in api/questions.php).
+  // Kilo Meshakkal (US-53 / D-53): a built-in category with no DB row. MIX and MIX_NAME must match
+  // MIX_ID and MIX_NAME in api/db.php (the server's single copy; the game cannot share a PHP constant).
   // Each box of its column holds a question from any category; open boxes show an emoji instead of
   // their value, and the values run in a random order down the column.
   const MIX = -1;
