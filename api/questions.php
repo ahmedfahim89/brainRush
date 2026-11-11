@@ -30,7 +30,7 @@
 // browser already played (`seen`, oldest first): a cell draws from its unseen questions,
 // and once all of them were played it takes the one played longest ago.
 //
-// Kilo Meshakkal (US-53 / D-53): the board's `categories` may also list MIX_ID (-1) once. It is a
+// Kilo Meshakkal (US-53 / D-53): the board's `categories` may also list MIX_ID (-1, in db.php) once. It is a
 // built-in column with no row in `categories`: each of its cells is a random question from any
 // playable category at that value (see mix_column()), and carries its source `category_name`.
 //
@@ -55,11 +55,6 @@ const WRONG_OPTION_MAX = 255;
 
 // Streak Challenge (US-33): questions per batch; the game asks for more when it runs low.
 const STREAK_BATCH = 20;
-
-// Kilo Meshakkal (US-53 / D-53): reserved board id (real ids are positive, Surprise is 0 in the game)
-// and its column name. MIX / MIX_NAME in js/game.js; also in api/game-log.php.
-const MIX_ID = -1;
-const MIX_NAME = 'Kilo Meshakkal';
 
 /**
  * A text as the game shows it as a choice (choiceText() in js/game.js): cut at its first
