@@ -1228,7 +1228,8 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
   box-shadow: 0 0 12px rgba(245, 197, 24, 0.35);
   font-weight: 700;
 }
-@media (hover: hover) { .btn-leaderboard:hover:not(:disabled) { background: rgba(245, 197, 24, 0.3); box-shadow: 0 0 18px rgba(245, 197, 24, 0.55); } }
+/* Hover fill: opaque equal of a 30% gold tint over the setup panel (#151c3d), so contrast tools read the real colour */
+@media (hover: hover) { .btn-leaderboard:hover:not(:disabled) { background: #584f32; box-shadow: 0 0 18px rgba(245, 197, 24, 0.55); } }
 
 /* Question screen in streak mode (game.js sets .streak): the streak panel takes the scoring
    panel's column; there is no answer block and no Pause/Reset. Fits 1366x768 (D-30). */
