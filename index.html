@@ -151,7 +151,7 @@
         <!-- Streak Challenge (US-33): replaces the player row and the category picker while chosen -->
         <fieldset id="streak-block" class="setup-block" hidden>
           <legend data-i18n="streak.legend">Streak Challenge</legend>
-          <p class="hint" data-i18n="streak.setupHint">Questions come from every category. Pick 1 of 3 answers before the time runs out: one wrong answer or time's up ends the run. Your streak goes on the shared leaderboard with your name.</p>
+          <p class="hint" data-i18n="streak.setupHint">Questions come from every category. Pick 1 of 3 answers before the time runs out: a wrong answer or time's up ends the run, but you get one second chance per run. Your streak goes on the shared leaderboard with your name.</p>
           <div class="field streak-name-field">
             <label for="streak-name" data-i18n="streak.nameLabel">Challenger name</label>
             <input id="streak-name" type="text" maxlength="30" autocomplete="off" aria-describedby="streak-name-error">
@@ -284,9 +284,10 @@
             <p id="streak-run-name" class="streak-name"></p>
             <p class="streak-count-line"><span id="streak-count-label" data-i18n="streak.count">Streak</span> <span id="streak-count" class="streak-count" aria-live="polite"></span></p>
           </div>
-          <p id="streak-hint" class="hint" data-i18n="streak.hint">Pick the right answer before the time runs out. One wrong answer ends the run.</p>
+          <p id="streak-hint" class="hint" data-i18n="streak.hintChance">Pick the right answer before the time runs out. One wrong answer ends the run, after your one second chance.</p>
           <ol id="streak-choices" class="streak-choices" aria-label="Choices" data-i18n-attr="aria-label:question.choices"></ol>
           <p id="streak-feedback" class="streak-feedback" role="status" aria-live="polite"></p>
+          <button type="button" id="streak-second-chance" class="btn btn-primary btn-large btn-block" hidden data-i18n="streak.secondChance">Use second chance</button>
           <button type="button" id="streak-next" class="btn btn-primary btn-large btn-block" hidden data-i18n="run.next">Next question</button>
           <button type="button" id="streak-end" class="btn btn-end btn-block" data-i18n="streak.end">End run</button>
         </section>
