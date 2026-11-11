@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  BrainRush trivia card: the MCP App that api/mcp.php serves as ui://brainrush/trivia-card.
+  Mokh Rush trivia card: the MCP App that api/mcp.php serves as ui://brainrush/trivia-card.
   Claude draws it in a sandboxed frame on another origin; api/mcp.php fills in the site's address
   (MCP_SITE) where the script and the pictures load from. Questions come from
   the card-only tool brainrush_trivia_questions, through the host, never through the model.
@@ -10,9 +10,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>BrainRush trivia</title>
+<title>Mokh Rush trivia</title>
 <style>
-  /* Claude's style variables when the host sends them, BrainRush-neutral fallbacks otherwise. */
+  /* Claude's style variables when the host sends them, brand-neutral fallbacks otherwise. */
   :root {
     --br-bg: var(--color-background-primary, #ffffff);
     --br-surface: var(--color-background-secondary, #f4f4f2);
@@ -121,7 +121,7 @@
 <body>
 <main>
   <div class="top">
-    <span><span class="brand">BrainRush</span> <span id="meta"></span></span>
+    <span><span class="brand">Mokh Rush</span> <span id="meta"></span></span>
     <span class="score" id="score">Score 0/0</span>
   </div>
 
@@ -161,7 +161,7 @@
     isDone: false,  // the bank has nothing left for this card
   };
 
-  const app = new App({ name: "BrainRush trivia", version: "1.0.0" });
+  const app = new App({ name: "Mokh Rush trivia", version: "1.0.0" });
 
   function applyContext(ctx) {
     if (!ctx) return;

@@ -1,4 +1,4 @@
-// BrainRush admin page: settings, point values, categories, questions, question reports, the streak leaderboard and the game logs.
+// Mokh Rush admin page: settings, point values, categories, questions, question reports, the streak leaderboard and the game logs.
 // Question bank (D-31 amended): every question has a point value, a category may have
 // several questions per value, and it is playable when every enabled point value has one.
 // All API/user text is rendered with textContent / DOM APIs (never innerHTML).

@@ -1,4 +1,4 @@
-# BrainRush Android app (TWA)
+# Mokh Rush Android app (TWA)
 
 The Android app is a Trusted Web Activity (US-40, D-43): a thin wrapper that opens the live site
 `https://brainrush.integration.ninja/?source=twa` full screen in Chrome. It was generated with

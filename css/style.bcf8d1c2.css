@@ -1,4 +1,4 @@
-/* BrainRush shared styles: dark board theme, gold accents, big readable text. */
+/* Mokh Rush shared styles: dark board theme, gold accents, big readable text. */
 
 :root {
   --bg: #0b1026;
@@ -62,7 +62,8 @@ a { color: var(--gold); }
   background: #0e1433;
 }
 .page-header h1 { margin: 0; }
-.brand-logo { width: 2.2rem; height: 2.2rem; vertical-align: middle; margin-right: 0.6rem; }
+/* Header mark (D-64): height-driven, width follows the mark's 1.5:1 shape */
+.brand-logo { width: auto; height: 2.2rem; vertical-align: middle; margin-right: 0.6rem; }
 .nav-link { font-weight: 600; text-decoration: none; }
 @media (hover: hover) { .nav-link:hover { text-decoration: underline; } }
 
@@ -483,7 +484,7 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 
 /* Setup */
 .setup { max-width: 54rem; margin: 0 auto; }
-/* Home intro (D-42): one short muted line under "New game" that says what BrainRush is */
+/* Home intro (D-42): one short muted line under "New game" that says what Mokh Rush is */
 .site-intro { margin: -0.3rem 0 1rem; color: var(--muted); font-size: 0.95rem; }
 
 /* Site footer (US-41): the same links on every public page. Hidden while a board game is on screen,

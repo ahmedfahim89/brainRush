@@ -1,4 +1,4 @@
-// BrainRush Android app mode (US-40, D-43), shared by the game page and the guide, Terms and
+// Mokh Rush Android app mode (US-40, D-43), shared by the game page and the guide, Terms and
 // Privacy pages. The app is a Trusted Web Activity: this same site, full screen in Chrome. It
 // opens ./?source=twa (the manifest's start_url), and Chrome sends the app as the referrer.
 // Either one marks this tab as the app in sessionStorage, so it stays in app mode while it

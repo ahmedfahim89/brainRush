@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Mokh Rush concept A: forward-leaning brain profile with motion slits and trailing streaks (maskable: full-bleed background, mark inside the central 80% circle). Shapes only, no text or fonts. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1d2654"/>
+      <stop offset="1" stop-color="#0b1026"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe27a"/>
+      <stop offset="1" stop-color="#f5c518"/>
+    </linearGradient>
+    <linearGradient id="goldH" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f5c518"/>
+      <stop offset="1" stop-color="#ffe27a"/>
+    </linearGradient>
+    <mask id="a-cut" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="#fff"/>
+      <g fill="none" stroke="#000" stroke-width="24" stroke-linecap="round">
+        <path d="M266 300 C284 284 308 280 326 288"/>
+        <path d="M376 214 C354 214 344 234 354 254"/>
+        <path d="M190 200 C210 194 230 208 226 230"/>
+        <path d="M302 140 C294 168 314 188 302 214"/>
+        <path d="M200 310 C220 318 244 318 262 304"/>
+      </g>
+    </mask>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g transform="translate(20.48 20.48) scale(0.92)">
+  <g transform="translate(276 262) skewX(-12) scale(1.04) translate(-272 -246)">
+    <path mask="url(#a-cut)" fill="url(#gold)" d="M372 300 C404 290 414 250 400 216 A46 46 0 0 0 352 158 A46 46 0 0 0 284 140 A46 46 0 0 0 214 148 A46 46 0 0 0 150 196 C124 236 130 290 170 306 C168 336 196 356 232 350 C256 346 266 330 262 316 C290 336 340 330 372 300 Z"/>
+  </g>
+  <g fill="#f5c518">
+    <rect x="74" y="186" width="64" height="20" rx="10"/>
+    <rect x="50" y="234" width="84" height="20" rx="10"/>
+    <rect x="78" y="282" width="52" height="20" rx="10"/>
+  </g>
+  </g>
+</svg>
