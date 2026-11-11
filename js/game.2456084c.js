@@ -1800,7 +1800,7 @@
       beginGame(board, timer);
     } catch (err) {
       // US-06: stay on setup with every input intact.
-      showMessage(dom.startMsg, () => t('start.failed', { reason: errorText(err) }), 'error');
+      showMessage(dom.startMsg, () => t('start.failed', { reason: localCategoryNames(errorText(err)) }), 'error');
     } finally {
       s.starting = false;
       dom.startBtn.textContent = t('setup.start');
@@ -1974,6 +1974,19 @@
    */
   function localName(name, nameAr) {
     return i18n.isArabic() && isFilled(nameAr) ? nameAr : name;
+  }
+
+  /**
+   * FU-56: the server's board errors name a category in quotes ('Category "Flags" is missing
+   * questions for: 300'). The text stays English (D-59 a); in Arabic only a quoted name of a Setup
+   * category (or Kilo Meshakkal) becomes its Arabic name, isolated so the English sentence keeps its order.
+   */
+  function localCategoryNames(text) {
+    if (!i18n.isArabic()) return text;
+    return state.setup.playable.concat([{ id: MIX, name: MIX_NAME }]).reduce((out, c) => {
+      const local = columnName(c);
+      return local === c.name ? out : out.split('"' + c.name + '"').join('"' + iso(local) + '"');
+    }, text);
   }
 
   /** A board column's or Setup tile's name; Kilo Meshakkal (US-53) has no DB row, so its names are in the string tables. */

@@ -350,6 +350,8 @@
     if (state.renamingId !== null && !findCategory(state.renamingId)) state.renamingId = null;
     clearMessage(dom.globalMsg);
     renderAll();
+    // Reports load on their own; once listed, redraw them so their Arabic category names (FU-56) follow.
+    if (state.reports.length) renderReports();
   }
 
   function renderAll() {
@@ -361,6 +363,17 @@
 
   function findCategory(id) {
     return state.categories.find((c) => c.id === id) || null;
+  }
+
+  /** The Arabic name of a listed category, or '' (none set, or the category list is not loaded yet). */
+  function arabicNameOf(categoryId) {
+    const c = findCategory(categoryId);
+    return c && c.name_ar ? c.name_ar : '';
+  }
+
+  /** Right-to-left span with a category's Arabic name, for the Questions and Reports lists (FU-56). */
+  function arabicNameSpan(nameAr) {
+    return h('span', { className: 'cat-ar', dir: 'rtl', lang: 'ar', text: nameAr });
   }
 
   // ---------- Settings (US-18) ----------
@@ -800,8 +813,12 @@
     rows.forEach((q) => {
       const isEditing = state.editing !== null && state.editing.id === q.id;
       const label = '"' + shortText(q.question) + '" (' + q.category_name + ' - ' + q.points + ')';
+      const nameAr = arabicNameOf(q.category_id);
       dom.questionsBody.appendChild(h('tr', { className: isEditing ? 'is-editing' : '' }, [
-        h('td', { className: 'name-cell', text: q.category_name }),
+        h('td', { className: 'name-cell' }, [
+          document.createTextNode(q.category_name),
+          nameAr ? arabicNameSpan(nameAr) : null,
+        ]),
         h('td', { className: 'num', text: String(q.points) }),
         h('td', { className: 'text-cell', text: q.question }),
         h('td', { className: 'text-cell', text: q.answer }),
@@ -1222,10 +1239,15 @@
     return Object.prototype.hasOwnProperty.call(REPORT_REASONS, reason) ? REPORT_REASONS[reason] : String(reason);
   }
 
-  /** "Geography – 300" (+ " – picture") over the question text and its answer. */
+  /** "Geography (جغرافيا) – 300" (+ " – picture") over the question text and its answer; no brackets without an Arabic name. */
   function reportQuestionCell(q) {
+    const nameAr = arabicNameOf(q.category_id);
+    const rest = ' ' + EN_DASH + ' ' + q.points + (q.image ? ' ' + EN_DASH + ' picture' : '');
+    const meta = nameAr
+      ? [document.createTextNode(q.category_name + ' ('), arabicNameSpan(nameAr), document.createTextNode(')' + rest)]
+      : [document.createTextNode(q.category_name + rest)];
     return h('td', { className: 'text-cell' }, [
-      h('div', { className: 'report-q-meta', text: q.category_name + ' ' + EN_DASH + ' ' + q.points + (q.image ? ' ' + EN_DASH + ' picture' : '') }),
+      h('div', { className: 'report-q-meta' }, meta),
       h('div', { text: q.question }),
       h('div', { className: 'hint', text: 'Answer: ' + q.answer }),
     ]);
