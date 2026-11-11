@@ -825,10 +825,14 @@
     });
   }
 
-  /** A cell closed after a Swap: the category and points of the question that replaced it (shown on the board). */
+  /**
+   * A cell closed after a Swap: the category and points of the question that replaced it (shown on the
+   * board) and its id (FU-35; missing in saves from before it).
+   */
   function isValidUsedSwap(swap) {
     return isPlainObject(swap) && typeof swap.catName === 'string' && swap.catName !== '' &&
-      isOptionalText(swap.catNameAr) && Number.isInteger(swap.points) && swap.points > 0;
+      isOptionalText(swap.catNameAr) && Number.isInteger(swap.points) && swap.points > 0 &&
+      (swap.id === undefined || (Number.isInteger(swap.id) && swap.id > 0));
   }
 
   /** Open question: an unused cell, marks only for real contestants, at most one Correct (US-14), valid helper use. */
@@ -2684,6 +2688,20 @@
     return ids;
   }
 
+  /**
+   * Ids of the questions the Swap helper brought into this game (FU-35), from the closed cells and
+   * the open question. Cells closed in a save from before FU-35 have no id and add nothing.
+   */
+  function swapQuestionIds(g) {
+    const ids = [];
+    Object.keys(g.used).forEach((key) => {
+      const swap = g.used[key].swap;
+      if (swap && Number.isInteger(swap.id)) ids.push(swap.id);
+    });
+    if (g.current && g.current.swap) ids.push(g.current.swap.question.id);
+    return ids;
+  }
+
   /** Check the random-question payload; returns the saved `swap` shape or throws. */
   function parseSwap(data) {
     const ok = isPlainObject(data) && isPlainObject(data.category) && Number.isInteger(data.category.id) &&
@@ -2717,7 +2735,10 @@
     sendQuestionStat(g, activeQuestion(g).question.id, boardOutcome(cur)); // saved below with the cell
     const cell = { owner: correctContestantId(cur) };
     // A Swap replaced the question: the board shows the old value struck through and the new one small.
-    if (cur.swap) cell.swap = { catName: cur.swap.catName, catNameAr: cur.swap.catNameAr, points: cur.swap.points };
+    // The id lets Golden Goal skip it too (FU-35).
+    if (cur.swap) {
+      cell.swap = { catName: cur.swap.catName, catNameAr: cur.swap.catNameAr, points: cur.swap.points, id: cur.swap.question.id };
+    }
     g.used[cellKey(cur.catId, cur.points)] = cell;
     g.current = null;
     renderGame();
@@ -4300,8 +4321,8 @@
 
   /**
    * "Go for goal": draw the question (shown later), then ask for the bets. Never a question of this
-   * game: the board's and the earlier rounds' are excluded, as the board avoids repeats. When none
-   * is left (409), the game ends in a tie (Results, D-10, D-51).
+   * game: the board's, the Swap helper's (FU-35) and the earlier rounds' are excluded, as the board
+   * avoids repeats. When none is left (409), the game ends in a tie (Results, D-10, D-51).
    */
   async function onFinalPlay() {
     const g = state.game;
@@ -4314,7 +4335,7 @@
     let noneLeft = false;
     try {
       drawn = parseSwap(await apiPost('questions.php?random=1', {
-        exclude: boardQuestionIds(g).concat(f.usedIds),
+        exclude: boardQuestionIds(g).concat(swapQuestionIds(g), f.usedIds),
         seen: loadSeen(),
       }));
     } catch (err) {
@@ -4487,8 +4508,8 @@
     });
     const allMarked = g.contestants.every((c) => hasOwn(f.marks, String(c.id)));
     dom.backBtn.disabled = !allMarked;
-    // D-51: still level at the top -> Continue to the next round's offer; otherwise the results.
-    dom.backBtn.textContent = allMarked && isTiedAtTop(g) ? t('final.continue') : t('run.seeResults');
+    // D-51: still level at the top -> the next round's offer (FU-34: "Next round"); otherwise the results.
+    dom.backBtn.textContent = allMarked && isTiedAtTop(g) ? t('final.nextRound') : t('run.seeResults');
   }
 
   function markFinal(contestant, result) {
@@ -4529,12 +4550,16 @@
     openFinalOffer(f.round + 1, f.usedIds.slice());
   }
 
-  /** Android Back on the final question (US-40): ask, then the results; anyone not scored keeps their score. */
+  /**
+   * Android Back on the final question (US-40): ask, then the results; anyone not scored keeps their
+   * score. Everyone marked and still tied asks too, as it skips the next round (FU-34, D-52 b).
+   */
   function onFinalLeave() {
     if (!finalOnScreen()) return;
     const g = state.game;
     const unscored = g.contestants.some((c) => !hasOwn(g.final.marks, String(c.id)));
     if (unscored && !window.confirm(t('final.leave.' + MODES[g.mode].key))) return;
+    if (!unscored && isTiedAtTop(g) && !window.confirm(t('final.leaveTied'))) return;
     finishFinal();
   }
 

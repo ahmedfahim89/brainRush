@@ -82,9 +82,16 @@ function find_category(PDO $pdo, int $id): ?array
 /**
  * Run an INSERT/UPDATE on the name, mapping the unique-key error to 409. The built-in Kilo Meshakkal
  * name (MIX_NAME in db.php, BUG-10-01, US-53) is taken too, so Setup never shows two tiles with that name.
+ * Runs of whitespace (any Unicode space) become one space, and the name is stored that way, so
+ * "Kilo  Meshakkal" is caught too (FU-62).
  */
 function save_category_name(PDOStatement $stmt, array $params, string $name): void
 {
+    $name = trim(preg_replace('/\s+/u', ' ', $name));
+    if ($name === '') {
+        bad_request('Name is required'); // only Unicode spaces that trim() kept
+    }
+    $params[':name'] = $name;
     if (mb_strtolower($name) === mb_strtolower(MIX_NAME)) {
         conflict("\"$name\" is the name of a built-in category");
     }

@@ -6,7 +6,7 @@
 // key, then reads the set back, so two simultaneous first requests still give one set. A question is
 // shaped as the Streak Challenge plays it (streak_question() in api/questions.php): its 3 choices,
 // cut at the first bracket, come in an order that is the same for everyone on that day.
-// number = days since the first stored challenge + 1 (#1 is the first day this database served one).
+// number = days since DAILY_LAUNCH_DATE (live #1) + 1, the same on every database (FU-30).
 // seconds_to_next = seconds until the next set (the next midnight in GAME_TIME_ZONE).
 // Public and read-only for the player: the answers are in the payload, as in the Streak Challenge
 // (D-37 g), and the result stays in the player's browser (a device-only lock, US-43).
@@ -16,6 +16,7 @@ const QUESTIONS_INCLUDE_ONLY = true; // questions.php: define its functions, han
 require_once __DIR__ . '/questions.php';
 
 const DAILY_QUESTIONS = 3;  // D-46: questions per Daily Challenge; the only place this count is set
+const DAILY_LAUNCH_DATE = '2026-11-02'; // FU-30: the UTC date of live Daily #1; #N counts from it
 const DAILY_PICK_TRIES = 3; // rounds of "fill the missing positions, read back" before giving up
 const DAILY_UNAVAILABLE = 'The Daily Challenge is not available right now. Please try again later.';
 
@@ -188,14 +189,17 @@ function daily_choices(PDO $pdo, array $r, string $date): ?array
     ];
 }
 
-/** #N of a day: days since the first stored challenge, plus 1. */
-function daily_number(PDO $pdo, string $date): int
+/**
+ * #N of a day: days since DAILY_LAUNCH_DATE, plus 1, so every database gives the same number for a
+ * date and deleting rows never shifts it (FU-30). A day before the launch date is #1.
+ */
+function daily_number(string $date): int
 {
-    $stmt = $pdo->prepare(
-        'SELECT DATEDIFF(:date, MIN(challenge_date)) FROM daily_challenge WHERE challenge_date <= :same_date'
-    );
-    $stmt->execute([':date' => $date, ':same_date' => $date]);
-    return max(0, (int) $stmt->fetchColumn()) + 1;
+    $utc = new DateTimeZone('UTC');
+    $launch = new DateTimeImmutable(DAILY_LAUNCH_DATE, $utc);
+    $day = new DateTimeImmutable($date, $utc);
+    $days = (int) $launch->diff($day)->format('%r%a');
+    return max(0, $days) + 1;
 }
 
 /** The payload for the game day that holds $now; 503 when no full set can be made. */
@@ -219,7 +223,7 @@ function daily_challenge(PDO $pdo, DateTimeImmutable $now): array
     }
     return [
         'date'            => $date,
-        'number'          => daily_number($pdo, $date),
+        'number'          => daily_number($date),
         'seconds_to_next' => max(1, $dayEnd->getTimestamp() - $now->getTimestamp()),
         'questions'       => $questions,
     ];
