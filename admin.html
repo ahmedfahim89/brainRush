@@ -8,7 +8,7 @@
   <link rel="icon" href="img/logo.svg" type="image/svg+xml">
   <link rel="icon" href="img/favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.9589cecb.css">
+  <link rel="stylesheet" href="css/style.5963a24c.css">
 </head>
 <body class="admin">
   <header class="page-header">
@@ -181,6 +181,9 @@
         <label for="question-points-filter">at</label>
         <select id="question-points-filter"></select>
         <span id="question-count" class="hint"></span>
+        <!-- FU-44: above 800px and up to 1200px the Arabic, Picture? and Choices columns are hidden so the Question
+             column gets room; this button (shown only there) brings them back -->
+        <button type="button" id="question-cols-toggle" class="btn btn-small cols-toggle" aria-pressed="false" aria-controls="questions-table">Show Arabic, Picture and Choices columns</button>
       </div>
       <!-- Difficulty stats (US-47, D-55): attempts and % correct from the game; the band of each enabled value.
            "Reset all stats" (change request after Sprint 11) empties question_stats. -->
@@ -190,10 +193,12 @@
       </div>
       <p id="question-stats-msg" class="msg" role="status" aria-live="polite" hidden></p>
       <p id="question-stats-reset-msg" class="msg" role="status" aria-live="polite" hidden></p>
+      <!-- FU-59: up to 800px wide the Questions, Reports, Streaks and Logs tables show each row as a card with
+           column labels (labelCells in admin.js); the Questions table keeps its sort buttons above the cards -->
       <div class="table-wrap">
-        <table class="data-table">
+        <table class="data-table card-table" id="questions-table">
           <thead>
-            <tr><th scope="col">Category</th><th scope="col">Points</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Arabic</th><th scope="col">Picture?</th><th scope="col">Choices</th><th scope="col" id="sort-attempts-head" aria-sort="none"><button type="button" class="sort-btn" data-sort="attempts">Attempts</button></th><th scope="col" id="sort-percent-head" aria-sort="none"><button type="button" class="sort-btn" data-sort="percent">% correct</button></th><th scope="col">Actions</th></tr>
+            <tr><th scope="col">Category</th><th scope="col">Points</th><th scope="col">Question</th><th scope="col">Answer</th><th scope="col" class="col-extra">Arabic</th><th scope="col" class="col-extra">Picture?</th><th scope="col" class="col-extra">Choices</th><th scope="col" id="sort-attempts-head" aria-sort="none"><button type="button" class="sort-btn" data-sort="attempts">Attempts</button></th><th scope="col" id="sort-percent-head" aria-sort="none"><button type="button" class="sort-btn" data-sort="percent">% correct</button></th><th scope="col">Actions</th></tr>
           </thead>
           <tbody id="questions-body"></tbody>
         </table>
@@ -209,7 +214,7 @@
       </div>
       <p id="reports-msg" class="msg" role="status" aria-live="polite" hidden></p>
       <div class="table-wrap">
-        <table class="data-table">
+        <table class="data-table card-table">
           <thead>
             <tr><th scope="col">Question</th><th scope="col">Reports</th><th scope="col">Reasons</th><th scope="col">Notes</th><th scope="col">Actions</th></tr>
           </thead>
@@ -227,7 +232,7 @@
       </div>
       <p id="streaks-msg" class="msg" role="status" aria-live="polite" hidden></p>
       <div class="table-wrap">
-        <table class="data-table">
+        <table class="data-table card-table">
           <thead>
             <tr><th scope="col">Name</th><th scope="col">Streak</th><th scope="col">Played</th><th scope="col">Actions</th></tr>
           </thead>
@@ -245,7 +250,7 @@
       </div>
       <p id="logs-msg" class="msg" role="status" aria-live="polite" hidden></p>
       <div class="table-wrap">
-        <table class="data-table">
+        <table class="data-table card-table">
           <thead>
             <tr><th scope="col">File</th><th scope="col">Size</th><th scope="col">Modified</th></tr>
           </thead>
@@ -260,6 +265,6 @@
     </section>
   </main>
 
-  <script src="js/admin.70239570.js"></script>
+  <script src="js/admin.47dc2a84.js"></script>
 </body>
 </html>

@@ -122,6 +122,8 @@
     qStatsMsg: byId('question-stats-msg'),
     qStatsResetMsg: byId('question-stats-reset-msg'),
     sortButtons: Array.prototype.slice.call(document.querySelectorAll('.sort-btn[data-sort]')),
+    qTable: byId('questions-table'),
+    qColsToggle: byId('question-cols-toggle'),
     reportsReload: byId('reports-reload'),
     reportsCount: byId('reports-count'),
     reportsMsg: byId('reports-msg'),
@@ -161,6 +163,21 @@
 
   function clear(node) {
     while (node.firstChild) node.removeChild(node.firstChild);
+  }
+
+  /**
+   * FU-59: give each cell its column name (data-label) for the card layout on narrow screens, where the
+   * header row is hidden and CSS shows the name above the value. Rows with fewer cells (the "empty" row)
+   * and the action buttons get none.
+   */
+  function labelCells(tbody) {
+    const heads = Array.from(tbody.parentNode.tHead.rows[0].cells).map((th) => th.textContent.trim());
+    Array.from(tbody.rows).forEach((tr) => {
+      if (tr.cells.length !== heads.length) return;
+      Array.from(tr.cells).forEach((td, i) => {
+        if (!td.classList.contains('row-actions')) td.setAttribute('data-label', heads[i]);
+      });
+    });
   }
 
   function plural(count, word, pluralWord) {
@@ -820,11 +837,11 @@
           nameAr ? arabicNameSpan(nameAr) : null,
         ]),
         h('td', { className: 'num', text: String(q.points) }),
-        h('td', { className: 'text-cell', text: q.question }),
-        h('td', { className: 'text-cell', text: q.answer }),
-        h('td', { className: 'text-cell', text: q.question_ar ? 'Yes' : '-' }),
-        h('td', { className: 'text-cell', text: q.image ? 'Yes' : '-' }),
-        h('td', { className: 'text-cell', text: choicesLabel(q) }),
+        h('td', { className: 'text-cell card-wide', text: q.question }),
+        h('td', { className: 'text-cell card-wide', text: q.answer }),
+        h('td', { className: 'text-cell col-extra', text: q.question_ar ? 'Yes' : '-' }),
+        h('td', { className: 'text-cell col-extra', text: q.image ? 'Yes' : '-' }),
+        h('td', { className: 'text-cell col-extra', text: choicesLabel(q) }),
         attemptsCell(q),
         percentCell(q, bands),
         h('td', { className: 'row-actions' }, [
@@ -845,6 +862,15 @@
         ]),
       ]));
     });
+    labelCells(dom.questionsBody);
+  }
+
+  /** FU-44: show or hide the Arabic, Picture? and Choices columns (the button is shown only above 800px, up to 1200px). */
+  function onColsToggle() {
+    const show = dom.qColsToggle.getAttribute('aria-pressed') !== 'true';
+    dom.qColsToggle.setAttribute('aria-pressed', String(show));
+    dom.qColsToggle.textContent = (show ? 'Hide' : 'Show') + ' Arabic, Picture and Choices columns';
+    dom.qTable.classList.toggle('show-extra', show);
   }
 
   // ---------- Difficulty stats (US-47, D-55) ----------
@@ -1246,7 +1272,7 @@
     const meta = nameAr
       ? [document.createTextNode(q.category_name + ' ('), arabicNameSpan(nameAr), document.createTextNode(')' + rest)]
       : [document.createTextNode(q.category_name + rest)];
-    return h('td', { className: 'text-cell' }, [
+    return h('td', { className: 'text-cell card-wide' }, [
       h('div', { className: 'report-q-meta' }, meta),
       h('div', { text: q.question }),
       h('div', { className: 'hint', text: 'Answer: ' + q.answer }),
@@ -1265,8 +1291,8 @@
   /** The reports that have a note, newest first: "Typo · 2026-11-02 09:45:55" and the note. */
   function reportNotesCell(group) {
     const withNote = group.reports.filter((r) => r.note !== '');
-    if (!withNote.length) return h('td', { className: 'hint', text: '-' });
-    return h('td', { className: 'text-cell' }, [
+    if (!withNote.length) return h('td', { className: 'hint card-wide', text: '-' });
+    return h('td', { className: 'text-cell card-wide' }, [
       h('ul', { className: 'cell-list' }, withNote.map((r) => h('li', {}, [
         h('span', { className: 'hint', text: reasonLabel(r.reason) + ' ' + String.fromCharCode(0x00b7) + ' ' + r.created_at }),
         h('div', { text: r.note, dir: 'auto' }), // an Arabic note reads right to left
@@ -1319,6 +1345,7 @@
         ]),
       ]));
     });
+    labelCells(dom.reportsBody);
   }
 
   /** Open the question in the Questions panel's edit form, with the list filtered to its category and points. */
@@ -1400,6 +1427,7 @@
         ]),
       ]));
     });
+    labelCells(dom.streaksBody);
   }
 
   /** Delete one run (confirm first, D-18); the leaderboard then shows the person's next best run, if any. */
@@ -1462,7 +1490,7 @@
     }
     state.logs.forEach((log) => {
       dom.logsBody.appendChild(h('tr', { className: log.name === state.openLog ? 'is-open' : '' }, [
-        h('td', { className: 'name-cell' }, [
+        h('td', { className: 'name-cell card-wide' }, [
           h('button', {
             type: 'button',
             className: 'link-btn',
@@ -1478,6 +1506,7 @@
         h('td', { className: 'num', text: String(log.modified) }),
       ]));
     });
+    labelCells(dom.logsBody);
   }
 
   /** Fetch one file and show it in the viewer below the list. */
@@ -1524,6 +1553,7 @@
     dom.reportsReload.addEventListener('click', onReportsReload);
     dom.streaksReload.addEventListener('click', onStreaksReload);
     dom.logsReload.addEventListener('click', onLogsReload);
+    dom.qColsToggle.addEventListener('click', onColsToggle);
   }
 
   async function loadData() {
