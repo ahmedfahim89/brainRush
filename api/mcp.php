@@ -1,5 +1,5 @@
 <?php
-// POST /api/mcp.php -> BrainRush Trivia, a connector for Claude (Chat, Cowork, desktop, mobile).
+// POST /api/mcp.php -> Mokh Rush Trivia, a connector for Claude (Chat, Cowork, desktop, mobile).
 // A remote MCP server over Streamable HTTP: stateless, every request a POST answered with plain
 // JSON, no sign-in (the questions are already public). Its one MCP App is a multiple-choice
 // trivia card (mcp/trivia-card.html) drawn from the Streak Challenge batch (streak_batch() in
@@ -84,20 +84,20 @@ function tool_list(): array
     return [
         [
             'name'        => 'show_brainrush_trivia',
-            'title'       => 'Play BrainRush trivia',
-            'description' => 'Opens an interactive BrainRush trivia card in the conversation: multiple-choice '
+            'title'       => 'Play Mokh Rush trivia',
+            'description' => 'Opens an interactive Mokh Rush trivia card in the conversation: multiple-choice '
                 . 'questions with 3 answers each, some with pictures, on geography, science, history, sports, '
-                . 'movies, flags, landmarks and more. Use it when the user asks for trivia, a quiz, BrainRush, '
+                . 'movies, flags, landmarks and more. Use it when the user asks for trivia, a quiz, Mokh Rush, '
                 . 'or something to play while they wait. The user plays in the card. Its questions and answers '
                 . 'are not returned to you, so do not ask or answer trivia questions yourself.',
             'inputSchema' => ['type' => 'object', 'properties' => new stdClass(), 'additionalProperties' => false],
-            'annotations' => ['title' => 'Play BrainRush trivia'] + READ_ONLY_TOOL,
+            'annotations' => ['title' => 'Play Mokh Rush trivia'] + READ_ONLY_TOOL,
             '_meta'       => ['ui' => ['resourceUri' => MCP_CARD_URI], 'ui/resourceUri' => MCP_CARD_URI],
         ],
         [
             'name'        => 'brainrush_trivia_questions',
-            'title'       => 'BrainRush trivia questions',
-            'description' => 'Loads the next questions for the BrainRush trivia card. Used by the card itself.',
+            'title'       => 'Mokh Rush trivia questions',
+            'description' => 'Loads the next questions for the Mokh Rush trivia card. Used by the card itself.',
             'inputSchema' => [
                 'type'                 => 'object',
                 'properties'           => [
@@ -110,7 +110,7 @@ function tool_list(): array
                 ],
                 'additionalProperties' => false,
             ],
-            'annotations' => ['title' => 'BrainRush trivia questions'] + READ_ONLY_TOOL,
+            'annotations' => ['title' => 'Mokh Rush trivia questions'] + READ_ONLY_TOOL,
             '_meta'       => ['ui' => ['visibility' => ['app']]],
         ],
     ];
@@ -154,7 +154,7 @@ function call_tool(string $name, array $args): ?array
 {
     switch ($name) {
         case 'show_brainrush_trivia':
-            return tool_result('The BrainRush trivia card is open in the conversation. The user plays it there; there is nothing else for you to do.');
+            return tool_result('The Mokh Rush trivia card is open in the conversation. The user plays it there; there is nothing else for you to do.');
 
         case 'brainrush_trivia_questions':
             $exclude = exclude_ids($args['exclude'] ?? null);
@@ -162,7 +162,7 @@ function call_tool(string $name, array $args): ?array
                 return tool_result('exclude must be a list of question ids.', null, true);
             }
             $questions = array_map('card_question', streak_batch(db(), $exclude, []));
-            return tool_result(count($questions) . ' BrainRush questions for the card.', ['questions' => $questions]);
+            return tool_result(count($questions) . ' Mokh Rush questions for the card.', ['questions' => $questions]);
     }
     return null;
 }
@@ -233,18 +233,18 @@ switch ($method) {
             ],
             'serverInfo'      => [
                 'name'        => 'brainrush-trivia',
-                'title'       => 'BrainRush Trivia',
+                'title'       => 'Mokh Rush Trivia',
                 'version'     => '1.0.0',
-                'description' => 'BrainRush trivia in a multiple-choice card: tap an answer, see right or wrong, keep score.',
+                'description' => 'Mokh Rush trivia in a multiple-choice card: tap an answer, see right or wrong, keep score.',
                 'websiteUrl'  => MCP_SITE,
                 // The app icon in clients that show one (ChatGPT's chip falls back to /favicon.ico without it).
                 'icons'       => [
-                    ['src' => MCP_SITE . '/img/icon-512.png', 'mimeType' => 'image/png', 'sizes' => ['512x512']],
-                    ['src' => MCP_SITE . '/img/icon-192.png', 'mimeType' => 'image/png', 'sizes' => ['192x192']],
+                    ['src' => MCP_SITE . '/img/mokh-icon-512.png', 'mimeType' => 'image/png', 'sizes' => ['512x512']],
+                    ['src' => MCP_SITE . '/img/mokh-icon-192.png', 'mimeType' => 'image/png', 'sizes' => ['192x192']],
                     ['src' => MCP_SITE . '/img/logo.svg', 'mimeType' => 'image/svg+xml', 'sizes' => ['any']],
                 ],
             ],
-            'instructions'    => 'Call show_brainrush_trivia when the user wants trivia, a quiz or BrainRush. '
+            'instructions'    => 'Call show_brainrush_trivia when the user wants trivia, a quiz or Mokh Rush. '
                 . 'It opens a card the user plays on their own; it returns no questions or answers.',
         ]);
         break;
@@ -272,7 +272,7 @@ switch ($method) {
         rpc_result($rpcId, ['resources' => [[
             'uri'         => MCP_CARD_URI,
             'name'        => 'brainrush-trivia-card',
-            'title'       => 'BrainRush trivia card',
+            'title'       => 'Mokh Rush trivia card',
             'description' => 'Interactive multiple-choice trivia card for show_brainrush_trivia.',
             'mimeType'    => MCP_CARD_MIME,
             '_meta'       => $card['_meta'],

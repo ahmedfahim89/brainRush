@@ -1,4 +1,4 @@
-# BrainRush - web server rules for the hosted deployment (US-29, D-20).
+# Mokh Rush - web server rules for the hosted deployment (US-29, D-20).
 # Works on Apache 2.4 (XAMPP) and LiteSpeed (Hostinger). Module-specific
 # directives sit inside <IfModule> so a missing module never causes a 500.
 # The PHP built-in server (php -S) ignores this file.
@@ -39,8 +39,8 @@ Options -Indexes
 
   # --- Icons at the usual root paths ---
   # Pages link img/ icons, but some clients (ChatGPT's connector chip) fetch /favicon.ico directly.
-  RewriteRule ^favicon\.(ico|png)$ img/favicon-32.png [L]
-  RewriteRule ^apple-touch-icon\.png$ img/apple-touch-icon.png [L]
+  RewriteRule ^favicon\.(ico|png)$ img/mokh-favicon-32.png [L]
+  RewriteRule ^apple-touch-icon\.png$ img/mokh-apple-touch-icon.png [L]
 </IfModule>
 
 # Second line of defence (no mod_rewrite needed): never serve config/include-only

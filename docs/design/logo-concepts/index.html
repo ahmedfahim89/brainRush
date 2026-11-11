@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mokh Rush logo concepts</title>
+<style>
+  /* Same root size, palette and font stack as css/style.*.css so the lockups render at the real h1 size. */
+  :root {
+    --bg: #0b1026; --panel: #151c3d; --panel-2: #1d2654; --border: #2c3770;
+    --text: #eef1ff; --muted: #a3acd3; --gold: #f5c518; --gold-light: #ffe27a;
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 17px; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+    line-height: 1.45;
+  }
+  main { padding: 1.5rem 1rem 4rem; max-width: 1240px; margin: 0 auto; }
+  .intro h1 { font-size: 2.6rem; color: var(--gold); margin: 0 0 0.4rem; line-height: 1.1; }
+  .intro p { color: var(--muted); max-width: 60ch; margin: 0 0 2rem; }
+  .concept { border: 1px solid var(--border); border-radius: 12px; background: var(--panel); padding: 1.25rem; margin-bottom: 2rem; }
+  .concept > h2 { font-size: 1.6rem; color: var(--gold); margin: 0 0 0.25rem; }
+  .rationale { margin: 0 0 1.25rem; max-width: 70ch; }
+  .label { display: block; color: var(--muted); font-size: 0.8rem; margin-top: 0.4rem; }
+  .row { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-end; margin-bottom: 1.5rem; }
+  .cell { display: flex; flex-direction: column; align-items: flex-start; }
+  .big { width: 100%; max-width: 512px; height: auto; }
+  .px { image-rendering: auto; }
+
+  /* Mock browser tab */
+  .tabbar { background: #dfe3ea; padding: 8px 8px 0; border-radius: 8px 8px 0 0; width: 260px; }
+  .tab { display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 8px 8px 0 0; padding: 8px 10px; color: #1f2430; font-size: 13px; }
+  .tab img { width: 16px; height: 16px; }
+  .tab.big-fav img { width: 32px; height: 32px; }
+
+  /* Maskable with 80% safe-zone overlay */
+  .mask-wrap { position: relative; width: 256px; height: 256px; }
+  .mask-wrap img { width: 256px; height: 256px; display: block; }
+  .mask-wrap::after {
+    content: ""; position: absolute; left: 10%; top: 10%; width: 80%; height: 80%;
+    border: 2px dashed var(--text); border-radius: 50%;
+  }
+  .mask-circle { width: 256px; height: 256px; clip-path: circle(40%); }
+
+  /* Header lockup, copied from the site rules */
+  .page-header { display: flex; align-items: center; padding: 1rem 1.5rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; min-width: 300px; }
+  .page-header h1 { margin: 0; font-size: 1.9rem; color: var(--gold); letter-spacing: 0.02em; line-height: 1.2; }
+  .brand-logo { width: 2.2rem; height: 2.2rem; vertical-align: middle; margin-right: 0.6rem; }
+  [dir="rtl"] .brand-logo { margin-right: 0; margin-left: 0.6rem; }
+
+  /* og-image mockup: SVG authored at 1200x630, shown at half size */
+  .og { display: block; width: 600px; max-width: 100%; height: auto; border-radius: 6px; }
+</style>
+</head>
+<body>
+<main>
+  <header class="intro">
+    <h1>Mokh Rush logo concepts</h1>
+    <p>Three directions for the rename. Each is shapes only in the site palette: board blue #0b1026 and #1d2654, gold #f5c518 to #ffe27a, darker gold #c99d00. Sizes below are shown at real CSS pixels.</p>
+  </header>
+
+  <!-- Concept A -->
+  <section class="concept" aria-labelledby="ca">
+    <h2 id="ca">A. Brain on the run</h2>
+    <p class="rationale">A brain in side profile leaning forward with speed streaks behind it: the mind racing to the buzzer, read left to right like motion.</p>
+    <div class="row">
+      <div class="cell"><img class="big" src="concept-a.svg" width="512" height="512" alt="Concept A icon at 512 pixels"><span class="label">512 px</span></div>
+      <div class="cell"><img src="concept-a.svg" width="192" height="192" alt="Concept A at 192 pixels"><span class="label">192 px</span></div>
+      <div class="cell"><img src="concept-a.svg" width="32" height="32" alt="Concept A at 32 pixels"><span class="label">32 px</span></div>
+      <div class="cell"><img src="concept-a.svg" width="16" height="16" alt="Concept A at 16 pixels"><span class="label">16 px</span></div>
+      <div class="cell"><div class="tabbar"><div class="tab big-fav"><img src="concept-a.svg" alt="">Mokh Rush</div></div><span class="label">32 px in a browser tab</span></div>
+    </div>
+    <div class="row">
+      <div class="cell"><div class="mask-wrap"><img src="concept-a-maskable.svg" alt="Concept A maskable icon with the 80 percent safe zone marked"></div><span class="label">Maskable, dashed line = 80% safe zone</span></div>
+      <div class="cell"><img class="mask-circle" src="concept-a-maskable.svg" alt="Concept A maskable icon cropped to a circle"><span class="label">Maskable, circle crop</span></div>
+    </div>
+    <div class="row">
+      <div class="cell"><div class="page-header"><h1><img class="brand-logo" src="concept-a.svg" alt="" width="36" height="36">Mokh Rush</h1></div><span class="label">Header lockup, English</span></div>
+      <div class="cell" dir="rtl" lang="ar"><div class="page-header"><h1><img class="brand-logo" src="concept-a.svg" alt="" width="36" height="36">مخ رش</h1></div><span class="label" dir="ltr" lang="en">Header lockup, Arabic UI (RTL)</span></div>
+    </div>
+    <div class="row">
+      <div class="cell"><svg class="og" viewBox="0 0 1200 630" width="600" height="315" role="img" aria-label="Concept A og-image: icon, Mokh Rush, Team trivia, buzzer speed"><defs><linearGradient id="og-bg-a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d2654"/><stop offset="1" stop-color="#0b1026"/></linearGradient><linearGradient id="og-gold-a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe27a"/><stop offset="1" stop-color="#f5c518"/></linearGradient></defs><rect x="6" y="6" width="1188" height="618" fill="url(#og-bg-a)" stroke="#f5c518" stroke-width="12"/><image href="concept-a.svg" x="110" y="195" width="240" height="240"/><text x="400" y="330" font-family="Segoe UI, system-ui, -apple-system, Roboto, Arial, sans-serif" font-weight="700" font-size="128" fill="url(#og-gold-a)">Mokh Rush</text><text x="404" y="410" font-family="Segoe UI, system-ui, -apple-system, Roboto, Arial, sans-serif" font-weight="600" font-size="46" fill="#eef1ff">Team trivia, buzzer speed</text></svg><span class="label">og-image 1200 x 630, shown at 50%</span></div>
+    </div>
+  </section>
+
+  <!-- Concept B -->
+  <section class="concept" aria-labelledby="cb">
+    <h2 id="cb">B. Split-second</h2>
+    <p class="rationale">Two brain hemispheres seen from above, split by a lightning-bolt fissure: the brain is the hero and the old bolt survives as the gap between the halves.</p>
+    <div class="row">
+      <div class="cell"><img class="big" src="concept-b.svg" width="512" height="512" alt="Concept B icon at 512 pixels"><span class="label">512 px</span></div>
+      <div class="cell"><img src="concept-b.svg" width="192" height="192" alt="Concept B at 192 pixels"><span class="label">192 px</span></div>
+      <div class="cell"><img src="concept-b.svg" width="32" height="32" alt="Concept B at 32 pixels"><span class="label">32 px</span></div>
+      <div class="cell"><img src="concept-b.svg" width="16" height="16" alt="Concept B at 16 pixels"><span class="label">16 px</span></div>
+      <div class="cell"><div class="tabbar"><div class="tab big-fav"><img src="concept-b.svg" alt="">Mokh Rush</div></div><span class="label">32 px in a browser tab</span></div>
+    </div>
+    <div class="row">
+      <div class="cell"><div class="mask-wrap"><img src="concept-b-maskable.svg" alt="Concept B maskable icon with the 80 percent safe zone marked"></div><span class="label">Maskable, dashed line = 80% safe zone</span></div>
+      <div class="cell"><img class="mask-circle" src="concept-b-maskable.svg" alt="Concept B maskable icon cropped to a circle"><span class="label">Maskable, circle crop</span></div>
+    </div>
+    <div class="row">
+      <div class="cell"><div class="page-header"><h1><img class="brand-logo" src="concept-b.svg" alt="" width="36" height="36">Mokh Rush</h1></div><span class="label">Header lockup, English</span></div>
+      <div class="cell" dir="rtl" lang="ar"><div class="page-header"><h1><img class="brand-logo" src="concept-b.svg" alt="" width="36" height="36">مخ رش</h1></div><span class="label" dir="ltr" lang="en">Header lockup, Arabic UI (RTL)</span></div>
+    </div>
+    <div class="row">
+      <div class="cell"><svg class="og" viewBox="0 0 1200 630" width="600" height="315" role="img" aria-label="Concept B og-image: icon, Mokh Rush, Team trivia, buzzer speed"><defs><linearGradient id="og-bg-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d2654"/><stop offset="1" stop-color="#0b1026"/></linearGradient><linearGradient id="og-gold-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe27a"/><stop offset="1" stop-color="#f5c518"/></linearGradient></defs><rect x="6" y="6" width="1188" height="618" fill="url(#og-bg-b)" stroke="#f5c518" stroke-width="12"/><image href="concept-b.svg" x="110" y="195" width="240" height="240"/><text x="400" y="330" font-family="Segoe UI, system-ui, -apple-system, Roboto, Arial, sans-serif" font-weight="700" font-size="128" fill="url(#og-gold-b)">Mokh Rush</text><text x="404" y="410" font-family="Segoe UI, system-ui, -apple-system, Roboto, Arial, sans-serif" font-weight="600" font-size="46" fill="#eef1ff">Team trivia, buzzer speed</text></svg><span class="label">og-image 1200 x 630, shown at 50%</span></div>
+    </div>
+  </section>
+
+  <!-- Concept C -->
+  <section class="concept" aria-labelledby="cc">
+    <h2 id="cc">C. Brain buzzer</h2>
+    <p class="rationale">A game-show buzzer whose dome is a brain, ringing as it is hit: the race to answer first, told with the object every team fights over.</p>
+    <div class="row">
+      <div class="cell"><img class="big" src="concept-c.svg" width="512" height="512" alt="Concept C icon at 512 pixels"><span class="label">512 px</span></div>
+      <div class="cell"><img src="concept-c.svg" width="192" height="192" alt="Concept C at 192 pixels"><span class="label">192 px</span></div>
+      <div class="cell"><img src="concept-c.svg" width="32" height="32" alt="Concept C at 32 pixels"><span class="label">32 px</span></div>
+      <div class="cell"><img src="concept-c.svg" width="16" height="16" alt="Concept C at 16 pixels"><span class="label">16 px</span></div>
+      <div class="cell"><div class="tabbar"><div class="tab big-fav"><img src="concept-c.svg" alt="">Mokh Rush</div></div><span class="label">32 px in a browser tab</span></div>
+    </div>
+    <div class="row">
+      <div class="cell"><div class="mask-wrap"><img src="concept-c-maskable.svg" alt="Concept C maskable icon with the 80 percent safe zone marked"></div><span class="label">Maskable, dashed line = 80% safe zone</span></div>
+      <div class="cell"><img class="mask-circle" src="concept-c-maskable.svg" alt="Concept C maskable icon cropped to a circle"><span class="label">Maskable, circle crop</span></div>
+    </div>
+    <div class="row">
+      <div class="cell"><div class="page-header"><h1><img class="brand-logo" src="concept-c.svg" alt="" width="36" height="36">Mokh Rush</h1></div><span class="label">Header lockup, English</span></div>
+      <div class="cell" dir="rtl" lang="ar"><div class="page-header"><h1><img class="brand-logo" src="concept-c.svg" alt="" width="36" height="36">مخ رش</h1></div><span class="label" dir="ltr" lang="en">Header lockup, Arabic UI (RTL)</span></div>
+    </div>
+    <div class="row">
+      <div class="cell"><svg class="og" viewBox="0 0 1200 630" width="600" height="315" role="img" aria-label="Concept C og-image: icon, Mokh Rush, Team trivia, buzzer speed"><defs><linearGradient id="og-bg-c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d2654"/><stop offset="1" stop-color="#0b1026"/></linearGradient><linearGradient id="og-gold-c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe27a"/><stop offset="1" stop-color="#f5c518"/></linearGradient></defs><rect x="6" y="6" width="1188" height="618" fill="url(#og-bg-c)" stroke="#f5c518" stroke-width="12"/><image href="concept-c.svg" x="110" y="195" width="240" height="240"/><text x="400" y="330" font-family="Segoe UI, system-ui, -apple-system, Roboto, Arial, sans-serif" font-weight="700" font-size="128" fill="url(#og-gold-c)">Mokh Rush</text><text x="404" y="410" font-family="Segoe UI, system-ui, -apple-system, Roboto, Arial, sans-serif" font-weight="600" font-size="46" fill="#eef1ff">Team trivia, buzzer speed</text></svg><span class="label">og-image 1200 x 630, shown at 50%</span></div>
+    </div>
+  </section>
+</main>
+</body>
+</html>

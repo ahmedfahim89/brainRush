@@ -1,6 +1,6 @@
-# BrainRush
+# Mokh Rush
 
-> BrainRush is a free trivia game for a group around one shared screen, played in the browser. One person hosts: they read each question out, listen to the spoken answers and mark them right or wrong. Players or teams pick questions from a board of categories and point values, and harder questions are worth more points.
+> Mokh Rush is a free trivia game for a group around one shared screen, played in the browser. One person hosts: they read each question out, listen to the spoken answers and mark them right or wrong. Players or teams pick questions from a board of categories and point values, and harder questions are worth more points.
 
 - Up to 6 players or 4 teams, each with their own color.
 - A correct answer adds the question's points, a wrong one takes them away.
@@ -9,7 +9,7 @@
 - When players are tied for first at the end, an optional "Golden Goal" tiebreaker follows: everyone secretly bets points on one more question, up to their score or the board's top point value, whichever is higher, and it repeats while the tie lasts.
 - Each player or team has 3 helpers per game: 3 choices, Swap (a random new question) and Skip (lose only half the points).
 - Playing alone, the Streak Challenge asks multiple-choice questions from every category until the first wrong answer or time's up; the longest streaks go on a shared top-10 leaderboard under the challenger name the player enters, for this week (Monday to Sunday, UTC) and of all time.
-- The Daily Challenge gives everyone the same 3 multiple-choice questions each day (a new set at midnight UTC); the result, such as "BrainRush Daily #12: 2/3" with a row of green and red squares, can be shared, as can the final standings of a board game.
+- The Daily Challenge gives everyone the same 3 multiple-choice questions each day (a new set at midnight UTC); the result, such as "Mokh Rush Daily #12: 2/3" with a row of green and red squares, can be shared, as can the final standings of a board game.
 - Many questions are in Arabic and English, and some show a picture, such as a flag or a famous place.
 - The game itself can be shown in English or Arabic (right to left) with the EN / AR switch in its header; the choice is saved on the device.
 - A wrong or unclear question can be reported from the game with the Report button on the question screen (in the Streak Challenge and the Daily Challenge, once the question is answered).
@@ -20,13 +20,13 @@ This file lists no questions or answers, on purpose.
 
 ## Play
 
-- [Play BrainRush](https://brainrush.integration.ninja/): set up players or teams, pick categories and start a game
+- [Play Mokh Rush](https://brainrush.integration.ninja/): set up players or teams, pick categories and start a game
 - [How to play](https://brainrush.integration.ninja/how-to-play.html): player guide covering setup, the board, answering, scoring, helpers, ending the game, the Golden Goal tiebreaker, the Streak Challenge and the Daily Challenge
 
 ## Optional
 
 - [Categories](https://brainrush.integration.ninja/api/categories.php): JSON list of the current categories and how many questions each has
-- [About](https://brainrush.integration.ninja/about.html): what BrainRush is, who makes it and how the questions are made
+- [About](https://brainrush.integration.ninja/about.html): what Mokh Rush is, who makes it and how the questions are made
 - [Contact](https://brainrush.integration.ninja/contact.html): email for corrections, ideas and data requests
 - [Terms of Service](https://brainrush.integration.ninja/terms.html): rules for using the site
 - [Privacy Policy](https://brainrush.integration.ninja/privacy.html): what the game saves, and how the Google AdSense ads on the Streak leaderboard screen use cookies

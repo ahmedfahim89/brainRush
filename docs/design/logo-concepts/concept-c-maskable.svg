@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Mokh Rush concept C: game-show buzzer whose dome is a brain, ringing (maskable: full-bleed background, mark inside the central 80% circle). Shapes only, no text or fonts. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1d2654"/>
+      <stop offset="1" stop-color="#0b1026"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe27a"/>
+      <stop offset="1" stop-color="#f5c518"/>
+    </linearGradient>
+    <linearGradient id="goldH" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f5c518"/>
+      <stop offset="1" stop-color="#ffe27a"/>
+    </linearGradient>
+    <mask id="c-folds" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="#fff"/>
+      <g fill="none" stroke="#000" stroke-width="22" stroke-linecap="round">
+        <path d="M256 206 V326"/>
+        <path d="M184 304 C172 270 196 240 228 248"/>
+        <path d="M328 304 C340 270 316 240 284 248"/>
+      </g>
+    </mask>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g transform="translate(12.80 12.80) scale(0.95)">
+  <path mask="url(#c-folds)" fill="url(#gold)" d="M140 324 C140 246 190 192 256 192 C322 192 372 246 372 324 Z"/>
+  <rect x="130" y="336" width="240" height="22" rx="11" fill="#f5c518"/>
+  <rect x="108" y="368" width="288" height="40" rx="20" fill="#f5c518"/>
+  <g fill="none" stroke="#f5c518" stroke-width="24" stroke-linecap="round">
+    <path d="M256 158 V114"/>
+    <path d="M158 192 L128 164"/>
+    <path d="M354 192 L384 164"/>
+  </g>
+  </g>
+</svg>

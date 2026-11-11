@@ -1,5 +1,5 @@
 <?php
-// BrainRush API helpers: PDO connection, JSON in/out, validation helpers,
+// Mokh Rush API helpers: PDO connection, JSON in/out, validation helpers,
 // admin protection for writes (require_admin), and a generic error handler
 // that never leaks DSN, credentials or traces. Include-only (blocked by .htaccess).
 
@@ -249,7 +249,7 @@ function is_foreign_key_error(PDOException $e): bool
 // Admin protection for write requests (US-29 / D-20)
 // ---------------------------------------------------------------------------
 
-const ADMIN_REALM = 'BrainRush admin';
+const ADMIN_REALM = 'Mokh Rush admin';
 
 /**
  * Stop with 401/403 unless the caller may change content:

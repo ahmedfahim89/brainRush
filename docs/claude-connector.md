@@ -1,6 +1,6 @@
-# BrainRush Trivia connector for Claude
+# Mokh Rush Trivia connector for Claude
 
-A connector that adds a BrainRush trivia card to Claude's Chat and Cowork (web, desktop and mobile apps). Ask Claude for BrainRush trivia and an interactive card opens in the conversation: each question has 3 answers, some have a picture, you tap one, see right or wrong, and go on. The card keeps a score for as long as it is open.
+A connector that adds a Mokh Rush trivia card to Claude's Chat and Cowork (web, desktop and mobile apps). Ask Claude for Mokh Rush trivia and an interactive card opens in the conversation: each question has 3 answers, some have a picture, you tap one, see right or wrong, and go on. The card keeps a score for as long as it is open.
 
 It complements the Claude Code mod (`ahmedfahim89/brainrush-trivia-claude-mod`), which shows questions above the prompt while Claude Code works. That band exists only in Claude Code; in Chat and Cowork the card opens when you ask for it.
 
@@ -11,7 +11,7 @@ Connector URL: `https://brainrush.integration.ninja/api/mcp.php` (no sign-in). U
 **Option A: install the plugin.** The mod repository bundles this connector (`.mcp.json`), so the plugin brings the card to Chat and Cowork and the band to Claude Code:
 
 1. In claude.ai or the desktop app, go to **Customize > Plugins > Add > Add marketplace** and enter `ahmedfahim89/brainrush-trivia-claude-mod`.
-2. Install **BrainRush Trivia**.
+2. Install **BrainRush Trivia** (the plugin keeps that name in the mod repository until the mod is renamed).
 3. Open the plugin's **Connectors** tab and connect **brainrush-trivia**.
 
 **Option B: add only the connector by its URL.**
@@ -20,26 +20,26 @@ On a Free, Pro, Max or Ultra plan:
 
 1. Go to **Customize > Connectors**.
 2. Click **Add custom connector**.
-3. Name it `BrainRush Trivia` and enter the connector URL.
+3. Name it `Mokh Rush Trivia` and enter the connector URL.
 4. Leave the OAuth fields under **Advanced settings** empty, or choose **No sign-in** if the dialog asks how people authenticate.
 5. Click **Add**. (The Free plan allows one custom connector.)
 
 On a Team or Enterprise plan (such as a company account), members can't add a custom connector themselves:
 
 1. An Owner goes to **Organization settings > Connectors**, selects **Add**, then **Custom** (type **Web** if asked), enters the URL, chooses no sign-in, and clicks **Add**.
-2. Each member goes to **Customize > Connectors**, finds **BrainRush Trivia** with the **Custom** label, and clicks **Connect**.
+2. Each member goes to **Customize > Connectors**, finds **Mokh Rush Trivia** with the **Custom** label, and clicks **Connect**.
 
-**Play:** in a chat, click **+**, select **Connectors** and check that BrainRush Trivia is on (in Cowork, check it is on for the task). Then ask, for example, "Let's play BrainRush trivia". The first time, Claude asks to show the card: choose **Allow** (or **Always allow**). To remove the connector, go to **Customize > Connectors** and click **Remove**.
+**Play:** in a chat, click **+**, select **Connectors** and check that Mokh Rush Trivia is on (in Cowork, check it is on for the task). Then ask, for example, "Let's play Mokh Rush trivia". The first time, Claude asks to show the card: choose **Allow** (or **Always allow**). To remove the connector, go to **Customize > Connectors** and click **Remove**.
 
 ## ChatGPT
 
 ChatGPT implements the same MCP Apps standard, so the same URL gives the same card there, with no change to the server or the card (checked on 1 November 2026: answering, scoring, a picture question, light and dark mode).
 
 1. Go to [chatgpt.com/plugins](https://chatgpt.com/plugins), click **+**, then **Add custom MCP server**.
-2. Name it `BrainRush Trivia` and enter the connector URL.
+2. Name it `Mokh Rush Trivia` and enter the connector URL.
 3. Choose no authentication, review the warning and confirm, then **Create as a plugin**.
 
-On a Business or Enterprise workspace an admin may have to allow custom MCP servers first. To play, pick BrainRush Trivia in the composer (type `@`) and ask for a game. ChatGPT may show a "CSP off" label above the card for a custom server; the card works the same. Listing it in ChatGPT's own directory would need OpenAI's app submission and review.
+On a Business or Enterprise workspace an admin may have to allow custom MCP servers first. To play, pick Mokh Rush Trivia in the composer (type `@`) and ask for a game. ChatGPT may show a "CSP off" label above the card for a custom server; the card works the same. Listing it in ChatGPT's own directory would need OpenAI's app submission and review.
 
 ## How it works
 
@@ -72,7 +72,7 @@ On the live site, after a deploy:
 
 1. The same `curl` against `https://brainrush.integration.ninja/api/mcp.php`.
 2. `curl -sI https://brainrush.integration.ninja/mcp/ext-apps-1.7.5.js` shows `Access-Control-Allow-Origin: *`.
-3. In Claude: add the connector, ask for BrainRush trivia, **Allow**, and play a few questions (one with a picture), in light and dark mode, then in Cowork.
+3. In Claude: add the connector, ask for Mokh Rush trivia, **Allow**, and play a few questions (one with a picture), in light and dark mode, then in Cowork.
 
 ## Limits
 

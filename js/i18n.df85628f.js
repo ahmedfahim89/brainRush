@@ -1,4 +1,4 @@
-// BrainRush interface language (US-49): English and Arabic string tables, a lookup with English
+// Mokh Rush interface language (US-49): English and Arabic string tables, a lookup with English
 // fallback, plural forms, bidi helpers and the page's lang/dir. Loaded in <head>, before the page
 // is drawn, so an Arabic page is right to left from its first paint. game.js uses t() / n() for
 // every visible text and calls apply() for the static texts of index.html (data-i18n="key",
@@ -21,6 +21,7 @@
   const STRINGS = {
     en: {
       // Header and footer
+      'app.name': 'Mokh Rush', // D-64: the brand in the header and the tab title
       'nav.howToPlay': 'How to play',
       'nav.terms': 'Terms',
       'nav.privacy': 'Privacy',
@@ -213,8 +214,8 @@
       'share.failed': 'Could not share the result.',
       'share.copied': 'Copied',
       'share.copyFailed': 'Could not copy. Your browser blocked it.',
-      'share.won': '{name} won BrainRush with {score}!',
-      'share.tie': "It's a tie between {names} in BrainRush with {score} each!",
+      'share.won': '{name} won Mokh Rush with {score}!',
+      'share.tie': "It's a tie between {names} in Mokh Rush with {score} each!",
 
       // Streak Challenge (US-33) and its leaderboard (US-34, US-45)
       'streak.openBtn': 'Sudden Death Streak',
@@ -287,7 +288,7 @@
       'daily.fix': 'The Daily Challenge cannot start yet. Please fix the errors above.',
       'daily.failed': 'Could not open the Daily Challenge: {reason}',
       'daily.leave': "Leave today's Daily Challenge? The questions you haven't answered score 0, and you can play it only once today.",
-      'daily.score': 'BrainRush Daily #{n}: {right}/{total}',
+      'daily.score': 'Mokh Rush Daily #{n}: {right}/{total}',
       'daily.squareRight': 'Question {n} right',
       'daily.squareWrong': 'Question {n} wrong',
       'daily.perfect': 'Perfect! ',
@@ -362,6 +363,7 @@
     // Arabic (Modern Standard Arabic), AI-drafted: to be reviewed by an Arabic speaker
     // (docs/sprints/sprint-13-dev.md lists every string). Numbers stay in Western digits.
     ar: {
+      'app.name': 'مخ رش',
       'nav.howToPlay': 'طريقة اللعب',
       'nav.terms': 'الشروط',
       'nav.privacy': 'الخصوصية',
@@ -555,8 +557,8 @@
       'share.failed': 'تعذّرت مشاركة النتيجة.',
       'share.copied': 'تم النسخ',
       'share.copyFailed': 'تعذّر النسخ. منعه المتصفح.',
-      'share.won': 'فاز {name} في BrainRush بنتيجة {score}!',
-      'share.tie': 'تعادل في BrainRush بين {names} بنتيجة {score} لكلٍّ منهم!',
+      'share.won': 'فاز {name} في مخ رش بنتيجة {score}!',
+      'share.tie': 'تعادل في مخ رش بين {names} بنتيجة {score} لكلٍّ منهم!',
 
       'streak.openBtn': 'سلسلة الموت المفاجئ',
       'streak.solo': '(فردي)',
@@ -618,7 +620,7 @@
       'daily.fix': 'لا يمكن بدء التحدي اليومي بعد. يُرجى تصحيح الأخطاء أعلاه.',
       'daily.failed': 'تعذّر فتح التحدي اليومي: {reason}',
       'daily.leave': 'مغادرة التحدي اليومي؟ الأسئلة التي لم تُجب عنها تُحتسب 0، ولا يمكنك لعبه إلا مرة واحدة اليوم.',
-      'daily.score': 'تحدي BrainRush اليومي #{n}: {right}/{total}',
+      'daily.score': 'تحدي مخ رش اليومي #{n}: {right}/{total}',
       'daily.squareRight': 'السؤال {n} صحيح',
       'daily.squareWrong': 'السؤال {n} خطأ',
       'daily.perfect': 'نتيجة كاملة! ',

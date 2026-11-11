@@ -1,4 +1,4 @@
-// BrainRush sharing (US-43, US-46): one module for the Daily Challenge result and the board game's
+// Mokh Rush sharing (US-43, US-46): one module for the Daily Challenge result and the board game's
 // final standings. share(text, status) adds the site link to the text, then opens the phone's share
 // sheet when there is one (also in the Android app, US-40, which runs in Chrome), or copies the text
 // to the clipboard and shows "Copied" in `status`. Desktop browsers copy too: a share sheet there

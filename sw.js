@@ -1,4 +1,4 @@
-// BrainRush service worker (US-40, D-43): an offline page, nothing else.
+// Mokh Rush service worker (US-40, D-43): an offline page, nothing else.
 // It lives at the site root (not in js/), because the pre-commit hook gives every js/*.js a
 // content-hashed name and a service worker needs a fixed URL; its scope is this folder.
 // - Install: cache offline.html only (in a versioned cache; activate deletes older ones).
@@ -8,7 +8,7 @@
 // Change CACHE (v2, v3, ...) whenever offline.html changes, so phones fetch the new copy.
 'use strict';
 
-const CACHE = 'brainrush-offline-v1';
+const CACHE = 'brainrush-offline-v2'; // v2: Mokh Rush name and logo (D-64)
 const CACHE_PREFIX = 'brainrush-offline-';
 const OFFLINE_URL = new URL('offline.html', self.registration.scope).href;
 const API_URL = new URL('api/', self.registration.scope).href;
