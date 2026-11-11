@@ -136,6 +136,7 @@ Unknown: the owner removed 19 AI suggestions on 2026-10-19 (all 5 at 500), and o
 | Huey, Dewey and Louie | 400 | Scrooge McDuck's three grand-nephews in "DuckTales" (1987) | 2026-11-03 | auto-2026-11-03-review.md |
 | Boots | 400 | Dora's monkey best friend in "Dora the Explorer" (2000) | 2026-11-10 | auto-2026-11-06-review.md |
 | Mr. Potato Head | 500 | 1952 toy of plastic face parts pushed into a real vegetable, first toy advertised on US TV | 2026-11-10 | auto-2026-11-06-review.md |
+| Penny (Inspector Gadget) | 400 | Inspector Gadget's clever niece who solves the cases with her dog Brain (1983 cartoon) | 2026-11-11 | auto-2026-11-11-review.md |
 
 ## Egyptians
 
@@ -316,6 +317,7 @@ Unknown: the owner removed 12 History suggestions on 2026-10-19, and only the fi
 | Qasr al-Farid | 600 | Picture: Nabataean tomb, Hegra | 2026-10-22 | landmarks-review.md |
 | Ziggurat of Ur | 600 | Picture: Mesopotamian temple, Iraq | 2026-10-22 | landmarks-review.md |
 | Potala Palace | 500 | Picture: palace of the Dalai Lamas, Lhasa | 2026-11-03 | auto-2026-11-03-review.md |
+| Koutoubia Mosque | 500 | Picture: Almohad minaret and mosque, Marrakesh | 2026-11-11 | auto-2026-11-11-review.md |
 
 Points for the owner removals are worked out from the draft counts and the order of the doc's lists (the doc gives no per-row value for them).
 
@@ -441,3 +443,6 @@ Notes: Gutenberg and Ada Lovelace were removed twice: the seed questions (points
 | Roald Amundsen | 500 | Polar explorer, first to the South Pole (December 1911) ahead of Scott | 2026-11-03 | auto-2026-11-03-review.md |
 | Frida Kahlo | 400 | Painter of self-portraits with joined eyebrows, bus accident at 18, married Diego Rivera twice | 2026-11-10 | auto-2026-11-06-review.md |
 | Mansa Musa | 500 | 14th-century Mali Empire ruler whose 1324 pilgrimage gold lowered its value in Cairo | 2026-11-10 | auto-2026-11-06-review.md |
+| Pablo Picasso | 100 | Spanish painter born in Malaga in 1881, started Cubism with Braque, painted "Guernica" (1937) | 2026-11-11 | auto-2026-11-11-review.md |
+| Hans Christian Andersen | 200 | Danish writer born in Odense in 1805, "The Ugly Duckling", "The Little Mermaid", "The Emperor's New Clothes" | 2026-11-11 | auto-2026-11-11-review.md |
+| Nadia Comaneci | 500 | Gymnast who scored the first Olympic perfect 10 at 14 (Montreal 1976), scoreboard showed "1.00" | 2026-11-11 | auto-2026-11-11-review.md |
