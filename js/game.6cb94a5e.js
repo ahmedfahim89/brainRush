@@ -306,6 +306,7 @@
     streakFeedback: byId('streak-feedback'),
     streakNext: byId('streak-next'),
     streakEnd: byId('streak-end'),
+    streakSecondChance: byId('streak-second-chance'), // US-54: only in index.html (null in the Integration Quiz)
     resultsWinner: byId('results-winner'),
     resultsList: byId('results-list'),
     newGameBtn: byId('new-game-btn'),
@@ -383,7 +384,8 @@
 
   // The streak panel's texts; the Daily Challenge sets its own and puts these back.
   function streakPanelText() {
-    return { title: t(INTEGRATION ? 'iq.title' : 'streak.legend'), label: t('streak.count'), hint: t('streak.hint') };
+    return { title: t(INTEGRATION ? 'iq.title' : 'streak.legend'), label: t('streak.count'),
+      hint: t(INTEGRATION ? 'streak.hint' : 'streak.hintChance') };
   }
   // The scoring panel's texts and the Back to Board label; the final round sets its own (US-44).
   function scoringPanelText() {
@@ -1110,7 +1112,7 @@
         if (daily.current.picked !== null) onDailyNext(); // answered: on, as Next
         else onDailyLeave();                         // "Leave today's Daily Challenge?" confirm
       } else if (!streakOnScreen()) confirmBackToBoard(); // "Back to Board", after a confirm
-      else if (streak.over) onStreakNext();          // lost run: on to the leaderboard, as Next
+      else if (streak.over || isStreakPending(streak)) onStreakNext(); // lost run: on to the leaderboard, as Next
       else onStreakEnd();                            // "End the run now?" confirm
     } else if (state.screen === 'daily') {
       onDailyNewGame();                              // the Daily result: back to setup, as New Game
@@ -3073,6 +3075,7 @@
       run.usedIds.every((id) => Number.isInteger(id) && id > 0) &&
       Number.isInteger(run.count) && run.count >= 0 && run.count <= run.usedIds.length &&
       isValidStatsSent(run.statsSent) && // US-47
+      (run.secondChanceUsed === undefined || typeof run.secondChanceUsed === 'boolean') && // US-54 (older saves lack it)
       isValidStreakCurrent(run.current, run);
   }
 
@@ -3084,7 +3087,8 @@
     const pickedOk = cur.picked === null || cur.picked === STREAK_TIME_UP ||
       (Number.isInteger(cur.picked) && cur.picked >= 0 && cur.picked < CHOICE_LETTERS.length);
     const lost = cur.picked !== null && cur.picked !== cur.q.correct;
-    return langOk && pickedOk && Number.isFinite(cur.deadline) && (!lost || run.over) &&
+    return langOk && pickedOk && Number.isFinite(cur.deadline) &&
+      (!lost || run.over || (!INTEGRATION && !run.secondChanceUsed)) && // US-54: a miss may wait for the choice
       (cur.leftMs === undefined || (Number.isFinite(cur.leftMs) && cur.leftMs >= 0));
   }
 
@@ -3183,6 +3187,7 @@
       current: null,
       over: false,
       statsSent: [], // US-47
+      secondChanceUsed: false, // US-54: one second chance per run (Streak Challenge only)
     };
     lastStreakProfile = profile;
     addToQueue(streak, questions);
@@ -3190,12 +3195,15 @@
     nextStreakQuestion();
   }
 
-  /** Open the next question (waiting for the next batch when the queue is empty). */
-  async function nextStreakQuestion() {
+  /**
+   * Open the next question (waiting for the next batch when the queue is empty).
+   * `useChance` (US-54): this question replaces a missed one; the chance counts as used only once it opens.
+   */
+  async function nextStreakQuestion(useChance) {
     const run = streak;
     if (!run || run.over) return;
     if (!run.queue.length) {
-      setStreakLoading(true);
+      setStreakLoading(true, useChance);
       let failure = null;
       try {
         await requestStreakBatch(run);
@@ -3216,6 +3224,7 @@
     }
     const q = run.queue.shift();
     run.usedIds.push(q.id);
+    if (useChance) run.secondChanceUsed = true;
     run.current = {
       q: q,
       lang: isFilled(q.question_ar) ? 'ar' : 'en', // Arabic first, as on the board
@@ -3255,7 +3264,7 @@
     if (cur.picked !== null) {
       showTimerAt(run.timerSeconds, cur.leftMs || 0);
       setTimeUp(cur.picked === STREAK_TIME_UP);
-      dom.streakNext.focus();
+      focusStreakAction();
       return;
     }
     // Never more than one full timer: a deadline moved forward in storage is pulled back.
@@ -3359,11 +3368,43 @@
     } else {
       showWrongFeedback(cur.q, cur);
     }
+    renderStreakButtons();
+  }
+
+  /** US-54: a miss in a run whose second chance is still unused waits for the player's choice. */
+  function isStreakPending(run) {
+    const cur = run && run.current;
+    return !INTEGRATION && !!cur && !run.over && !run.secondChanceUsed &&
+      cur.picked !== null && cur.picked !== cur.q.correct;
+  }
+
+  /** Next / See results, End run and (after a first miss) Use second chance. */
+  function renderStreakButtons() {
+    const run = streak;
+    const cur = run.current;
+    const lost = cur.picked !== null && cur.picked !== cur.q.correct;
     dom.streakNext.hidden = cur.picked === null;
     dom.streakNext.textContent = lost ? t('run.seeResults') : t('run.next');
     dom.streakNext.disabled = finishing;
     dom.streakEnd.hidden = lost;
     dom.streakEnd.disabled = finishing;
+    setSecondChanceButton(isStreakPending(run), finishing, t('streak.secondChance'));
+  }
+
+  function setSecondChanceButton(shown, disabled, text) {
+    const btn = dom.streakSecondChance;
+    if (!btn) return; // the Integration Quiz page has none
+    btn.hidden = !shown;
+    btn.disabled = disabled;
+    btn.textContent = text;
+    // The primary action is the second chance; See results steps back to a secondary look.
+    dom.streakNext.classList.toggle('btn-primary', !shown);
+  }
+
+  /** Focus the main action of the answered question (Enter goes on). */
+  function focusStreakAction() {
+    const btn = dom.streakSecondChance;
+    (btn && !btn.hidden ? btn : dom.streakNext).focus();
   }
 
   /** The panel's hidden heading, the count's label and the hint (Streak or Daily Challenge). */
@@ -3401,9 +3442,14 @@
     dom.streakFeedback.className = 'streak-feedback' + (kind ? ' ' + kind : '');
   }
 
-  function setStreakLoading(loading) {
-    dom.streakNext.disabled = loading;
-    dom.streakNext.textContent = loading ? t('common.loading') : t('run.next');
+  function setStreakLoading(loading, useChance) {
+    if (!loading) {
+      renderStreakButtons();
+      return;
+    }
+    dom.streakNext.disabled = true;
+    if (useChance) setSecondChanceButton(true, true, t('common.loading'));
+    else dom.streakNext.textContent = t('common.loading');
   }
 
   /** A tapped choice, or null when the time ran out. Right: +1 and Next; wrong or too late: the run is over. */
@@ -3416,7 +3462,8 @@
     cur.leftMs = Math.max(0, leftMs);
     cur.picked = index === null || leftMs <= 0 ? STREAK_TIME_UP : index;
     if (cur.picked === cur.q.correct) run.count += 1;
-    else run.over = true;
+    else if (INTEGRATION || run.secondChanceUsed) run.over = true;
+    // else US-54: the first miss waits for "Use second chance" or "See results" (run.over stays false)
     // US-47 / D-55 f: right -> correct, wrong -> wrong, time's up -> timeout (End run sends nothing).
     if (!INTEGRATION) {
       sendQuestionStat(run, cur.q.id, cur.picked === cur.q.correct ? STAT.correct
@@ -3428,15 +3475,22 @@
     renderStreakChoices();
     renderStreakPanel();
     updateReportButton(); // US-42: Report appears now that it is answered
-    dom.streakNext.focus(); // Enter goes on
+    focusStreakAction(); // Enter goes on
     refillStreak(run);
   }
 
   function onStreakNext() {
     const run = streak;
     if (!run || !run.current || run.current.picked === null || dom.streakNext.disabled) return;
-    if (run.over) finishStreak();
+    if (run.over || isStreakPending(run)) finishStreak(); // pending: "See results" gives up the second chance
     else nextStreakQuestion();
+  }
+
+  /** US-54: continue after the first miss with a new question; the streak count is kept. */
+  function onStreakSecondChance() {
+    const run = streak;
+    if (!isStreakPending(run) || !streakOnScreen() || finishing || dom.streakSecondChance.disabled) return;
+    nextStreakQuestion(true);
   }
 
   /** Enter anywhere on the answered question means Next (buttons and links handle Enter themselves). */
@@ -3454,7 +3508,8 @@
     const target = event.target;
     if (target && target.closest && target.closest('button, a, input, select, textarea')) return;
     event.preventDefault();
-    onRunNext();
+    if (!dailyOnScreen() && isStreakPending(streak)) onStreakSecondChance(); // US-54: Enter takes the second chance
+    else onRunNext();
   }
 
   /** End run: stop now and save the streak so far (confirm first). */
@@ -3927,6 +3982,7 @@
     dom.streakNext.disabled = false;
     dom.streakNext.textContent = cur.index + 1 >= total ? t('daily.seeResult') : t('run.next');
     dom.streakEnd.hidden = true;
+    setSecondChanceButton(false, false, ''); // US-54 is for the Streak Challenge only
   }
 
   function toggleDailyLang() {
@@ -4984,6 +5040,7 @@
     dom.streakNameInput.addEventListener('input', () => setFieldError(dom.streakNameInput, dom.streakNameError, ''));
     dom.streakNext.addEventListener('click', onRunNext);
     dom.streakEnd.addEventListener('click', onStreakEnd);
+    if (dom.streakSecondChance) dom.streakSecondChance.addEventListener('click', onStreakSecondChance);
     dom.lbAgain.addEventListener('click', onPlayAgain);
     dom.lbNew.addEventListener('click', onLeaderboardNewGame);
     dom.lbBack.addEventListener('click', onLeaderboardBack);

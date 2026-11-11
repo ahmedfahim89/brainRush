@@ -722,3 +722,9 @@ Added by the PO at Sprint 6 acceptance and re-acceptance on 2026-10-11. Full wor
 **Other Sprint 6 steps (not follow-ups):** the owner's local Chrome check and the PR to `main` are done (PR #11, merged 2026-10-11).
 
 **Open items:** none (2026-10-14).
+
+---
+
+## Change request "Free second chance in Streak" (US-54) — outside the sprint cycle, 2026-11-11
+
+**Change request (owner, 2026-11-11):** every Streak Challenge run gets one free second chance after the first wrong pick or time-out: the streak is kept, the missed question is replaced by a new one. Streak Challenge only (D-64). Client-only (`game.js`, `i18n.js`, `index.html`, guide and `llms.txt`); US-51 (rewarded ad) stays planned in Sprint 15. Branch `streak-second-chance`. Dev and test notes: `docs/sprints/cr-us54-dev.md`, `docs/sprints/cr-us54-test-report.md`. **Status:** built; local Chrome test next, then PR for the owner.
