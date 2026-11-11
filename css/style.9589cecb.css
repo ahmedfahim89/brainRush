@@ -290,6 +290,37 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 /* min-width keeps normal names on one line; "anywhere" still breaks very long unbroken names */
 .data-table td.name-cell { min-width: 9rem; overflow-wrap: anywhere; }
 .rename-input { max-width: 22rem; }
+/* Arabic category name under the English one in the Questions and Reports lists (FU-56) */
+.cat-ar { display: block; font-weight: 400; }
+.report-q-meta .cat-ar { display: inline; }
+
+/* FU-55: Categories on a phone. The add form stacks; each table row becomes a small card (name and
+   Arabic name, count and status, then the buttons), so Rename, Delete, Save and Cancel are on screen
+   without scrolling the table sideways, and every control is at least 40px tall. Desktop unchanged. */
+@media (max-width: 600px) {
+  #category-form { flex-wrap: wrap; }
+  #category-form input, #category-form .btn { flex: 1 1 100%; min-height: 40px; }
+  #categories-panel .data-table thead { display: none; }
+  #categories-panel .data-table, #categories-panel .data-table tbody { display: block; }
+  #categories-panel .data-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.35rem 0.75rem;
+    padding: 0.6rem 0.2rem;
+    border-bottom: 1px solid var(--border);
+  }
+  #categories-panel .data-table td { display: block; min-width: 0; padding: 0; border: 0; }
+  #categories-panel .data-table tr.is-editing { padding: 0.6rem; background: rgba(245, 197, 24, 0.08); }
+  #categories-panel .data-table tr.is-editing td { background: none; }
+  #categories-panel .data-table td.empty-row,
+  #categories-panel .data-table td.row-actions,
+  #categories-panel .data-table tr.is-editing td.name-cell { grid-column: 1 / -1; }
+  #categories-panel .data-table td.num { white-space: normal; }
+  #categories-panel .data-table .badge { white-space: normal; }
+  #categories-panel .data-table td.row-actions { display: flex; gap: 0.5rem; }
+  #categories-panel .data-table td.row-actions .btn { flex: 1 1 0; min-height: 40px; margin: 0; }
+  #categories-panel .rename-input { max-width: none; min-height: 40px; }
+}
 
 /* Reports panel (US-42): question with its category and answer; one line per reason and per note */
 .report-q-meta { color: var(--gold); font-weight: 600; white-space: normal; }
