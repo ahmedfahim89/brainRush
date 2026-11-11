@@ -326,7 +326,7 @@
       'final.loadFailed': 'Could not load the question: {reason} Try again, or skip to the results.',
       'final.hint.players': 'Every player answers, for example on paper. Correct wins their bet, Wrong loses it. Mark each one once.',
       'final.hint.teams': 'Every team answers, for example on paper. Correct wins their bet, Wrong loses it. Mark each one once.',
-      'final.continue': 'Continue',
+      'final.nextRound': 'Next round',
       'final.correctBtn': '✓ Correct',
       'final.wrongBtn': '✗ Wrong',
       'final.correctLabel': 'Correct for {name}, plus their bet',
@@ -335,6 +335,7 @@
       'final.statusWrong': '{name} marked wrong, bet {bet}, score {score}',
       'final.leave.players': 'Stop Golden Goal and show the results? Players not marked yet keep their score.',
       'final.leave.teams': 'Stop Golden Goal and show the results? Teams not marked yet keep their score.',
+      'final.leaveTied': 'Stop Golden Goal and show the results? The tie stands.',
       'final.backConfirm': 'Stop Golden Goal and show the results? The bets of this round are dropped and no score changes.',
 
       // Report a question (US-42)
@@ -655,7 +656,7 @@
       'final.loadFailed': 'تعذّر تحميل السؤال: {reason} حاول مرة أخرى، أو تخطَّ إلى النتائج.',
       'final.hint.players': 'يجيب كل لاعب، على ورقة مثلًا. «صحيح» يربح رهانه و«خطأ» يخسره. احتسب لكل واحد مرة واحدة.',
       'final.hint.teams': 'يجيب كل فريق، على ورقة مثلًا. «صحيح» يربح رهانه و«خطأ» يخسره. احتسب لكل فريق مرة واحدة.',
-      'final.continue': 'متابعة',
+      'final.nextRound': 'الجولة التالية',
       'final.correctBtn': '✓ صحيح',
       'final.wrongBtn': '✗ خطأ',
       'final.correctLabel': 'صحيح لـ{name}، يربح رهانه',
@@ -664,6 +665,7 @@
       'final.statusWrong': 'احتُسبت إجابة {name} خاطئة، الرهان {bet}، الرصيد {score}',
       'final.leave.players': 'إيقاف الهدف الذهبي وعرض النتائج؟ اللاعبون الذين لم تُحتسب إجاباتهم يحتفظون برصيدهم.',
       'final.leave.teams': 'إيقاف الهدف الذهبي وعرض النتائج؟ الفرق التي لم تُحتسب إجاباتها تحتفظ برصيدها.',
+      'final.leaveTied': 'إيقاف الهدف الذهبي وعرض النتائج؟ يبقى التعادل قائمًا.',
       'final.backConfirm': 'إيقاف الهدف الذهبي وعرض النتائج؟ تُلغى رهانات هذه الجولة ولا يتغير أي رصيد.',
 
       'report.title': 'الإبلاغ عن هذا السؤال',
