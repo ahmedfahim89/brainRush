@@ -865,7 +865,7 @@
     labelCells(dom.questionsBody);
   }
 
-  /** FU-44: show or hide the Arabic, Picture? and Choices columns (the button is shown only above 800px, up to 1200px). */
+  /** FU-44: show or hide the Arabic, Picture? and Choices columns (the button is shown only above 800px, up to 1365px, FU-61). */
   function onColsToggle() {
     const show = dom.qColsToggle.getAttribute('aria-pressed') !== 'true';
     dom.qColsToggle.setAttribute('aria-pressed', String(show));

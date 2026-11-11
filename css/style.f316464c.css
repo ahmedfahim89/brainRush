@@ -454,14 +454,14 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
   .admin main .btn-small { min-height: 40px; }
 }
 
-/* FU-44: above 800px and up to 1200px the Questions table hides its Arabic, Picture? and Choices columns,
+/* FU-44 / FU-61: above 800px and up to 1365px the Questions table hides its Arabic, Picture? and Choices columns,
    so the Question and Answer columns get room and the rows stay low; the toggle button brings them back.
    Outside this range the button is hidden and the table is unchanged. The outer query is the exact
    opposite of the card query (max-width: 800px), so at fractional widths (zoom, high-DPI screens) such
    as 800.5px one of the two always applies. */
 .cols-toggle { display: none; }
 @media not all and (max-width: 800px) {
-  @media (max-width: 1200px) {
+  @media (max-width: 1365px) {
     .cols-toggle { display: inline-block; min-height: 40px; }
     #questions-table:not(.show-extra) .col-extra { display: none; }
     /* Edit above Delete: a narrower Actions column leaves more room for the text */
