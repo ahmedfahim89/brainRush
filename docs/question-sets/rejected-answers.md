@@ -50,6 +50,7 @@ How to read the tables:
 | Voice typing | | Phone feature (too unfamiliar) | 2026-10-20 | ai-2-review.md |
 | Wake word | | Word that wakes a voice assistant | 2026-10-19 | general-genz-ai-egyptians-review.md |
 | Computer vision | 500 | Field of AI that teaches computers to understand photos and video (self-driving cars spotting people and road signs) | 2026-11-01 | auto-2026-11-01-review.md |
+| A cyborg | 400 | Being that is part human and part machine ("cybernetic organism") | 2026-11-11 | auto-2026-11-11-2-review.md |
 
 Unknown: the owner removed 19 AI suggestions on 2026-10-19 (all 5 at 500), and only the ones above are still named. The owner's ai-2 feedback also rules out whole types: film robots, product feature names, viral incidents, model or version trivia and country-policy news.
 
@@ -137,6 +138,9 @@ Unknown: the owner removed 19 AI suggestions on 2026-10-19 (all 5 at 500), and o
 | Boots | 400 | Dora's monkey best friend in "Dora the Explorer" (2000) | 2026-11-10 | auto-2026-11-06-review.md |
 | Mr. Potato Head | 500 | 1952 toy of plastic face parts pushed into a real vegetable, first toy advertised on US TV | 2026-11-10 | auto-2026-11-06-review.md |
 | Penny (Inspector Gadget) | 400 | Inspector Gadget's clever niece who solves the cases with her dog Brain (1983 cartoon) | 2026-11-11 | auto-2026-11-11-review.md |
+| Pingu | 300 | Swiss clay-animated penguin of a 1990s children's TV series, honks "Noot noot!" | 2026-11-11 | auto-2026-11-11-2-review.md |
+| Azrael (Harhour) | 400 | Gargamel's cat in "The Smurfs" (1981 cartoon), هرهور in Arabic | 2026-11-11 | auto-2026-11-11-2-review.md |
+| Sid (Ice Age) | 400 | Chatty, clumsy sloth who travels with Manny the mammoth in "Ice Age" (2002) | 2026-11-11 | auto-2026-11-11-2-review.md |
 
 ## Egyptians
 
@@ -318,6 +322,7 @@ Unknown: the owner removed 12 History suggestions on 2026-10-19, and only the fi
 | Ziggurat of Ur | 600 | Picture: Mesopotamian temple, Iraq | 2026-10-22 | landmarks-review.md |
 | Potala Palace | 500 | Picture: palace of the Dalai Lamas, Lhasa | 2026-11-03 | auto-2026-11-03-review.md |
 | Koutoubia Mosque | 500 | Picture: Almohad minaret and mosque, Marrakesh | 2026-11-11 | auto-2026-11-11-review.md |
+| Galata Tower | 500 | Picture: medieval Genoese stone tower with a conical roof, Istanbul, lit at night | 2026-11-11 | auto-2026-11-11-2-review.md |
 
 Points for the owner removals are worked out from the draft counts and the order of the doc's lists (the doc gives no per-row value for them).
 
@@ -428,7 +433,7 @@ Notes: the docs say "the Netflix and the Soviet Union questions were removed". N
 | Lenovo | | Bought IBM's PC business (2005) | 2026-10-19 | general-sports-movies-technology-review.md |
 | Netflix | | General-set question (text not kept) | 2026-10-19 | general-sports-movies-technology-review.md |
 
-Notes: Gutenberg and Ada Lovelace were removed twice: the seed questions (points shown) went missing from the DB, and the reworded 2026-10-19 suggestions were removed again. Unknown: the owner removed 17 Technology suggestions on 2026-10-19, including all 5 at 500 and all 5 at 600.
+Notes: Gutenberg and Ada Lovelace were removed twice: the seed questions (points shown) went missing from the DB, and the reworded 2026-10-19 suggestions were removed again. Gutenberg was removed a third time on 2026-11-11 as a Who Am I? 300 question (listed under Who Am I?), so he is rejected as an answer in every category. Unknown: the owner removed 17 Technology suggestions on 2026-10-19, including all 5 at 500 and all 5 at 600.
 
 ## Who Am I?
 
@@ -446,3 +451,6 @@ Notes: Gutenberg and Ada Lovelace were removed twice: the seed questions (points
 | Pablo Picasso | 100 | Spanish painter born in Malaga in 1881, started Cubism with Braque, painted "Guernica" (1937) | 2026-11-11 | auto-2026-11-11-review.md |
 | Hans Christian Andersen | 200 | Danish writer born in Odense in 1805, "The Ugly Duckling", "The Little Mermaid", "The Emperor's New Clothes" | 2026-11-11 | auto-2026-11-11-review.md |
 | Nadia Comaneci | 500 | Gymnast who scored the first Olympic perfect 10 at 14 (Montreal 1976), scoreboard showed "1.00" | 2026-11-11 | auto-2026-11-11-review.md |
+| Helen Keller | 200 | Deaf-blind writer and campaigner, Anne Sullivan spelled "water" into her hand, graduated in 1904 | 2026-11-11 | auto-2026-11-11-2-review.md |
+| Johannes Gutenberg | 300 | Mainz goldsmith, movable metal type around 1450, the Bible that carries his name (also in Technology) | 2026-11-11 | auto-2026-11-11-2-review.md |
+| Valentina Tereshkova | 500 | Factory worker and amateur parachutist, first woman in space (June 1963), 48 orbits | 2026-11-11 | auto-2026-11-11-2-review.md |
