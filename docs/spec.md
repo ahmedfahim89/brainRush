@@ -28,8 +28,8 @@ Added 2026-10-26. These two agents are personal subagents in `~/.claude/agents/`
 
 | File | Agent | Role | Tools | Output |
 |---|---|---|---|---|
-| `~/.claude/agents/mobile-developer.md` | **mobile-developer** | Senior Android developer (Kotlin/Java, Jetpack Compose or Views, coroutines/Flow, Gradle). Designs, implements and debugs app code, adds developer-side tests, fixes the mobile-tester's defects; follows the existing architecture and reports which builds and tests were run. Model: opus. | Read, Write, Edit, Glob, Grep, Bash | app code + tests |
-| `~/.claude/agents/mobile-tester.md` | **mobile-tester** | Senior mobile QA (Android, iOS where applicable). Builds a risk-based test plan, verifies acceptance criteria on emulators/devices, automates high-value regression tests, reports reproducible defects and gives a release recommendation. May write test code and reports, never production code, resources, manifests or build config. Model: sonnet. | Read, Write, Edit, Glob, Grep, Bash | test code + `docs/sprints/android-twa-test-report.md`, `docs/sprints/android-twa-device-test-report.md` |
+| `~/.claude/agents/mobile-developer.md` | **mobile-developer** | Senior Android developer (Kotlin/Java, Jetpack Compose or Views, coroutines/Flow, Gradle). Designs, implements and debugs app code, adds developer-side tests, fixes the mobile-tester's defects; follows the existing architecture and reports which builds and tests were run. Model: sonnet. | Read, Write, Edit, Glob, Grep, Bash | app code + tests |
+| `~/.claude/agents/mobile-tester.md` | **mobile-tester** | Senior mobile QA (Android, iOS where applicable). Builds a risk-based test plan, verifies acceptance criteria on emulators/devices, automates high-value regression tests, reports reproducible defects and gives a release recommendation. May write test code and reports, never production code, resources, manifests or build config. Model: haiku. | Read, Write, Edit, Glob, Grep, Bash | test code + `docs/sprints/android-twa-test-report.md`, `docs/sprints/android-twa-device-test-report.md` |
 
 ### Workflow (I orchestrate)
 1. **product-owner** → writes `docs/product-backlog.md` from this plan.
