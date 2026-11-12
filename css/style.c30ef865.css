@@ -129,6 +129,11 @@ a { color: var(--gold); }
   animation: banner-pulse 1.6s ease-in-out infinite;
 }
 
+/* Second chance popup (US-54): the double-score popup's card, with the feedback and two stacked buttons */
+.double-card .chance-feedback { color: var(--danger); font-weight: 700; overflow-wrap: anywhere; }
+.chance-actions { display: flex; flex-direction: column; gap: 0.6rem; }
+.chance-actions .btn { width: 100%; }
+
 /* ---------- Form controls ---------- */
 input, select, textarea, button { font: inherit; }
 /* No double-tap zoom when the host taps buttons quickly (e.g. + / - on the scoreboard) */

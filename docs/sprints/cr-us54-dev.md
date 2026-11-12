@@ -10,3 +10,6 @@ Branch `streak-second-chance` (2026-11-11). Owner request, D-65. Client-only, St
 
 ## Not changed
 `api/streaks.php`, `api/game-log.php`, `api/questions.php`, the leaderboard (no marker).
+
+## Change 2026-11-12: second chance as a popup (owner request)
+The "Use second chance" panel button became a popup shaped like the double-score popup (`#chance-overlay`, reusing `.double-overlay` / `.double-card`; `chance.*` strings). It opens right after the first miss with the feedback (right answer), the kept streak and two buttons: **Use second chance** (focused) and **See results**. It must be answered: Escape does nothing, Android Back means See results, the page behind is inert, Report is blocked while it is open, and a refresh on a pending miss opens it again. The panel's Next / See results / End run buttons stay hidden while it is open. A failed load of the new question shows the error inside the popup and does not use up the chance. Zero streak uses `chance.textNone`.

@@ -307,7 +307,12 @@
     streakFeedback: byId('streak-feedback'),
     streakNext: byId('streak-next'),
     streakEnd: byId('streak-end'),
-    streakSecondChance: byId('streak-second-chance'), // US-54: only in index.html (null in the Integration Quiz)
+    // US-54 second-chance popup: only in index.html (null in the Integration Quiz, which never offers it)
+    chanceOverlay: byId('chance-overlay'),
+    chanceFeedback: byId('chance-feedback'),
+    chanceText: byId('chance-text'),
+    chanceUse: byId('chance-use'),
+    chanceEnd: byId('chance-end'),
     resultsWinner: byId('results-winner'),
     resultsList: byId('results-list'),
     newGameBtn: byId('new-game-btn'),
@@ -1113,7 +1118,8 @@
         if (daily.current.picked !== null) onDailyNext(); // answered: on, as Next
         else onDailyLeave();                         // "Leave today's Daily Challenge?" confirm
       } else if (!streakOnScreen()) confirmBackToBoard(); // "Back to Board", after a confirm
-      else if (streak.over || isStreakPending(streak)) onStreakNext(); // lost run: on to the leaderboard, as Next
+      else if (isStreakPending(streak)) onChanceEnd();  // US-54: Back in the second-chance popup is See results
+      else if (streak.over) onStreakNext();          // lost run: on to the leaderboard, as Next
       else onStreakEnd();                            // "End the run now?" confirm
     } else if (state.screen === 'daily') {
       onDailyNewGame();                              // the Daily result: back to setup, as New Game
@@ -3215,7 +3221,8 @@
       setStreakLoading(false);
       if (!run.queue.length) {
         if (failure) {
-          showStreakFeedback(t('streak.nextFailed', { reason: errorText(failure) }), 'is-bad');
+          showStreakFeedback(t(useChance ? 'streak.nextFailedChance' : 'streak.nextFailed', { reason: errorText(failure) }), 'is-bad');
+          if (isChancePopupOpen()) fillChancePopup(); // the popup shows the failure too
           return;
         }
         run.over = true; // every question was played in this run: it ends with the full streak
@@ -3254,6 +3261,7 @@
     const run = streak;
     const cur = run.current;
     const q = cur.q;
+    closeChancePopup(); // US-54: the new question after a second chance replaces the popup
     setStreakLayout(true);
     renderRunHeading(q);
     renderQuestionImage(q);
@@ -3379,33 +3387,56 @@
       cur.picked !== null && cur.picked !== cur.q.correct;
   }
 
-  /** Next / See results, End run and (after a first miss) Use second chance. */
+  /** Next / See results and End run. A pending first miss shows neither: the second-chance popup holds the choice. */
   function renderStreakButtons() {
     const run = streak;
     const cur = run.current;
     const lost = cur.picked !== null && cur.picked !== cur.q.correct;
-    dom.streakNext.hidden = cur.picked === null;
+    dom.streakNext.hidden = cur.picked === null || isStreakPending(run);
     dom.streakNext.textContent = lost ? t('run.seeResults') : t('run.next');
     dom.streakNext.disabled = finishing;
     dom.streakEnd.hidden = lost;
     dom.streakEnd.disabled = finishing;
-    setSecondChanceButton(isStreakPending(run), finishing, t('streak.secondChance'));
+    if (isChancePopupOpen()) fillChancePopup(); // a language change or a failed load updates the open popup
   }
 
-  function setSecondChanceButton(shown, disabled, text) {
-    const btn = dom.streakSecondChance;
-    if (!btn) return; // the Integration Quiz page has none
-    btn.hidden = !shown;
-    btn.disabled = disabled;
-    btn.textContent = text;
-    // The primary action is the second chance; See results steps back to a secondary look.
-    dom.streakNext.classList.toggle('btn-primary', !shown);
+  // ---------- Second chance popup (US-54), built like the double-score popup ----------
+
+  function isChancePopupOpen() {
+    return !!dom.chanceOverlay && !dom.chanceOverlay.hidden;
   }
 
-  /** Focus the main action of the answered question (Enter goes on). */
+  /** The missed question's feedback (right answer included), the streak that stays and the two choices. */
+  function fillChancePopup() {
+    clear(dom.chanceFeedback);
+    Array.from(dom.streakFeedback.childNodes).forEach((node) => dom.chanceFeedback.appendChild(node.cloneNode(true)));
+    dom.chanceText.textContent = streak.count > 0 ? t('chance.text', { n: streak.count }) : t('chance.textNone');
+    dom.chanceUse.textContent = t('streak.secondChance');
+    dom.chanceEnd.textContent = t('run.seeResults');
+    dom.chanceUse.disabled = finishing;
+    dom.chanceEnd.disabled = finishing;
+  }
+
+  /** After the first miss of a run: the player must choose; everything behind the popup is inert. */
+  function openChancePopup() {
+    if (!dom.chanceOverlay || isChancePopupOpen() || !isStreakPending(streak)) return;
+    fillChancePopup();
+    stopReading();
+    dom.chanceOverlay.hidden = false;
+    setPageInert(true); // keyboard focus stays on the popup
+    dom.chanceUse.focus();
+  }
+
+  function closeChancePopup() {
+    if (!isChancePopupOpen()) return;
+    dom.chanceOverlay.hidden = true;
+    setPageInert(false);
+  }
+
+  /** Focus the main action of the answered question: the popup after a first miss, else Next (Enter goes on). */
   function focusStreakAction() {
-    const btn = dom.streakSecondChance;
-    (btn && !btn.hidden ? btn : dom.streakNext).focus();
+    if (isStreakPending(streak)) openChancePopup();
+    else dom.streakNext.focus();
   }
 
   /** The panel's hidden heading, the count's label and the hint (Streak or Daily Challenge). */
@@ -3449,8 +3480,11 @@
       return;
     }
     dom.streakNext.disabled = true;
-    if (useChance) setSecondChanceButton(true, true, t('common.loading'));
-    else dom.streakNext.textContent = t('common.loading');
+    if (useChance) { // the popup stays open until the new question is shown
+      dom.chanceUse.disabled = true;
+      dom.chanceEnd.disabled = true;
+      dom.chanceUse.textContent = t('common.loading');
+    } else dom.streakNext.textContent = t('common.loading');
   }
 
   /** A tapped choice, or null when the time ran out. Right: +1 and Next; wrong or too late: the run is over. */
@@ -3490,8 +3524,15 @@
   /** US-54: continue after the first miss with a new question; the streak count is kept. */
   function onStreakSecondChance() {
     const run = streak;
-    if (!isStreakPending(run) || !streakOnScreen() || finishing || dom.streakSecondChance.disabled) return;
-    nextStreakQuestion(true);
+    if (!isStreakPending(run) || !streakOnScreen() || finishing || dom.chanceUse.disabled) return;
+    nextStreakQuestion(true); // the popup closes when the new question opens
+  }
+
+  /** "See results" in the popup: give up the second chance and end the run (the streak is saved). */
+  function onChanceEnd() {
+    if (!isStreakPending(streak) || finishing || dom.chanceEnd.disabled) return;
+    closeChancePopup();
+    finishStreak();
   }
 
   /** Enter anywhere on the answered question means Next (buttons and links handle Enter themselves). */
@@ -3509,8 +3550,7 @@
     const target = event.target;
     if (target && target.closest && target.closest('button, a, input, select, textarea')) return;
     event.preventDefault();
-    if (!dailyOnScreen() && isStreakPending(streak)) onStreakSecondChance(); // US-54: Enter takes the second chance
-    else onRunNext();
+    onRunNext();
   }
 
   /** End run: stop now and save the streak so far (confirm first). */
@@ -3983,7 +4023,6 @@
     dom.streakNext.disabled = false;
     dom.streakNext.textContent = cur.index + 1 >= total ? t('daily.seeResult') : t('run.next');
     dom.streakEnd.hidden = true;
-    setSecondChanceButton(false, false, ''); // US-54 is for the Streak Challenge only
   }
 
   function toggleDailyLang() {
@@ -4816,7 +4855,7 @@
 
   function openReport() {
     const target = reportTarget();
-    if (!target || isReportOpen() || !dom.doubleOverlay.hidden) return;
+    if (!target || isReportOpen() || !dom.doubleOverlay.hidden || isChancePopupOpen()) return;
     report = { questionId: target.id, sending: false };
     dom.reportAbout.textContent = target.label;
     dom.reportReasons.forEach((input) => { input.checked = false; });
@@ -5043,7 +5082,10 @@
     dom.streakNameInput.addEventListener('input', () => setFieldError(dom.streakNameInput, dom.streakNameError, ''));
     dom.streakNext.addEventListener('click', onRunNext);
     dom.streakEnd.addEventListener('click', onStreakEnd);
-    if (dom.streakSecondChance) dom.streakSecondChance.addEventListener('click', onStreakSecondChance);
+    if (dom.chanceUse) { // US-54: not on the Integration Quiz page
+      dom.chanceUse.addEventListener('click', onStreakSecondChance);
+      dom.chanceEnd.addEventListener('click', onChanceEnd);
+    }
     dom.lbAgain.addEventListener('click', onPlayAgain);
     dom.lbNew.addEventListener('click', onLeaderboardNewGame);
     dom.lbBack.addEventListener('click', onLeaderboardBack);
