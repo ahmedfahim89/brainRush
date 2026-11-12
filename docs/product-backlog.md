@@ -540,8 +540,8 @@ As a host, I want a "Kilo Meshakkal" category whose boxes each hide a question f
 
 ### US-54 Free second chance in the Streak Challenge (Should)
 As a streak player, I want one second chance per run, so that a single slip doesn't end a long streak. *(Added 2026-11-11, owner request, D-65. Size S. Client-only: no API or database change. Streak Challenge only; US-51, the rewarded-ad version, stays planned.)*
-- **Given** a Streak Challenge run that has not used its second chance, **when** the player picks a wrong answer or the time runs out, **then** the usual feedback shows (pick red, right answer green, "Time's up!" if late), the run is not over, and the panel offers **Use second chance** (primary) and **See results**.
-- **When** the player clicks **Use second chance** (or presses Enter), **then** the streak count is unchanged, the missed question is replaced by a new question the run has not shown (fresh timer), and the chance is used up for the rest of the run.
+- **Given** a Streak Challenge run that has not used its second chance, **when** the player picks a wrong answer or the time runs out, **then** the usual feedback shows (pick red, right answer green, "Time's up!" if late), the run is not over, and a **"Second chance!" popup** (the double-score popup's card) opens with the feedback, **Use second chance** (primary) and **See results**. The popup must be answered: Escape does nothing and Android Back means See results.
+- **When** the player clicks **Use second chance** (or presses Enter while it is focused), **then** the streak count is unchanged, the missed question is replaced by a new question the run has not shown (fresh timer), and the chance is used up for the rest of the run.
 - **When** the player clicks **See results** (or Android Back), **then** the run ends as before and the streak is saved.
 - **Given** a run that used its second chance, **when** the player misses again, **then** the run ends as before (no offer).
 - **Given** a refresh while the choice is open, **then** the same choice is offered again; a refresh after using the chance keeps it used. A saved run from before this change loads and counts as unused.

@@ -48,9 +48,9 @@
   <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="css/style.bcf8d1c2.css">
+  <link rel="stylesheet" href="css/style.c30ef865.css">
   <!-- Interface language (US-49): loaded first, so an Arabic page is right to left from its first paint -->
-  <script src="js/i18n.8fef9947.js"></script>
+  <script src="js/i18n.c8df9c4b.js"></script>
 </head>
 <body class="game">
   <header class="page-header">
@@ -74,6 +74,19 @@
       <p id="double-title" class="double-title" data-i18n="double.title">&times;2 Double score!</p>
       <p id="double-text"></p>
       <button type="button" id="double-ok" class="btn btn-primary btn-large" data-i18n="double.ok">Let's play</button>
+    </div>
+  </div>
+
+  <!-- Second chance (US-54, D-65): shown after the first miss of a Streak Challenge run; the player must choose -->
+  <div id="chance-overlay" class="double-overlay" role="alertdialog" aria-modal="true" aria-labelledby="chance-title" aria-describedby="chance-feedback chance-text" hidden>
+    <div class="double-card">
+      <p id="chance-title" class="double-title" data-i18n="chance.title">Second chance!</p>
+      <p id="chance-feedback" class="chance-feedback"></p>
+      <p id="chance-text"></p>
+      <div class="chance-actions">
+        <button type="button" id="chance-use" class="btn btn-primary btn-large" data-i18n="streak.secondChance">Use second chance</button>
+        <button type="button" id="chance-end" class="btn btn-large" data-i18n="run.seeResults">See results</button>
+      </div>
     </div>
   </div>
 
@@ -287,8 +300,7 @@
           <p id="streak-hint" class="hint" data-i18n="streak.hintChance">Pick the right answer before the time runs out. One wrong answer ends the run, after your one second chance.</p>
           <ol id="streak-choices" class="streak-choices" aria-label="Choices" data-i18n-attr="aria-label:question.choices"></ol>
           <p id="streak-feedback" class="streak-feedback" role="status" aria-live="polite"></p>
-          <button type="button" id="streak-second-chance" class="btn btn-primary btn-large btn-block" hidden data-i18n="streak.secondChance">Use second chance</button>
-          <button type="button" id="streak-next" class="btn btn-primary btn-large btn-block" hidden data-i18n="run.next">Next question</button>
+                    <button type="button" id="streak-next" class="btn btn-primary btn-large btn-block" hidden data-i18n="run.next">Next question</button>
           <button type="button" id="streak-end" class="btn btn-end btn-block" data-i18n="streak.end">End run</button>
         </section>
       </div>
@@ -394,6 +406,6 @@
   <script src="js/share.4fcf5fb3.js"></script>
   <!-- Read aloud (US-48): loaded before game.js, which uses it -->
   <script src="js/speech.019a1850.js"></script>
-  <script src="js/game.455eabc4.js"></script>
+  <script src="js/game.c535b134.js"></script>
 </body>
 </html>
