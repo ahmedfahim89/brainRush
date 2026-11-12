@@ -141,6 +141,8 @@ Unknown: the owner removed 19 AI suggestions on 2026-10-19 (all 5 at 500), and o
 | Pingu | 300 | Swiss clay-animated penguin of a 1990s children's TV series, honks "Noot noot!" | 2026-11-11 | auto-2026-11-11-2-review.md |
 | Azrael (Harhour) | 400 | Gargamel's cat in "The Smurfs" (1981 cartoon), هرهور in Arabic | 2026-11-11 | auto-2026-11-11-2-review.md |
 | Sid (Ice Age) | 400 | Chatty, clumsy sloth who travels with Manny the mammoth in "Ice Age" (2002) | 2026-11-11 | auto-2026-11-11-2-review.md |
+| Oggy | 400 | Lazy blue cat whose life is ruined by three cockroaches in "Oggy and the Cockroaches" (1998 French cartoon) | 2026-11-12 | auto-2026-11-12-review.md |
+| A fox (Nick Wilde) | 500 | What kind of animal Judy Hopps's con-artist partner Nick Wilde is in "Zootopia" (2016) | 2026-11-12 | auto-2026-11-12-review.md |
 
 ## Egyptians
 
