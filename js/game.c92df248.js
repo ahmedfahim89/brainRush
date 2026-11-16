@@ -115,15 +115,16 @@
     teams: { limit: 4, key: 'teams' },
   };
 
-  // Six distinct contestant colors; `ink` is the readable text color on that background; `name` is
-  // the key of the color's name (t('color.red')).
+  // Six distinct contestant colors; `ink` is the readable text color on that background (dark navy on
+  // all six, so every card meets WCAG AA 4.5:1, FU-75); `name` is the key of the color's name
+  // (t('color.red')).
   // Grey (unanswered cell) and gold (UI accent) are deliberately not in the palette.
   const PALETTE = [
-    { value: '#e5484d', name: 'color.red', ink: '#ffffff' },
-    { value: '#3e7bfa', name: 'color.blue', ink: '#ffffff' },
+    { value: '#e5484d', name: 'color.red', ink: '#0b1026' },
+    { value: '#3e7bfa', name: 'color.blue', ink: '#0b1026' },
     { value: '#2fb36d', name: 'color.green', ink: '#0b1026' },
     { value: '#f08c2e', name: 'color.orange', ink: '#0b1026' },
-    { value: '#9b5de5', name: 'color.purple', ink: '#ffffff' },
+    { value: '#9b5de5', name: 'color.purple', ink: '#0b1026' },
     { value: '#22b8cf', name: 'color.cyan', ink: '#0b1026' },
   ];
 
