@@ -728,3 +728,9 @@ Added by the PO at Sprint 6 acceptance and re-acceptance on 2026-10-11. Full wor
 ## Change request "Free second chance in Streak" (US-54) — outside the sprint cycle, 2026-11-11
 
 **Change request (owner, 2026-11-11):** every Streak Challenge run gets one free second chance after the first wrong pick or time-out: the streak is kept, the missed question is replaced by a new one. Streak Challenge only (D-65). Client-only (`game.js`, `i18n.js`, `index.html`, guide and `llms.txt`); US-51 (rewarded ad) stays planned in Sprint 15. Branch `streak-second-chance`. Dev and test notes: `docs/sprints/cr-us54-dev.md`, `docs/sprints/cr-us54-test-report.md`. **Status:** built; local Chrome test next, then PR for the owner.
+
+---
+
+## Backlog, not planned — US-56, US-57 (added 2026-11-16)
+
+US-56 Challenge a friend (Should, M: new `challenges` table and API) and US-57 Earn the second chance (Should, S, client-only) are in `docs/product-backlog.md` (D-68, D-69) and not committed to a sprint until the owner answers FU-80 to FU-82.
