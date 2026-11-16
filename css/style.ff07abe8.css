@@ -877,6 +877,7 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 }
 .score-name { grid-area: name; font-weight: 700; text-align: center; overflow-wrap: anywhere; }
 .score-value { grid-area: score; font-size: 1.8rem; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+/* Score buttons and helper chips sit on the contestant colour with its dark ink (FU-75): a light tint keeps them at 4.5:1 or more */
 .score-btn {
   width: 2.2rem;
   height: 2.2rem;
@@ -885,17 +886,17 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
   font-size: 1.3rem;
   font-weight: 700;
   line-height: 1;
-  background: rgba(0, 0, 0, 0.22);
+  background: rgba(255, 255, 255, 0.3);
   border: 1px solid rgba(0, 0, 0, 0.3);
   border-radius: 50%;
   cursor: pointer;
 }
-@media (hover: hover) { .score-btn:hover { background: rgba(0, 0, 0, 0.38); } }
+@media (hover: hover) { .score-btn:hover { background: rgba(255, 255, 255, 0.45); } }
 .score-minus { grid-area: minus; }
 .score-plus { grid-area: plus; }
 /* Helpers left (US-32): one small line of the chip symbols; a used helper is dimmed and struck */
 .score-helpers { grid-area: helpers; display: flex; justify-content: center; gap: 0.3rem; font-size: 0.7rem; font-weight: 700; line-height: 1; }
-.score-helper { padding: 0.12rem 0.4rem; background: rgba(0, 0, 0, 0.22); border-radius: 999px; }
+.score-helper { padding: 0.12rem 0.4rem; background: rgba(255, 255, 255, 0.3); border-radius: 999px; }
 .score-helpers[hidden], .srow-helpers[hidden] { display: none; }
 .score-helper.is-used { opacity: 0.35; text-decoration: line-through; }
 
