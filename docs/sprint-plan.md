@@ -729,6 +729,8 @@ Added by the PO at Sprint 6 acceptance and re-acceptance on 2026-10-11. Full wor
 
 **Change request (owner, 2026-11-11):** every Streak Challenge run gets one free second chance after the first wrong pick or time-out: the streak is kept, the missed question is replaced by a new one. Streak Challenge only (D-65). Client-only (`game.js`, `i18n.js`, `index.html`, guide and `llms.txt`); US-51 (rewarded ad) stays planned in Sprint 15. Branch `streak-second-chance`. Dev and test notes: `docs/sprints/cr-us54-dev.md`, `docs/sprints/cr-us54-test-report.md`. **Status:** built; local Chrome test next, then PR for the owner.
 
-## Change request "Christmas theme" (US-55) — outside the sprint cycle, 2026-11-16
+---
 
-**Change request (owner, 2026-11-16):** an Admin toggle for a Christmas look and greeting on the game page only, built to be removed after Christmas (D-66). Branch `christmas-theme`. Dev and test notes: `docs/sprints/cr-us55-christmas-dev.md`, `docs/sprints/cr-us55-christmas-test-report.md`. **Status:** Accepted by the PO with follow-ups 2026-11-16 (D-67): 24 criteria, 22 PASS at test; BUG-55-02 and BUG-55-03 (Minor) fixed in fix loop 1; BUG-55-01 (pre-existing in `js/game.*.js`) moved to FU-75. Pending the owner's local Chrome check and commit (FU-76, includes reduced motion, first paint and the Python gates) and the hosted deploy (FU-77, no migration); removal CR after Christmas (FU-78). Not committed.
+## Backlog, not planned — US-56, US-57 (added 2026-11-16)
+
+US-56 Challenge a friend (Should, M: new `challenges` table and API) and US-57 Earn the second chance (Should, S, client-only) are in `docs/product-backlog.md` (D-68, D-69) and not committed to a sprint until the owner answers FU-80 to FU-82.
