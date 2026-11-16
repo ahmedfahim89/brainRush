@@ -731,6 +731,12 @@ Added by the PO at Sprint 6 acceptance and re-acceptance on 2026-10-11. Full wor
 
 ---
 
+## Change request "Christmas theme" (US-55) — outside the sprint cycle, 2026-11-16
+
+**Change request (owner, 2026-11-16):** an Admin toggle for a Christmas look and greeting on the game page only, built to be removed after Christmas (D-66). Branch `christmas-theme`. Dev and test notes: `docs/sprints/cr-us55-christmas-dev.md`, `docs/sprints/cr-us55-christmas-test-report.md`. **Status:** done. Accepted by the PO with follow-ups (D-67), merged via PR #121 and deployed 2026-11-16 (live verified). FU-75 (player card contrast) fixed via PR #123 and live the same day. Removal CR after Christmas (FU-78).
+
+---
+
 ## Backlog, not planned — US-56, US-57 (added 2026-11-16)
 
 US-56 Challenge a friend (Should, M: new `challenges` table and API) and US-57 Earn the second chance (Should, S, client-only) are in `docs/product-backlog.md` (D-68, D-69) and not committed to a sprint until the owner answers FU-80 to FU-82.
