@@ -2,6 +2,7 @@
 // GET  /api/settings.php  -> { categories_per_game, timer_seconds, banner_enabled, banner_text, start_game_hidden, helpers_enabled, ads_enabled, final_round_enabled, ads_client, ads_slot }
 // PUT  /api/settings.php  body { categories_per_game?, timer_seconds?, banner_enabled?, banner_text?, start_game_hidden?, helpers_enabled?, ads_enabled?, final_round_enabled?, ads_client?, ads_slot? } -> updated settings
 // Writes need admin access (require_admin: 401/403 otherwise).
+// CHRISTMAS (US-55, D-66): also christmas_theme (0/1, missing row = 0) and christmas_banner_text (max 150, may be empty, missing row = "").
 require_once __DIR__ . '/db.php';
 
 // Editable settings and their allowed integer range (values themselves live in the DB).
@@ -13,12 +14,17 @@ const SETTING_RULES = [
     'helpers_enabled'     => [0, 1], // 3 choices, Swap and Skip; a missing row counts as on
     'ads_enabled'         => [0, 1], // AdSense banner on the Streak leaderboard (D-41); a missing row counts as off
     'final_round_enabled' => [0, 1], // final wager round before Results (US-44); a missing row counts as off
+    'christmas_theme'     => [0, 1], // CHRISTMAS (US-55): festive look on the game page; a missing row counts as off
 ];
 
 // Editable text settings and their maximum length in characters.
 const TEXT_SETTING_RULES = [
     'banner_text' => 150,
+    'christmas_banner_text' => 150, // CHRISTMAS (US-55): greeting strip; empty = the game's built-in greeting
 ];
+
+// CHRISTMAS (US-55): text settings that may be saved empty.
+const EMPTY_TEXT_ALLOWED = ['christmas_banner_text'];
 
 // AdSense IDs (D-41): public values that go into the page, so only their format is checked.
 // Empty is allowed so the admin can clear them.
@@ -38,6 +44,9 @@ function load_settings(PDO $pdo): array
     foreach (array_merge(array_keys(TEXT_SETTING_RULES), array_keys(AD_SETTING_RULES)) as $name) {
         $settings[$name] = isset($rows[$name]) ? (string) $rows[$name] : null;
     }
+    // CHRISTMAS (US-55): a missing row means off / no custom greeting
+    $settings['christmas_theme'] = $settings['christmas_theme'] ?? 0;
+    $settings['christmas_banner_text'] = $settings['christmas_banner_text'] ?? '';
     return $settings;
 }
 
@@ -56,9 +65,14 @@ function validate_settings(array $body): array
         $updates[$name] = $value;
     }
     foreach (TEXT_SETTING_RULES as $name => $maxChars) {
-        if (array_key_exists($name, $body)) {
-            $updates[$name] = require_text($body[$name], $name, $maxChars);
+        if (!array_key_exists($name, $body)) {
+            continue;
         }
+        // CHRISTMAS (US-55): an empty greeting is allowed (EMPTY_TEXT_ALLOWED)
+        $value = $body[$name];
+        $emptyOk = in_array($name, EMPTY_TEXT_ALLOWED, true)
+            && ($value === null || (is_string($value) && trim($value) === ''));
+        $updates[$name] = $emptyOk ? '' : require_text($value, $name, $maxChars);
     }
     foreach (AD_SETTING_RULES as $name => [$pattern, $message]) {
         if (!array_key_exists($name, $body)) {
