@@ -456,3 +456,4 @@ Notes: Gutenberg and Ada Lovelace were removed twice: the seed questions (points
 | Helen Keller | 200 | Deaf-blind writer and campaigner, Anne Sullivan spelled "water" into her hand, graduated in 1904 | 2026-11-11 | auto-2026-11-11-2-review.md |
 | Johannes Gutenberg | 300 | Mainz goldsmith, movable metal type around 1450, the Bible that carries his name (also in Technology) | 2026-11-11 | auto-2026-11-11-2-review.md |
 | Valentina Tereshkova | 500 | Factory worker and amateur parachutist, first woman in space (June 1963), 48 orbits | 2026-11-11 | auto-2026-11-11-2-review.md |
+| Banksy | 500 | Anonymous English street artist, "Girl with Balloon" shredded itself at a London auction in 2018 | 2026-11-16 | auto-2026-11-16-4-review.md |
