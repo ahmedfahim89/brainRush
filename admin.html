@@ -40,6 +40,15 @@
         <label for="setting-banner-text">Banner text</label>
         <input id="setting-banner-text" name="banner_text" class="wide-input" type="text" maxlength="150" required aria-describedby="setting-banner-hint">
         <p id="setting-banner-hint" class="hint">For example: New questions added in Egyptians category &mdash; try it now!</p>
+        <!-- CHRISTMAS (US-55, D-66): seasonal theme on the game page; remove after Christmas -->
+        <label class="check-label" for="setting-christmas-theme">
+          <input id="setting-christmas-theme" name="christmas_theme" type="checkbox">
+          Christmas theme on the game page
+        </label>
+        <label for="setting-christmas-text">Christmas greeting</label>
+        <input id="setting-christmas-text" name="christmas_banner_text" class="wide-input" type="text" maxlength="150" aria-describedby="setting-christmas-hint">
+        <p id="setting-christmas-hint" class="hint">Shown in a strip on the game's setup screen while the theme is on. Leave empty for the built-in greeting (Merry Christmas from Mokh Rush!, in English or Arabic).</p>
+        <!-- /CHRISTMAS -->
         <!-- Maintenance mode: hides the Start Game button and shows an overlay on the game screen -->
         <label class="check-label" for="setting-start-hidden">
           <input id="setting-start-hidden" name="start_game_hidden" type="checkbox">
@@ -265,6 +274,6 @@
     </section>
   </main>
 
-  <script src="js/admin.750e5b72.js"></script>
+  <script src="js/admin.fcf45ed5.js"></script>
 </body>
 </html>

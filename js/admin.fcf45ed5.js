@@ -77,6 +77,8 @@
     settingTimer: byId('setting-timer'),
     settingBannerEnabled: byId('setting-banner-enabled'),
     settingBannerText: byId('setting-banner-text'),
+    settingChristmasTheme: byId('setting-christmas-theme'), // CHRISTMAS (US-55)
+    settingChristmasText: byId('setting-christmas-text'), // CHRISTMAS (US-55)
     settingStartHidden: byId('setting-start-hidden'),
     settingHelpersEnabled: byId('setting-helpers-enabled'),
     settingFinalRound: byId('setting-final-round'),
@@ -405,6 +407,9 @@
     dom.settingFinalRound.checked = settings.final_round_enabled === 1; // US-44: a missing row means off
     dom.settingBannerText.value = typeof settings.banner_text === 'string' ? settings.banner_text : BANNER_DEFAULT;
     dom.settingAdsEnabled.checked = settings.ads_enabled === 1; // a missing row means off
+    // CHRISTMAS (US-55): a missing row means off / empty greeting
+    dom.settingChristmasTheme.checked = settings.christmas_theme === 1;
+    dom.settingChristmasText.value = typeof settings.christmas_banner_text === 'string' ? settings.christmas_banner_text : '';
     dom.settingAdsClient.value = typeof settings.ads_client === 'string' ? settings.ads_client : '';
     dom.settingAdsSlot.value = typeof settings.ads_slot === 'string' ? settings.ads_slot : '';
     renderCategorySummary();
@@ -428,6 +433,10 @@
     if (!bannerText) bannerError = 'Banner text is required.';
     // Array.from counts characters like the server does (an emoji is one, not two)
     else if (Array.from(bannerText).length > BANNER_MAX) bannerError = 'Banner text must be at most ' + BANNER_MAX + ' characters.';
+    // CHRISTMAS (US-55): the greeting may be empty (the game then shows its built-in one)
+    const christmasText = dom.settingChristmasText.value.trim();
+    const christmasError = Array.from(christmasText).length > BANNER_MAX
+      ? 'Christmas greeting must be at most ' + BANNER_MAX + ' characters.' : '';
     const adsEnabled = dom.settingAdsEnabled.checked;
     const adsClient = dom.settingAdsClient.value.trim();
     const adsSlot = dom.settingAdsSlot.value.trim();
@@ -435,7 +444,7 @@
     if (!ADS_CLIENT_PATTERN.test(adsClient)) adsError = 'The publisher ID must look like ca-pub-1234567890123456.';
     else if (!ADS_SLOT_PATTERN.test(adsSlot)) adsError = 'The ad unit slot ID must be digits only.';
     else if (adsEnabled && (!adsClient || !adsSlot)) adsError = 'To show ads, enter the publisher ID and the ad unit slot ID.';
-    const errors = [perGame.error, timer.error, bannerError, adsError].filter(Boolean);
+    const errors = [perGame.error, timer.error, bannerError, christmasError /* CHRISTMAS */, adsError].filter(Boolean);
     if (errors.length) {
       showError(dom.settingsMsg, errors.join('\n'));
       return;
@@ -453,6 +462,8 @@
         ads_enabled: adsEnabled ? 1 : 0,
         ads_client: adsClient,
         ads_slot: adsSlot,
+        christmas_theme: dom.settingChristmasTheme.checked ? 1 : 0, // CHRISTMAS (US-55)
+        christmas_banner_text: christmasText, // CHRISTMAS (US-55)
       });
       fillSettings(saved);
       showSuccess(dom.settingsMsg, 'Settings saved.');

@@ -1,0 +1,172 @@
+/* CHRISTMAS (US-55, D-66): Christmas theme for the game page (index.html only). Remove after Christmas.
+   Everything is scoped under body.theme-christmas, which js/christmas.js adds only while the Admin
+   switch (christmas_theme) is on; without the class this file changes nothing.
+   Palette: deep pine background and panels, festive red accent, the brand gold kept for point values
+   and primary buttons. Every text colour below meets WCAG AA on the backgrounds it is used on
+   (see docs/sprints/cr-us55-christmas-dev.md for the measured ratios).
+   Emojis are allowed in this theme (D-66); decorative ones are hidden from screen readers. */
+
+/* ---------- Palette (overrides the :root variables of style.css) ---------- */
+.theme-christmas {
+  --bg: #0b2318;
+  --panel: #12301f;
+  --panel-2: #1a3f2a;
+  --border: #5a9a72;         /* 3.5:1 on panel-2, 4.3:1 on panel (WCAG 1.4.11) */
+  --text: #f2f7f3;
+  --muted: #b4cdbd;
+  --gold: #f5c518;
+  --gold-dark: #c99d00;
+  --danger: #ff8a8a;
+  --danger-bg: rgba(255, 138, 138, 0.12);
+  --focus: 0 0 0 3px rgba(245, 197, 24, 0.5);
+  --xmas-red: #b3121f;       /* greeting strip, header edge, category edge */
+  --xmas-red-dark: #9e0f1c;
+  --xmas-header: #0f2a1b;    /* replaces the header's #0e1433 */
+  --xmas-field: #0d2618;     /* replaces the fields' and tracks' #0e1433 */
+  --xmas-gold-light: #ffe066; /* replaces the gold hovers #ffe27a / #ffd84a */
+  --xmas-snow: #ffffff;
+}
+
+/* ---------- Hard-coded colours of style.css ---------- */
+@media (hover: hover) {
+  .theme-christmas a:hover { color: var(--xmas-gold-light); }
+  .theme-christmas .btn-primary:hover:not(:disabled) { background: var(--xmas-gold-light); color: #1a1a1a; }
+  /* opaque equal of a 12% / 25% gold tint over the pine panel, as style.css does for the navy one
+     (25%, not 30%, keeps the gold label at 4.9:1) */
+  .theme-christmas .btn-streak:not(.btn-primary):hover:not(:disabled),
+  .theme-christmas .btn-daily:hover:not(:disabled) { background: #2d421e; }
+  .theme-christmas .btn-leaderboard:hover:not(:disabled) { background: #4b551d; }
+  .theme-christmas .streak-choice:hover:not(:disabled) { background: #24573a; }
+}
+.theme-christmas input,
+.theme-christmas select,
+.theme-christmas textarea,
+.theme-christmas .timer-track,
+.theme-christmas .played-track { background: var(--xmas-field); }
+.theme-christmas .maintenance-overlay,
+.theme-christmas .double-overlay,
+.theme-christmas .report-overlay { background: rgba(4, 16, 9, 0.9); }
+.theme-christmas .new-banner {
+  background: linear-gradient(90deg, var(--gold-dark), var(--gold) 30%, var(--xmas-gold-light) 70%, var(--gold));
+}
+
+/* ---------- Header: pine bar, red edge, a string of lights and a Santa hat on the logo ---------- */
+.theme-christmas .page-header {
+  background: var(--xmas-header);
+  border-bottom: 3px solid var(--xmas-red);
+}
+/* The string of lights hangs just under the header's red edge; it never takes clicks */
+.theme-christmas .page-header::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 14px;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle at 12px 9px, #ff5a5a 0 3.5px, rgba(255, 90, 90, 0.35) 4.5px, transparent 7px),
+    radial-gradient(circle at 36px 9px, #ffd84a 0 3.5px, rgba(255, 216, 74, 0.35) 4.5px, transparent 7px),
+    radial-gradient(circle at 60px 9px, #5be08f 0 3.5px, rgba(91, 224, 143, 0.35) 4.5px, transparent 7px),
+    radial-gradient(circle at 84px 9px, #6cb6ff 0 3.5px, rgba(108, 182, 255, 0.35) 4.5px, transparent 7px),
+    linear-gradient(#2e5a40, #2e5a40);
+  background-size: 96px 14px, 96px 14px, 96px 14px, 96px 14px, 100% 2px;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 2px;
+  background-repeat: repeat-x, repeat-x, repeat-x, repeat-x, no-repeat;
+  animation: xmas-twinkle 2.4s ease-in-out infinite;
+}
+@keyframes xmas-twinkle { 50% { opacity: 0.6; } }
+
+/* Santa hat on the header logo: an inline SVG drawing, tilted onto the top corner of the mark */
+.theme-christmas .page-header h1 { position: relative; }
+.theme-christmas .page-header h1::before {
+  content: "";
+  position: absolute;
+  top: -0.85rem;
+  left: 1.3rem; /* over the brain, the right part of the mark (the mark is not mirrored in Arabic) */
+  width: 2rem;
+  height: 1.6rem;
+  pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 32'%3E%3Cpath d='M6 24 C10 12 18 4 30 5 C27 9 26 15 28 24 Z' fill='%23d62839'/%3E%3Cpath d='M30 5 C33 6 35 9 35 12' fill='none' stroke='%23d62839' stroke-width='4' stroke-linecap='round'/%3E%3Crect x='3' y='22' width='29' height='7' rx='3.5' fill='%23ffffff'/%3E%3Ccircle cx='35' cy='14' r='4' fill='%23ffffff'/%3E%3C/svg%3E") no-repeat center / contain;
+  transform: rotate(-12deg);
+}
+html[dir="rtl"] .theme-christmas .page-header h1::before { left: auto; right: 0; }
+.theme-christmas .xmas-title-emoji { margin-inline-start: 0.45rem; font-size: 0.8em; vertical-align: 0.1em; }
+
+/* ---------- Greeting strip on the setup screen (text from Admin, or the built-in EN/AR one) ---------- */
+.theme-christmas .xmas-greeting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.7rem;
+  margin: 0 0 1rem;
+  padding: 0.6rem 1rem;
+  color: var(--xmas-snow);
+  font-size: 1.15rem;
+  font-weight: 800;
+  text-align: center;
+  overflow-wrap: anywhere;
+  background: linear-gradient(90deg, var(--xmas-red-dark), var(--xmas-red) 50%, var(--xmas-red-dark));
+  border: 2px dashed var(--gold);
+  border-radius: var(--radius);
+  box-shadow: 0 0 16px rgba(179, 18, 31, 0.45);
+}
+.theme-christmas .xmas-greeting[hidden] { display: none; }
+.theme-christmas .xmas-greeting-text { min-width: 0; }
+.theme-christmas .xmas-greeting-emoji { flex: none; font-weight: 400; letter-spacing: 0.15em; }
+
+/* ---------- Board: a snow edge along the category row, red under-edge, a tree by the info line ---------- */
+.theme-christmas .board-cat {
+  padding-top: 0.6rem;
+  background:
+    radial-gradient(circle at 50% 0, var(--xmas-snow) 0 5px, transparent 5.5px) 0 0 / 14px 8px repeat-x,
+    linear-gradient(var(--xmas-snow), var(--xmas-snow)) 0 0 / 100% 3px no-repeat,
+    var(--panel-2);
+  border-bottom-color: var(--xmas-red);
+}
+/* open cells only: played cells keep their owner colour (inline) or the grey of style.css */
+.theme-christmas .board-cell:not(.is-used) { background: linear-gradient(#1d4a30, #153a25); }
+.theme-christmas .board-info::before {
+  content: "\1F384\00A0";
+  content: "\1F384\00A0" / "";
+}
+
+/* ---------- Snowfall: a fixed layer behind the page content (z-index -1), never takes clicks ---------- */
+.theme-christmas .xmas-snow {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.theme-christmas .xmas-flake {
+  position: absolute;
+  top: -2rem;
+  left: var(--x, 50%);
+  color: var(--xmas-snow);
+  font-size: var(--size, 1rem);
+  line-height: 1;
+  opacity: var(--alpha, 0.6);
+  animation: xmas-fall var(--dur, 14s) linear var(--delay, 0s) infinite;
+}
+@keyframes xmas-fall {
+  0% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(var(--sway, 20px), 55vh, 0); }
+  100% { transform: translate3d(0, 110vh, 0); }
+}
+
+/* ---------- Phones: fewer flakes, room for the lights above the first line ---------- */
+@media (max-width: 600px) {
+  .theme-christmas .xmas-flake:nth-child(n+13) { display: none; }
+  .theme-christmas .game-main { padding-top: 1.15rem; }
+  .theme-christmas .page-header h1::before { top: -0.5rem; } /* keep the hat tip inside the page */
+  .theme-christmas .xmas-greeting { padding: 0.5rem 0.7rem; font-size: 0.95rem; }
+}
+
+/* ---------- Reduced motion: no snowfall, steady lights; the rest of the theme stays ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .theme-christmas .xmas-snow { display: none; }
+  .theme-christmas .page-header::after { animation: none; }
+}

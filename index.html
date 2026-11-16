@@ -49,10 +49,14 @@
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="css/style.c30ef865.css">
+  <!-- CHRISTMAS (US-55, D-66): seasonal theme, only active under body.theme-christmas; remove after Christmas -->
+  <link rel="stylesheet" href="css/christmas.717dbe43.css">
   <!-- Interface language (US-49): loaded first, so an Arabic page is right to left from its first paint -->
   <script src="js/i18n.c8df9c4b.js"></script>
 </head>
 <body class="game">
+  <!-- CHRISTMAS (US-55, D-66): first in <body> so the last known theme is applied before the first paint; remove after Christmas -->
+  <script src="js/christmas.527b5601.js"></script>
   <header class="page-header">
     <h1><img class="brand-logo" src="img/mokh-mark.svg" alt="" width="54" height="36"><span data-i18n="app.name">Mokh Rush</span></h1>
     <nav><a class="nav-link" href="how-to-play.html" target="_blank" rel="noopener" data-i18n="nav.howToPlay">How to play</a> &middot; <a class="nav-link" href="terms.html" target="_blank" rel="noopener" data-i18n="nav.terms">Terms</a> &middot; <a class="nav-link" href="privacy.html" target="_blank" rel="noopener" data-i18n="nav.privacy">Privacy</a> &middot; <a class="nav-link" href="admin.html" data-i18n="nav.admin">Admin</a></nav>
@@ -130,6 +134,8 @@
     <section id="screen-setup" class="screen setup" aria-labelledby="setup-title">
       <!-- "New questions" banner: text and on/off are set in Admin > Game settings -->
       <p id="new-banner" class="new-banner" role="status" hidden></p>
+      <!-- CHRISTMAS (US-55): greeting strip, filled and shown by the Christmas script when the theme is on -->
+      <p id="xmas-greeting" class="xmas-greeting" hidden></p>
       <h2 id="setup-title" data-i18n="setup.title">New game</h2>
       <!-- Home intro (D-42): visible text that tells players and search engines what Mokh Rush is -->
       <p class="site-intro"><span data-i18n="setup.intro">Free Jeopardy-style trivia quiz game for parties, classrooms and family nights: questions in English and Arabic, players or teams on one shared screen.</span> <a href="how-to-play.html" target="_blank" rel="noopener" data-i18n="nav.howToPlay">How to play</a></p>
