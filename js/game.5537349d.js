@@ -79,6 +79,11 @@
   const STREAK_REFILL_AT = 5;   // ask for the next batch once fewer questions are queued
   const STREAK_MAX_QUEUE = 100; // a saved queue is never longer (batches are 20)
   const STREAK_TIME_UP = -1;    // `picked` when the time ran out
+  // Earned second chances (US-57, D-69): a run starts with none; 5 correct answers earn the 1st, then
+  // 10 more the 2nd. Using one restarts the counter at 0. Streak Challenge only.
+  const CHANCE_FIRST_AT = 5;    // correct answers for the 1st chance
+  const CHANCE_NEXT_AFTER = 10; // correct answers for the 2nd, counted from the 1st (or from its use)
+  const CHANCE_MAX = 2;         // chances earned per run at most
   const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/; // "YYYY-MM-DD" from the API
   const LB_PERIODS = ['week', 'all']; // leaderboard tabs (US-45): GET streaks.php?period=
   const REPORT_NOTE_MAX = 200; // REPORT_NOTE_MAX in api/reports.php (US-42, D-45)
@@ -304,6 +309,7 @@
     streakCountLabel: byId('streak-count-label'),
     streakCount: byId('streak-count'),
     streakHint: byId('streak-hint'),
+    streakChances: byId('streak-chances'), // US-57: only in index.html (a stand-in in the Integration Quiz)
     streakChoices: byId('streak-choices'),
     streakFeedback: byId('streak-feedback'),
     streakNext: byId('streak-next'),
@@ -3043,7 +3049,10 @@
     if (raw === null) return null;
     try {
       const saved = JSON.parse(raw);
-      if (isValidStreak(saved)) return saved;
+      if (isValidStreak(saved)) {
+        if (saved.chances === undefined) upgradeChances(saved);
+        return saved;
+      }
     } catch (err) {
       // invalid JSON: discard it
     }
@@ -3084,7 +3093,81 @@
       Number.isInteger(run.count) && run.count >= 0 && run.count <= run.usedIds.length &&
       isValidStatsSent(run.statsSent) && // US-47
       (run.secondChanceUsed === undefined || typeof run.secondChanceUsed === 'boolean') && // US-54 (older saves lack it)
+      (run.chances === undefined || isValidChances(run.chances, run.count)) && // US-57 (older saves lack it)
       isValidStreakCurrent(run.current, run);
+  }
+
+  // ---------- Earned second chances (US-57, D-69) ----------
+
+  /**
+   * The run's chances {earned, used, progress, earnedAt}: `earnedAt` is the streak when the last chance
+   * was earned (0 = none, or a US-54 save). A US-54 save (`secondChanceUsed`) had its free chance: it
+   * counts as earned (used or not) with the counter at 0; a save older than US-54 has none.
+   */
+  function runChances(run) {
+    if (isPlainObject(run.chances)) return run.chances;
+    if (typeof run.secondChanceUsed === 'boolean') {
+      return { earned: 1, used: run.secondChanceUsed ? 1 : 0, progress: 0, earnedAt: 0 };
+    }
+    return { earned: 0, used: 0, progress: 0, earnedAt: 0 };
+  }
+
+  /** This right answer earned a chance ("+1 second chance!"): derived, so a refresh shows it too. */
+  function justEarnedChance(run) {
+    const cur = run.current;
+    const chances = runChances(run);
+    return !INTEGRATION && !!cur && cur.picked === cur.q.correct && chances.earned > 0 && chances.earnedAt === run.count;
+  }
+
+  /** An older save gets its chances and is saved again in the new shape. */
+  function upgradeChances(run) {
+    run.chances = runChances(run);
+    delete run.secondChanceUsed;
+    try {
+      window.localStorage.setItem(STREAK_KEY, JSON.stringify(run));
+    } catch (err) {
+      // storage full or disabled: it is saved with the next change
+    }
+  }
+
+  /** Correct answers needed for the next chance: 5, then 10; null once both are earned. */
+  function chanceGoal(chances) {
+    if (chances.earned >= CHANCE_MAX) return null;
+    return chances.earned === 0 ? CHANCE_FIRST_AT : CHANCE_NEXT_AFTER;
+  }
+
+  /** Second chances the player still holds. */
+  function chancesLeft(run) {
+    const chances = runChances(run);
+    return chances.earned - chances.used;
+  }
+
+  /**
+   * Whole numbers, 0 <= used <= earned <= 2, 0 <= progress < goal (0 once both are earned), and the
+   * counter never holds more right answers than the streak has since the last chance was earned.
+   */
+  function isValidChances(c, count) {
+    const whole = (v) => Number.isInteger(v) && v >= 0;
+    if (!isPlainObject(c) || !whole(c.earned) || !whole(c.used) || !whole(c.progress) || !whole(c.earnedAt) ||
+        c.used > c.earned || c.earned > CHANCE_MAX || c.earnedAt > count) return false;
+    if (c.earned === 0 ? c.earnedAt !== 0 : (c.earnedAt !== 0 && c.earnedAt < CHANCE_FIRST_AT)) return false;
+    if (c.progress > count - c.earnedAt) return false;
+    const goal = chanceGoal(c);
+    return goal === null ? c.progress === 0 : c.progress < goal;
+  }
+
+  /** A correct answer moves the counter on; reaching the goal earns a chance. Returns true when it does. */
+  function countTowardChance(run) {
+    if (INTEGRATION) return false;
+    const chances = run.chances;
+    const goal = chanceGoal(chances);
+    if (goal === null) return false;
+    chances.progress += 1;
+    if (chances.progress < goal) return false;
+    chances.earned += 1;
+    chances.progress = 0;
+    chances.earnedAt = run.count;
+    return true;
   }
 
   /** The open question: one of the run's, a known language and pick, and a wrong pick only in an ended run. */
@@ -3096,7 +3179,7 @@
       (Number.isInteger(cur.picked) && cur.picked >= 0 && cur.picked < CHOICE_LETTERS.length);
     const lost = cur.picked !== null && cur.picked !== cur.q.correct;
     return langOk && pickedOk && Number.isFinite(cur.deadline) &&
-      (!lost || run.over || (!INTEGRATION && !run.secondChanceUsed)) && // US-54: a miss may wait for the choice
+      (!lost || run.over || (!INTEGRATION && chancesLeft(run) > 0)) && // US-54: a miss may wait for the choice
       (cur.leftMs === undefined || (Number.isFinite(cur.leftMs) && cur.leftMs >= 0));
   }
 
@@ -3195,7 +3278,7 @@
       current: null,
       over: false,
       statsSent: [], // US-47
-      secondChanceUsed: false, // US-54: one second chance per run (Streak Challenge only)
+      chances: { earned: 0, used: 0, progress: 0, earnedAt: 0 }, // US-57: none at the start, earned by right answers
     };
     lastStreakProfile = profile;
     addToQueue(streak, questions);
@@ -3233,7 +3316,10 @@
     }
     const q = run.queue.shift();
     run.usedIds.push(q.id);
-    if (useChance) run.secondChanceUsed = true;
+    if (useChance) { // US-57: the chance is spent and the counter starts again
+      run.chances.used += 1;
+      run.chances.progress = 0;
+    }
     run.current = {
       q: q,
       lang: isFilled(q.question_ar) ? 'ar' : 'en', // Arabic first, as on the board
@@ -3371,24 +3457,49 @@
     dom.streakName.textContent = iso(run.name);
     dom.streakName.style.borderInlineStartColor = paletteEntry(run.color).value; // the right edge in Arabic
     dom.streakCount.textContent = String(run.count);
+    renderChanceCounter(run);
     if (cur.picked === null) {
       showStreakFeedback('', '');
     } else if (!lost) {
-      showStreakFeedback(t('streak.correct', { n: run.count }), 'is-good');
+      showStreakFeedback(t(justEarnedChance(run) ? 'streak.correctChance' : 'streak.correct', { n: run.count }), 'is-good');
     } else {
       showWrongFeedback(cur.q, cur);
     }
     renderStreakButtons();
   }
 
-  /** US-54: a miss in a run whose second chance is still unused waits for the player's choice. */
+  /**
+   * US-57: "Next chance: 3/5 · 1 chance" under the streak count. The counter is gone once both chances
+   * are earned; the chances held show once one is earned. Not in the Integration Quiz.
+   */
+  function renderChanceCounter(run) {
+    const line = dom.streakChances;
+    clear(line);
+    line.hidden = INTEGRATION;
+    if (INTEGRATION) return;
+    const chances = runChances(run);
+    const goal = chanceGoal(chances);
+    const left = chancesLeft(run);
+    if (goal !== null) {
+      line.appendChild(h('span', { text: t('chance.next', { count: ltr(chances.progress + '/' + goal) }) }));
+    }
+    if (chances.earned > 0) {
+      if (line.childNodes.length) line.appendChild(h('span', { text: ' · ', 'aria-hidden': 'true' }));
+      line.appendChild(h('span', {
+        className: 'streak-chances-held' + (left > 0 ? ' has-chance' : ''),
+        text: left > 0 ? tn('chance.held', left) : t('chance.none'),
+      }));
+    }
+  }
+
+  /** US-54: a miss in a run that still holds a second chance (US-57) waits for the player's choice. */
   function isStreakPending(run) {
     const cur = run && run.current;
-    return !INTEGRATION && !!cur && !run.over && !run.secondChanceUsed &&
+    return !INTEGRATION && !!cur && !run.over && chancesLeft(run) > 0 &&
       cur.picked !== null && cur.picked !== cur.q.correct;
   }
 
-  /** Next / See results and End run. A pending first miss shows neither: the second-chance popup holds the choice. */
+  /** Next / See results and End run. A pending miss (a chance held) shows neither: the second-chance popup holds the choice. */
   function renderStreakButtons() {
     const run = streak;
     const cur = run.current;
@@ -3411,14 +3522,16 @@
   function fillChancePopup() {
     clear(dom.chanceFeedback);
     Array.from(dom.streakFeedback.childNodes).forEach((node) => dom.chanceFeedback.appendChild(node.cloneNode(true)));
-    dom.chanceText.textContent = streak.count > 0 ? t('chance.text', { n: streak.count }) : t('chance.textNone');
+    const left = chancesLeft(streak); // US-57: 1 or 2
+    dom.chanceText.textContent = streak.count > 0
+      ? tn('chance.text', left, { streak: streak.count }) : tn('chance.textNone', left);
     dom.chanceUse.textContent = t('streak.secondChance');
     dom.chanceEnd.textContent = t('run.seeResults');
     dom.chanceUse.disabled = finishing;
     dom.chanceEnd.disabled = finishing;
   }
 
-  /** After the first miss of a run: the player must choose; everything behind the popup is inert. */
+  /** After a miss with a chance held: the player must choose; everything behind the popup is inert. */
   function openChancePopup() {
     if (!dom.chanceOverlay || isChancePopupOpen() || !isStreakPending(streak)) return;
     fillChancePopup();
@@ -3434,7 +3547,7 @@
     setPageInert(false);
   }
 
-  /** Focus the main action of the answered question: the popup after a first miss, else Next (Enter goes on). */
+  /** Focus the main action of the answered question: the popup after a pending miss, else Next (Enter goes on). */
   function focusStreakAction() {
     if (isStreakPending(streak)) openChancePopup();
     else dom.streakNext.focus();
@@ -3497,9 +3610,11 @@
     stopTimer();
     cur.leftMs = Math.max(0, leftMs);
     cur.picked = index === null || leftMs <= 0 ? STREAK_TIME_UP : index;
-    if (cur.picked === cur.q.correct) run.count += 1;
-    else if (INTEGRATION || run.secondChanceUsed) run.over = true;
-    // else US-54: the first miss waits for "Use second chance" or "See results" (run.over stays false)
+    if (cur.picked === cur.q.correct) {
+      run.count += 1;
+      countTowardChance(run); // US-57: may earn a chance ("+1 second chance!")
+    } else if (INTEGRATION || chancesLeft(run) === 0) run.over = true;
+    // else US-54: a miss with a chance held waits for "Use second chance" or "See results" (run.over stays false)
     // US-47 / D-55 f: right -> correct, wrong -> wrong, time's up -> timeout (End run sends nothing).
     if (!INTEGRATION) {
       sendQuestionStat(run, cur.q.id, cur.picked === cur.q.correct ? STAT.correct
@@ -3522,7 +3637,7 @@
     else nextStreakQuestion();
   }
 
-  /** US-54: continue after the first miss with a new question; the streak count is kept. */
+  /** US-54: continue after a miss with a new question (one chance is used); the streak count is kept. */
   function onStreakSecondChance() {
     const run = streak;
     if (!isStreakPending(run) || !streakOnScreen() || finishing || dom.chanceUse.disabled) return;
@@ -4017,6 +4132,7 @@
     dom.streakName.textContent = t('daily.number', { n: daily.number });
     dom.streakName.style.borderInlineStartColor = 'var(--gold)'; // the right edge in Arabic
     dom.streakCount.textContent = (cur.index + 1) + '/' + total;
+    dom.streakChances.hidden = true; // US-57: no second chances in the Daily Challenge
     if (cur.picked === null) showStreakFeedback('', '');
     else if (cur.picked === q.correct) showStreakFeedback(t('daily.correct'), 'is-good');
     else showWrongFeedback(q, cur);

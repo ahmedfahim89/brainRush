@@ -48,11 +48,11 @@
   <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="css/style.ff07abe8.css">
+  <link rel="stylesheet" href="css/style.fb4210d4.css">
   <!-- CHRISTMAS (US-55, D-66): seasonal theme, only active under body.theme-christmas; remove after Christmas -->
   <link rel="stylesheet" href="css/christmas.717dbe43.css">
   <!-- Interface language (US-49): loaded first, so an Arabic page is right to left from its first paint -->
-  <script src="js/i18n.c8df9c4b.js"></script>
+  <script src="js/i18n.20ce31e2.js"></script>
 </head>
 <body class="game">
   <!-- CHRISTMAS (US-55, D-66): first in <body> so the last known theme is applied before the first paint; remove after Christmas -->
@@ -81,7 +81,7 @@
     </div>
   </div>
 
-  <!-- Second chance (US-54, D-65): shown after the first miss of a Streak Challenge run; the player must choose -->
+  <!-- Second chance (US-54, D-65): shown after a miss in a Streak Challenge run while the player holds an earned chance (US-57); the player must choose -->
   <div id="chance-overlay" class="double-overlay" role="alertdialog" aria-modal="true" aria-labelledby="chance-title" aria-describedby="chance-feedback chance-text" hidden>
     <div class="double-card">
       <p id="chance-title" class="double-title" data-i18n="chance.title">Second chance!</p>
@@ -170,7 +170,7 @@
         <!-- Streak Challenge (US-33): replaces the player row and the category picker while chosen -->
         <fieldset id="streak-block" class="setup-block" hidden>
           <legend data-i18n="streak.legend">Streak Challenge</legend>
-          <p class="hint" data-i18n="streak.setupHint">Questions come from every category. Pick 1 of 3 answers before the time runs out: a wrong answer or time's up ends the run, but you get one second chance per run. Your streak goes on the shared leaderboard with your name.</p>
+          <p class="hint" data-i18n="streak.setupHint">Questions come from every category. Pick 1 of 3 answers before the time runs out: a wrong answer or time's up ends the run. Earn a second chance with 5 correct answers and another with 10 more (2 at most per run). Your streak goes on the shared leaderboard with your name.</p>
           <div class="field streak-name-field">
             <label for="streak-name" data-i18n="streak.nameLabel">Challenger name</label>
             <input id="streak-name" type="text" maxlength="30" autocomplete="off" aria-describedby="streak-name-error">
@@ -302,8 +302,10 @@
           <div class="streak-head">
             <p id="streak-run-name" class="streak-name"></p>
             <p class="streak-count-line"><span id="streak-count-label" data-i18n="streak.count">Streak</span> <span id="streak-count" class="streak-count" aria-live="polite"></span></p>
+            <!-- US-57: "Next chance: 3/5 · 1 chance", set by game.js (hidden in the Daily Challenge) -->
+            <p id="streak-chances" class="streak-chances" aria-live="polite" hidden></p>
           </div>
-          <p id="streak-hint" class="hint" data-i18n="streak.hintChance">Pick the right answer before the time runs out. One wrong answer ends the run, after your one second chance.</p>
+          <p id="streak-hint" class="hint" data-i18n="streak.hintChance">Pick the right answer before the time runs out. A wrong answer ends the run unless you hold a second chance: earn one with 5 correct answers, then another with 10 more.</p>
           <ol id="streak-choices" class="streak-choices" aria-label="Choices" data-i18n-attr="aria-label:question.choices"></ol>
           <p id="streak-feedback" class="streak-feedback" role="status" aria-live="polite"></p>
                     <button type="button" id="streak-next" class="btn btn-primary btn-large btn-block" hidden data-i18n="run.next">Next question</button>
@@ -412,6 +414,6 @@
   <script src="js/share.4fcf5fb3.js"></script>
   <!-- Read aloud (US-48): loaded before game.js, which uses it -->
   <script src="js/speech.019a1850.js"></script>
-  <script src="js/game.c92df248.js"></script>
+  <script src="js/game.5537349d.js"></script>
 </body>
 </html>
