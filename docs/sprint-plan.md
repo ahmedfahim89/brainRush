@@ -737,6 +737,16 @@ Added by the PO at Sprint 6 acceptance and re-acceptance on 2026-10-11. Full wor
 
 ---
 
-## Backlog, not planned — US-56, US-57 (added 2026-11-16)
+## Backlog, not planned — US-56 (added 2026-11-16)
 
-US-56 Challenge a friend (Should, M: new `challenges` table and API) and US-57 Earn the second chance (Should, S, client-only) are in `docs/product-backlog.md` (D-68, D-69) and not committed to a sprint until the owner answers FU-80 to FU-82.
+US-56 Challenge a friend (Should, M: new `challenges` table and API) is in `docs/product-backlog.md` (D-68) and not committed to a sprint until the owner answers FU-80 and FU-81.
+
+---
+
+## Change request "Earn the second chance" (US-57) — outside the sprint cycle, 2026-11-17
+
+**Change request (owner, 2026-11-17):** the Streak second chance (US-54) is no longer free. A run starts with 0 chances, the 1st after 5 correct answers, the 2nd after 10 more, at most 2; using one restarts the counter and keeps the streak (FU-82 closed, D-69 amended). Client-only, no migration (`game.js`, `i18n.js`, `index.html`, `style.css`, guide and `llms.txt`). Branch `us-57-earn-chance` (uncommitted). Dev and test notes: `docs/sprints/us-57-dev.md`, `docs/sprints/us-57-test-report.md`.
+
+- **Test:** 41 PASS / 1 FAIL (US57-01); fixed in fix loop 1; retest 33 PASS / 0 FAIL.
+- **Outcome:** accepted by the PO on 2026-11-17 (D-70). Follow-ups FU-83..FU-86 in `docs/product-backlog.md`.
+- **Status:** accepted, not yet merged or live. Next: owner's local Chrome test (FU-83), then commit and PR, then live deploy (FU-85): client-only, so upload the new hashed `js/` and `css/` files and every HTML page that references them.
