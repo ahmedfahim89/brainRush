@@ -737,9 +737,9 @@ Added by the PO at Sprint 6 acceptance and re-acceptance on 2026-10-11. Full wor
 
 ---
 
-## Backlog, not planned — US-56 (added 2026-11-16)
+## Cancelled — US-56 (added 2026-11-16, cancelled 2026-11-18)
 
-US-56 Challenge a friend (Should, M: new `challenges` table and API) is in `docs/product-backlog.md` (D-68) and not committed to a sprint until the owner answers FU-80 and FU-81.
+US-56 Challenge a friend (Should, M: new `challenges` table and API) is in `docs/product-backlog.md` (D-68) and was cancelled by the owner on 2026-11-18 (FU-80 and FU-81 cancelled with it). Nothing was built.
 
 ---
 
