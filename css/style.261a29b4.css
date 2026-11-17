@@ -13,6 +13,8 @@
   --danger-bg: rgba(255, 107, 107, 0.12);
   --success: #4cd18a;
   --success-bg: rgba(76, 209, 138, 0.12);
+  --heart-on: #ff4d5e;  /* a second chance held: 5.1:1 on --panel, 4.4:1 on the Christmas panel */
+  --heart-off: #6c7599; /* not earned yet or used: 3.7:1 on --panel, 3.2:1 on the Christmas panel */
   --radius: 8px;
   --focus: 0 0 0 3px rgba(245, 197, 24, 0.45);
 }
@@ -1265,10 +1267,42 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 }
 .streak-count-line { margin: 0; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
 .streak-count { margin-left: 0.3rem; color: var(--gold); font-size: 2.4rem; font-weight: 800; line-height: 1; letter-spacing: 0; font-variant-numeric: tabular-nums; }
-/* US-57: earned second chances, on its own line under the count (aligned with it) */
-.streak-chances { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 0.95rem; font-weight: 700; text-align: end; }
+/* US-57 (CR hearts): "Next chance: 3/5" and the second-chance hearts (game lives), on their own line under
+   the count, aligned with it. Red = a chance held, gray = not earned yet or used. */
+.streak-chances { display: flex; flex-basis: 100%; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.2rem 0.6rem; margin: 0; color: var(--muted); font-size: 0.95rem; font-weight: 700; }
 .streak-chances[hidden] { display: none; }
-.streak-chances-held.has-chance { color: var(--gold); }
+.chance-hearts { display: inline-flex; gap: 0.3rem; }
+.chance-heart { display: block; width: 1.6rem; height: 1.6rem; overflow: visible; transform-origin: 50% 55%; }
+.chance-heart .heart-shape { fill: var(--heart-off); }
+.chance-heart.is-on .heart-shape { fill: var(--heart-on); }
+.chance-heart .heart-shine { fill: rgba(255, 255, 255, 0.6); opacity: 0; }
+.chance-heart.is-on .heart-shine { opacity: 1; }
+.chance-heart .heart-crack { fill: none; stroke: var(--panel); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+/* Only on the live event (game.js adds the class); transforms only, so nothing around moves */
+.chance-heart.fx-gain { animation: heart-gain 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+.chance-heart.fx-gain .heart-shape { animation: heart-fill-on 0.2s ease-out; }
+.chance-heart.fx-lose { animation: heart-lose 0.55s ease-in-out; }
+.chance-heart.fx-lose .heart-shape { animation: heart-fill-off 0.55s ease-in; }
+.chance-heart.fx-lose .heart-crack { animation: heart-crack 0.55s linear; }
+@keyframes heart-gain {
+  0% { transform: scale(0.6); }
+  45% { transform: scale(1.35); filter: drop-shadow(0 0 6px var(--heart-on)); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 0 transparent); }
+}
+@keyframes heart-fill-on { from { fill: var(--heart-off); } }
+@keyframes heart-lose {
+  0% { transform: scale(1); }
+  20% { transform: scale(1.15) rotate(-8deg); }
+  40% { transform: scale(1.1) rotate(8deg); }
+  70% { transform: scale(0.7); opacity: 0.55; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes heart-fill-off { 0%, 45% { fill: var(--heart-on); } }
+@keyframes heart-crack { 0% { opacity: 0; } 15%, 70% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .chance-heart.fx-gain, .chance-heart.fx-lose,
+  .chance-heart.fx-gain .heart-shape, .chance-heart.fx-lose .heart-shape, .chance-heart.fx-lose .heart-crack { animation: none; }
+}
 .streak-panel .hint { margin: 0 0 0.8rem; }
 /* The 3 choices: big buttons with the .choice look of the 3 choices helper */
 .streak-choices { display: grid; gap: 0.6rem; margin: 0 0 0.8rem; padding: 0; list-style: none; }

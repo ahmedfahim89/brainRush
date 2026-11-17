@@ -188,6 +188,9 @@
   let streak = null;
   let streakRequest = null;      // { run, promise } of the batch request in flight (memory only)
   let finishing = false;         // the finished run is being saved
+  // CR hearts (US-57): the heart animation of the live event just played ({kind: 'gain'|'lose', left}),
+  // read once by the next renderChanceCounter, so a refresh or a re-render never plays it
+  let chanceFx = null;
   let lastStreakProfile = null;  // name, color and timer of the last run, for Play again
   let leaderboardResult = null;  // the run shown on the leaderboard screen (null = opened from setup)
   let leaderboardLoads = 0;      // drops leaderboard responses that arrive after a newer request
@@ -3319,6 +3322,7 @@
     if (useChance) { // US-57: the chance is spent and the counter starts again
       run.chances.used += 1;
       run.chances.progress = 0;
+      chanceFx = { kind: 'lose', left: chancesLeft(run) }; // the emptied heart breaks
     }
     run.current = {
       q: q,
@@ -3469,27 +3473,67 @@
   }
 
   /**
-   * US-57: "Next chance: 3/5 · 1 chance" under the streak count. The counter is gone once both chances
-   * are earned; the chances held show once one is earned. Not in the Integration Quiz.
+   * US-57 (CR hearts): "Next chance: 3/5" and CHANCE_MAX hearts under the streak count, red for each chance
+   * held and gray for the rest (not earned yet, or used). The counter is gone once both chances are
+   * earned. Not in the Integration Quiz. The line is only rebuilt when it changes, so the live region
+   * announces a change once; an earn or a use (chanceFx) animates the heart that changed.
    */
   function renderChanceCounter(run) {
     const line = dom.streakChances;
-    clear(line);
     line.hidden = INTEGRATION;
     if (INTEGRATION) return;
     const chances = runChances(run);
     const goal = chanceGoal(chances);
     const left = chancesLeft(run);
-    if (goal !== null) {
-      line.appendChild(h('span', { text: t('chance.next', { count: ltr(chances.progress + '/' + goal) }) }));
+    const label = t('chance.hearts', { n: left, max: CHANCE_MAX });
+    const next = goal === null ? '' : t('chance.next', { count: ltr(chances.progress + '/' + goal) });
+    // reduced motion plays no animation, so no class is added (no animationend would ever remove it)
+    const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const fx = chanceFx && chanceFx.left === left && !still ? chanceFx.kind : null;
+    chanceFx = null;
+    const key = left + '|' + label + '|' + next;
+    if (!fx && line.getAttribute('data-shown') === key) return;
+    line.setAttribute('data-shown', key);
+    clear(line);
+    if (next) line.appendChild(h('span', { className: 'streak-chances-next', text: next }));
+    line.appendChild(chanceHearts(left, label, fx));
+  }
+
+  /** The hearts (role img, one label); red ones first, so they fill from the start side (the right in Arabic). */
+  function chanceHearts(left, label, fx) {
+    const group = h('span', { className: 'chance-hearts', 'aria-label': label });
+    group.setAttribute('role', 'img');
+    for (let i = 0; i < CHANCE_MAX; i += 1) {
+      const heart = heartIcon();
+      const fxClass = fx === 'gain' && i === left - 1 ? ' fx-gain' : fx === 'lose' && i === left ? ' fx-lose' : '';
+      heart.setAttribute('class', 'chance-heart' + (i < left ? ' is-on' : '') + fxClass);
+      // played once: dropping the class keeps it from playing again when the line is shown again
+      if (fxClass) {
+        heart.addEventListener('animationend', (event) => {
+          if (event.target === heart) heart.classList.remove('fx-gain', 'fx-lose'); // not a child's end
+        });
+      }
+      group.appendChild(heart);
     }
-    if (chances.earned > 0) {
-      if (line.childNodes.length) line.appendChild(h('span', { text: ' · ', 'aria-hidden': 'true' }));
-      line.appendChild(h('span', {
-        className: 'streak-chances-held' + (left > 0 ? ' has-chance' : ''),
-        text: left > 0 ? tn('chance.held', left) : t('chance.none'),
-      }));
-    }
+    return group;
+  }
+
+  /** One heart: the shape, a shine (red hearts only) and a crack (only while it breaks), all coloured by CSS. */
+  function heartIcon() {
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    [['heart-shape', 'M12 21s-7.6-4.6-9.7-9.4C.8 8.2 3 4.4 6.7 4.4c2.1 0 3.7 1.1 4.6 2.7.9-1.6 2.5-2.7 4.6-2.7 3.7 0 5.9 3.8 4.4 7.2C19.6 16.4 12 21 12 21z'],
+      ['heart-shine', 'M6.4 7.2c-1.4.3-2.2 1.6-2 3 .1.5.8.6 1 .1.3-.9.9-1.6 1.7-1.9.6-.2.4-1.3-.7-1.2z'],
+      ['heart-crack', 'M12.3 7.6l-1.9 3.6 2.8 2-2.1 3.9']].forEach((part) => {
+      const path = document.createElementNS(NS, 'path');
+      path.setAttribute('class', part[0]);
+      path.setAttribute('d', part[1]);
+      svg.appendChild(path);
+    });
+    return svg;
   }
 
   /** US-54: a miss in a run that still holds a second chance (US-57) waits for the player's choice. */
@@ -3612,7 +3656,8 @@
     cur.picked = index === null || leftMs <= 0 ? STREAK_TIME_UP : index;
     if (cur.picked === cur.q.correct) {
       run.count += 1;
-      countTowardChance(run); // US-57: may earn a chance ("+1 second chance!")
+      // US-57: may earn a chance ("+1 second chance!"); the new red heart pops
+      if (countTowardChance(run)) chanceFx = { kind: 'gain', left: chancesLeft(run) };
     } else if (INTEGRATION || chancesLeft(run) === 0) run.over = true;
     // else US-54: a miss with a chance held waits for "Use second chance" or "See results" (run.over stays false)
     // US-47 / D-55 f: right -> correct, wrong -> wrong, time's up -> timeout (End run sends nothing).

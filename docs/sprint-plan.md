@@ -749,4 +749,5 @@ US-56 Challenge a friend (Should, M: new `challenges` table and API) is in `docs
 
 - **Test:** 41 PASS / 1 FAIL (US57-01); fixed in fix loop 1; retest 33 PASS / 0 FAIL.
 - **Outcome:** accepted by the PO on 2026-11-17 (D-70). Follow-ups FU-83..FU-86 in `docs/product-backlog.md`.
-- **Status:** accepted, not yet merged or live. Next: owner's local Chrome test (FU-83), then commit and PR, then live deploy (FU-85): client-only, so upload the new hashed `js/` and `css/` files and every HTML page that references them.
+- **CR hearts (owner, 2026-11-17, D-71):** the held count text replaced by 2 heart slots (red = held, gray = not earned or used) with a pop on earn and a break on use. Branch `chance-hearts` (uncommitted). Test 58 PASS / 0 FAIL; PO accepted 2026-11-17 (D-71 f).
+- **Status:** US-57 merged to `main` (PR #125) and live (verified 2026-11-17). **CR hearts accepted, awaiting the owner's local test** (FU-83), then commit and PR, then live deploy (FU-85): client-only, so upload the new hashed `js/` and `css/` files and every HTML page that references them.
