@@ -58,3 +58,39 @@ I found no path in the US-57 changes that drops a valid run. What I checked:
 
 ### No real writes during the tests
 Port 8010, stopped afterwards. Every non-GET API request was faked in Playwright except the two read-only batch POSTs (`questions.php?streak=1`, `integration-quiz.php?batch=1`). A listener also recorded any write that reached PHP: 0. Service workers were blocked. Before and after snapshots (row counts and `CHECKSUM TABLE` of `streaks`, `integration_scores`, `question_stats`, `question_reports`, `questions`, `settings`, plus the `logs/` file sizes) are identical.
+
+## CR hearts (2026-11-17)
+
+Owner request 2026-11-17 (D-71), branch `chance-hearts` (from `main` 8cd5e2c): gray hearts that turn red when a chance is earned, like game lives, with an animation when a heart turns red or a life is used. Client-only.
+
+### What changed
+
+| File | Change |
+|---|---|
+| `js/game.5537349d.js` | `renderChanceCounter` now shows "Next chance: x/5" (while a goal is open) and `CHANCE_MAX` hearts from the start of the run: `chancesLeft(run)` red, the rest gray, red first (inline start, so the right in Arabic). New `chanceHearts` (the `role="img"` group with its `aria-label`) and `heartIcon` (inline SVG built with `createElementNS`: shape, shine, crack; `aria-hidden`). New memory-only `chanceFx` ({kind, left}): set when `countTowardChance` earns in `streakAnswer` ('gain') and when `nextStreakQuestion(true)` spends a chance ('lose'); read and cleared by the next render, which adds `fx-gain` / `fx-lose` to the heart that changed. The class is dropped on the heart's own `animationend`, so showing the line again never replays it. The line is rebuilt only when its content (count, label, counter text) changes. |
+| `css/style.fb4210d4.css` | Tokens `--heart-on` / `--heart-off`. `.streak-chances` is a flex row aligned to the end; `.chance-hearts`, `.chance-heart` (1.6rem), the pop (`heart-gain`, `heart-fill-on`) and break (`heart-lose`, `heart-fill-off`, `heart-crack`) keyframes; `prefers-reduced-motion` turns them off. `.streak-chances-held` removed. |
+| `js/i18n.20ce31e2.js` | EN + AR: `chance.hearts` ("Second chances: {n} of {max}", Arabic AI-drafted, D-58 a). `chance.held` and `chance.none` removed (no other use; the popup has its own `chance.text` / `chance.textNone`). |
+| `index.html` | Comment on `#streak-chances` only. |
+| `how-to-play.html` | The held-count sentence is replaced by one on the hearts (red = ready, gray = not earned yet or used). `llms.txt` had no "1 chance" wording: unchanged. |
+| `docs/product-backlog.md` | US-57 CR note; D-71; D-70 a marked as replaced. |
+
+### Decisions I made
+
+1. **Order in the line**: "Next chance: 0/5" first, then the hearts at the end edge, right under the streak number (like lives under a score). Once both chances are earned only the hearts remain.
+2. **Colours**: `--heart-on` #ff4d5e and `--heart-off` #6c7599 work on both the navy panel and the Christmas pine panel (5.1 / 4.4 and 3.7 / 3.2 :1), so christmas.css needs no override. There is no light theme in the project. A small white shine on red hearts gives a cue beyond colour.
+3. **Break animation**: a shake, a crack line (drawn in the panel colour) across the heart, a shrink with partial fade, and the fill fading from red to gray, 0.55 s. The pop: scale 0.6 -> 1.35 -> 1 with a red glow, 0.5 s. Transforms and filter only; measured: no layout change.
+4. **One announcement**: before, the whole `aria-live` line was rebuilt on every panel render (each answer, Next, switching the question language). Now it is rebuilt only when its text or label changes, so the live region announces each change once (screen reader not tried, FU-86 still open).
+5. **Line height**: the hearts make the line 27 px at both widths, the same with or without the counter text.
+
+### How I tested
+
+PHP built-in server on port 8010 behind a test router that answers every non-GET API call itself (only `questions.php?streak=1` and `integration-quiz.php?batch=1` pass), and Playwright with Chrome faking the same calls (45 faked, 0 reached PHP; the router log has only GETs and the two batch POSTs). Server stopped afterwards. DB snapshot (row counts and `CHECKSUM TABLE` of `streaks`, `integration_scores`, `question_stats`, `question_reports`, `questions`, `settings`, plus the `logs/` sizes) identical before and after.
+
+32 scripted checks, all PASS: fresh run 2 gray, label "Second chances: 0 of 2", no animation, no "chance(s)" text; earn at 5: first heart red with the pop running, label 1 of 2, "Next chance: 0/10"; no layout shift during the pop (positions measured during and after); fits 1366x768; Next and a hide/show of the line do not replay; refresh shows 1 red with no animation; miss: popup with the heart still red; Use: the heart breaks to gray, label 0 of 2; 2nd earn after a use pops; switching to Arabic does not replay, Arabic label, red heart on the right; 375x812: 2 red at 15 (pop on the 2nd), no overflow, refresh with no animation, using one of 2 breaks the 2nd heart; Arabic at 375 fits; reduced motion: colour change only (`animation-name: none`); the Integration Quiz page has no hearts. `node --check` on both JS files; no PHP touched.
+
+### Not verified
+
+- Screen reader reading of the hearts' label and the live line (FU-86).
+- Native review of `chance.hearts` in Arabic (D-58 a; to add to FU-84).
+- The UX gate on `index.html` and `how-to-play.html`.
+- The Christmas look was checked by adding `theme-christmas` to the page by hand (screenshot), not with the setting on.

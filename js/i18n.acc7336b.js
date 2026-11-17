@@ -246,8 +246,7 @@
         other: 'Your streak of {streak} is safe. You have {n} second chances. Use one to go on with a new question, or see your results.',
       },
       'chance.next': 'Next chance: {count}', // US-57: {count} is "3/5"
-      'chance.held': { one: '1 chance', other: '{n} chances' },
-      'chance.none': 'No chances left',
+      'chance.hearts': 'Second chances: {n} of {max}', // CR hearts: label of the hearts (red = held)
       'streak.correct': 'Correct! Your streak is {n}.',
       'streak.correctChance': 'Correct! Your streak is {n}. +1 second chance!',
       'streak.nextFailed': 'Could not load the next question: {reason} Try Next again.',
@@ -606,8 +605,7 @@
         other: 'سلسلتك البالغة {streak} في أمان. لديك {n} فرص ثانية. استخدم إحداها لتتابع بسؤال جديد، أو اعرض نتائجك.',
       },
       'chance.next': 'الفرصة التالية: {count}',
-      'chance.held': { one: 'فرصة واحدة', two: 'فرصتان', other: '{n} فرص' },
-      'chance.none': 'لا فرص متبقية',
+      'chance.hearts': 'الفرص الثانية: {n} من {max}',
       'streak.correct': 'صحيح! سلسلتك الآن {n}.',
       'streak.correctChance': 'صحيح! سلسلتك الآن {n}. حصلت على فرصة ثانية!',
       'streak.nextFailed': 'تعذّر تحميل السؤال التالي: {reason} اضغط «السؤال التالي» مرة أخرى.',
