@@ -17,14 +17,14 @@ Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..U
 | 3 | Game setup and dynamic board | Done |
 | 4 | Question, timer, scoring, results, persistence | Done |
 | 5 | Polish (FU-03, FU-04, FU-05, FU-08) | Done |
-| 6 | Question bank: random questions per new game (US-30, D-31; D-32 alongside) | Done (accepted 2026-10-11 after rework); owner Chrome check, commit/PR and hosted migration (FU-11) open |
-| 7 | Report a question (US-42) | Accepted by the PO 2026-11-02, pending the owner's local Chrome check (FU-25) and the hosted steps (FU-26); not committed |
-| 8 | Daily Challenge, share, weekly leaderboard (US-43, US-46, US-45) | Accepted by the PO 2026-11-02, pending the owner's local Chrome check and commit (FU-28) and the hosted steps (FU-29); not committed |
-| 9 | Final round with wagers (Golden Goal ⚽ tiebreaker), read aloud (US-44, US-48) | Accepted by the PO 2026-11-02, re-accepted 2026-11-03 after the D-51 change; Done and merged to `main` (PR #89, `c0eb4c9`); hosted and device steps (FU-32) open |
-| 10 | Kilo Meshakkal category (US-53) | Accepted by the PO 2026-11-03 (D-54; BUG-10-01 fixed), pending the owner's local Chrome check and commit (FU-36) and the hosted and device steps (FU-37); not committed |
-| 11 | Question difficulty stats (US-47) | Planned |
+| 6 | Question bank: random questions per new game (US-30, D-31; D-32 alongside) | Done (accepted 2026-10-11 after rework); merged to `main` (PR #11); FU-11 is Done in the backlog |
+| 7 | Report a question (US-42) | Done: accepted by the PO 2026-11-02; merged to `main` (PR #87, `b5fd630`); FU-25 and FU-26 are Done in the backlog |
+| 8 | Daily Challenge, share, weekly leaderboard (US-43, US-46, US-45) | Done: accepted by the PO 2026-11-02; merged to `main` (PR #88, `8288a72`); FU-28 and FU-29 are Done in the backlog |
+| 9 | Final round with wagers (Golden Goal ⚽ tiebreaker), read aloud (US-44, US-48) | Accepted by the PO 2026-11-02, re-accepted 2026-11-03 after the D-51 change; Done and merged to `main` (PR #89, `c0eb4c9`); FU-32 is Done in the backlog |
+| 10 | Kilo Meshakkal category (US-53) | Done: accepted by the PO 2026-11-03 (D-54; BUG-10-01 fixed); merged to `main` (PR #90, `ce36362`); FU-36 and FU-37 are Done in the backlog |
+| 11 | Question difficulty stats (US-47) | Done: accepted by the PO 2026-11-03 (D-56); merged to `main` (PR #92, `e5e4776`); reset-stats CR merged (PR #93) |
 | 12 | Custom category for one game (US-50) | Cancelled by the owner 2026-11-11 |
-| 13 | Arabic interface (US-49) | Accepted by the PO 2026-11-09 (ran before Sprint 12); pending the owner's local Chrome check and commit (FU-47), the hosted and device steps (FU-49) and the native review of the strings (FU-48); not committed. CR "Arabic category names" accepted 2026-11-09 (D-61); hosted migration before the code (FU-53) |
+| 13 | Arabic interface (US-49) | Accepted by the PO 2026-11-09 (ran before Sprint 12); merged to `main` (PR #94, `1629605`); FU-47, FU-48 and FU-49 are Done in the backlog. CR "Arabic category names" accepted 2026-11-09 (D-61); hosted migration before the code (FU-53) |
 | 14 | Phone buzzers (US-52), spike first | Planned (later; not committed until the FU-24 spike) |
 | 15 | Rewarded second chance in Streak (US-51) | Planned (later; blocked by FU-23) |
 
@@ -663,13 +663,13 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 | 4 | US-08, US-10, US-11, US-12, US-13, US-14, US-15, US-16, US-17, US-27 |
 | 5 (polish) | none (follow-ups FU-03, FU-04, FU-05, FU-08) |
 | 6 | US-30 (amends US-19, US-20, US-21, US-24, US-25; US-22 stays retired); D-32 (US-04 amended) delivered alongside |
-| 7 | US-42 (accepted 2026-11-02, pending owner checks FU-25 and FU-26) |
-| 8 | US-43, US-46, US-45 (accepted 2026-11-02, pending owner checks FU-28 and FU-29) |
-| 9 | US-44, US-48 (accepted 2026-11-02, re-accepted 2026-11-03 after D-51; merged, PR #89; owner step FU-32 still open) |
-| 10 | US-53 (accepted 2026-11-03, pending owner checks FU-36 and FU-37) |
-| 11 | US-47 (planned) |
+| 7 | US-42 (accepted 2026-11-02, merged, PR #87) |
+| 8 | US-43, US-46, US-45 (accepted 2026-11-02, merged, PR #88) |
+| 9 | US-44, US-48 (accepted 2026-11-02, re-accepted 2026-11-03 after D-51; merged, PR #89) |
+| 10 | US-53 (accepted 2026-11-03, merged, PR #90) |
+| 11 | US-47 (done, accepted 2026-11-03, merged, PR #92) |
 | 12 | US-50 (cancelled 2026-11-11) |
-| 13 | US-49 (done, accepted 2026-11-09) |
+| 13 | US-49 (done, accepted 2026-11-09, merged, PR #94) |
 | 14 | US-52 (planned, later; spike first, not committed) |
 | 15 | US-51 (planned, later; blocked by FU-23) |
 
