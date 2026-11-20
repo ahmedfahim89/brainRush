@@ -21,6 +21,9 @@ const CROSSWORD_MAX_WORDS = 10;  // D-72 e: words in a grid, at most
 const CROSSWORD_MIN_WORDS = 6;   // fewer than this -> 503, nothing stored
 const CROSSWORD_MAX_SIZE = 13;   // width and height, at most
 const CROSSWORD_LAUNCH_DATE = '2026-11-20'; // D-72 n: UTC date of live crossword #1; move it if the deploy is later
+// D-72 y (owner, 2026-11-21): categories whose answers never go into the crossword, matched by name
+// because category ids differ between databases. A name that does not exist is simply ignored.
+const CROSSWORD_EXCLUDED_CATEGORIES = ['Egyptians', 'Who Am I?', 'Flags', 'Landmarks'];
 const CROSSWORD_TRIES = 24;      // grids built per day (each with its own seed); the best one is kept
 const CROSSWORD_WORD_PATTERN = '/^[A-Z]{3,10}$/D'; // CW_WORD_PATTERN in js/game.*.js checks the same: keep the two the same
 const CROSSWORD_UNAVAILABLE = 'The Daily Crossword is not available right now. Please try again later.';
@@ -85,11 +88,24 @@ function word_in_clue(string $word, array $r): bool
  * each answer cleaned by crossword_word(), never a word found in its own clue. Duplicates are kept
  * here; the builder uses one question per word.
  */
+/** Ids of the CROSSWORD_EXCLUDED_CATEGORIES on this database: id => true. */
+function crossword_excluded_category_ids(PDO $pdo): array
+{
+    $names = CROSSWORD_EXCLUDED_CATEGORIES;
+    if (!$names) {
+        return [];
+    }
+    $stmt = $pdo->prepare('SELECT id FROM categories WHERE name IN (' . implode(',', array_fill(0, count($names), '?')) . ')');
+    $stmt->execute($names);
+    return array_fill_keys(array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN)), true);
+}
+
 function crossword_candidates(PDO $pdo): array
 {
     $candidates = [];
+    $excluded = crossword_excluded_category_ids($pdo);
     foreach (daily_bank($pdo)['rows'] as $r) {
-        if (question_kind($r) !== 'text' || trim($r['answer']) === '') {
+        if (isset($excluded[(int) $r['category_id']]) || question_kind($r) !== 'text' || trim($r['answer']) === '') {
             continue;
         }
         $word = crossword_word($r['answer']);
