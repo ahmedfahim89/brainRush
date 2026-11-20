@@ -750,7 +750,7 @@ US-56 Challenge a friend (Should, M: new `challenges` table and API) is in `docs
 - **Story:** US-58 (Should, L).
 - **Test:** 46 PASS / 0 FAIL, 3 PENDING closed by the PO. BUG-58-01..03 (Minor) fixed in fix loop 1 and re-tested.
 - **Outcome:** accepted by the PO on 2026-11-20 (D-72 s to v).
-- **Status:** Merged via PR #137 and live 2026-11-20. Only the phone share-sheet check is left (FU-90).
+- **Status:** Merged via PR #137 and live 2026-11-20; phone share-sheet check passed 2026-11-21 (FU-90 done). Done.
 
 **Definition of Done items still open:**
 1. Owner local Chrome test (FU-89).
