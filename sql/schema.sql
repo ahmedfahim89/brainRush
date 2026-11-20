@@ -133,6 +133,17 @@ CREATE TABLE IF NOT EXISTS daily_challenge (
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
+-- Daily Crossword (US-58, D-72): one grid per day (the UTC date). `layout` is JSON: width, height
+-- and words {question_id, word, row, col, dir, length}; the clue text is read from `questions` at
+-- request time. The first request of the day stores the grid (INSERT IGNORE on the primary key, so
+-- two simultaneous first requests cannot store two grids). Nothing about the player is stored.
+CREATE TABLE IF NOT EXISTS daily_crossword (
+  puzzle_date DATE     NOT NULL,
+  layout      TEXT     NOT NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (puzzle_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
 -- Question difficulty stats (US-47, D-55): one row per question with four counters, one per
 -- outcome the game sends when a board question closes or a Streak question is answered.
 -- Attempts = the four added up; only "correct" counts as correct. No name, IP address, device id

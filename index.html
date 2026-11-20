@@ -48,11 +48,11 @@
   <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="css/style.261a29b4.css">
+  <link rel="stylesheet" href="css/style.e9159325.css">
   <!-- CHRISTMAS (US-55, D-66): seasonal theme, only active under body.theme-christmas; remove after Christmas -->
   <link rel="stylesheet" href="css/christmas.717dbe43.css">
   <!-- Interface language (US-49): loaded first, so an Arabic page is right to left from its first paint -->
-  <script src="js/i18n.acc7336b.js"></script>
+  <script src="js/i18n.a7643303.js"></script>
 </head>
 <body class="game">
   <!-- CHRISTMAS (US-55, D-66): first in <body> so the last known theme is applied before the first paint; remove after Christmas -->
@@ -155,11 +155,17 @@
                 <span><span data-i18n="mode.teams">Teams</span> <small id="mode-limit-teams" class="mode-limit"></small></span>
               </label>
             </div>
+            <!-- The solo and daily modes as one group (BUG-58-01): beside the toggle when they fit,
+                 otherwise together on the line below it, so they never split over two lines on a laptop -->
+            <div class="mode-extras">
             <!-- Streak Challenge (US-33): Players mode with exactly 1 player; next to the mode
                  toggle so it is seen without scrolling, also on small screens -->
             <button type="button" id="streak-open-btn" class="btn btn-streak" hidden>💀 <span data-i18n="streak.openBtn">Sudden Death Streak</span> <small class="mode-limit" data-i18n="streak.solo">(solo)</small></button>
             <!-- Daily Challenge (US-43, D-46): the same questions for everyone today, with the setup timer -->
             <button type="button" id="daily-open-btn" class="btn btn-daily" hidden><span aria-hidden="true">📅</span> <span id="daily-open-label" data-i18n="daily.name">Daily Challenge</span></button>
+            <!-- Daily Crossword (US-58, D-72): shown when the admin turned it on (crossword_enabled) -->
+            <button type="button" id="crossword-open-btn" class="btn btn-daily" hidden><span aria-hidden="true">&#9638;</span> <span id="crossword-open-label" data-i18n="cw.name">Daily Crossword</span></button>
+            </div>
           </div>
           <p class="hint" data-i18n="setup.colorHint">Click a color circle to switch to the next free color.</p>
           <ol id="entry-list" class="entry-list"></ol>
@@ -400,6 +406,54 @@
       <div id="daily-msg" class="msg" role="alert" hidden></div>
       <button type="button" id="daily-play" class="btn btn-primary btn-large" hidden data-i18n="daily.playNew">Play the new challenge</button>
     </section>
+
+    <!-- Daily Crossword (US-58, D-72): today's grid (the same for everyone, UTC day), the clues and the
+         tools; once solved, the result with Share and the countdown. game.js draws the grid, the clues
+         and every text set at run time. The grid is always left to right, also in Arabic. -->
+    <section id="screen-crossword" class="screen crossword" aria-labelledby="cw-title" hidden>
+      <div class="cw-head">
+        <h2 id="cw-title" tabindex="-1"></h2>
+        <p class="cw-stats"><span id="cw-timer" class="cw-timer" role="timer" aria-label="Time" data-i18n-attr="aria-label:cw.time">0:00</span> <span id="cw-hints" class="cw-hints"></span></p>
+        <button type="button" id="cw-back" class="btn" data-i18n="common.back">Back</button>
+      </div>
+      <!-- Result (shown once every letter is right) -->
+      <div id="cw-result" class="cw-result" hidden>
+        <p id="cw-solved" class="daily-score" tabindex="-1"></p>
+        <p id="cw-hints-line" class="cw-hints-line"></p>
+        <div class="actions start-row">
+          <button type="button" id="cw-share" class="btn btn-primary btn-large" data-i18n="common.share">Share</button>
+          <span id="cw-share-status" class="share-status" role="status"></span>
+        </div>
+        <p id="cw-next" class="daily-next"></p>
+        <div id="cw-result-msg" class="msg" role="alert" hidden></div>
+        <button type="button" id="cw-play" class="btn btn-primary btn-large" hidden data-i18n="cw.playNew">Play the new crossword</button>
+      </div>
+      <div class="cw-layout">
+        <!-- The active clue: its number, direction and category, the text and the EN/AR toggle -->
+        <div id="cw-bar" class="cw-bar">
+          <p id="cw-bar-label" class="cw-bar-label"></p>
+          <p class="cw-bar-clue"><span id="cw-bar-text" dir="auto"></span> <button type="button" id="cw-bar-lang" class="btn btn-small cw-bar-lang" hidden></button></p>
+        </div>
+        <div class="cw-play">
+          <div id="cw-board" class="cw-board" dir="ltr">
+            <div id="cw-grid" class="cw-grid" dir="ltr" role="group"></div>
+            <!-- Keeps the phone keyboard open and takes the typing; it sits on the current cell -->
+            <input id="cw-input" class="cw-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" enterkeyhint="next" aria-describedby="cw-msg">
+          </div>
+          <div id="cw-tools" class="cw-tools">
+            <button type="button" id="cw-check" class="btn" data-i18n="cw.check">Check word</button>
+            <button type="button" id="cw-reveal" class="btn">Reveal letter (3 left)</button>
+          </div>
+          <p id="cw-msg" class="cw-msg" role="status" aria-live="polite"></p>
+        </div>
+        <div id="cw-clues" class="cw-clues">
+          <h3 data-i18n="cw.across">Across</h3>
+          <ol id="cw-across" class="cw-clue-list"></ol>
+          <h3 data-i18n="cw.down">Down</h3>
+          <ol id="cw-down" class="cw-clue-list"></ol>
+        </div>
+      </div>
+    </section>
   </main>
 
   <!-- Site footer (US-41): the same links on every public page; new tabs here so a running game is never left, as in the header. Hidden on the board and question screens. -->
@@ -414,6 +468,6 @@
   <script src="js/share.4fcf5fb3.js"></script>
   <!-- Read aloud (US-48): loaded before game.js, which uses it -->
   <script src="js/speech.019a1850.js"></script>
-  <script src="js/game.4ca1f55c.js"></script>
+  <script src="js/game.3d7ac9bd.js"></script>
 </body>
 </html>

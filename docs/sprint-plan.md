@@ -743,6 +743,24 @@ US-56 Challenge a friend (Should, M: new `challenges` table and API) is in `docs
 
 ---
 
+## Change request "Daily Crossword" (US-58, Epic E19) — outside the sprint cycle, 2026-11-20
+
+**Goal:** a small daily crossword built from Mokh Rush questions, the same for everyone that day, with a timer, hints, EN/AR clues and Share (D-72). New `api/crossword.php`, new migration `sql/migrate-add-daily-crossword.sql` (mirrored in both schema files), client changes in `game.js`, `i18n.js`, `index.html`, `style.css`, `admin.html`, guide, privacy and `llms.txt`. Branch `crossword` (uncommitted). Dev and test notes: `docs/sprints/us-58-dev.md`, `docs/sprints/us-58-test-report.md`. Follow-ups FU-87..FU-90 in `docs/product-backlog.md`.
+
+- **Story:** US-58 (Should, L).
+- **Test:** 46 PASS / 0 FAIL, 3 PENDING closed by the PO. BUG-58-01..03 (Minor) fixed in fix loop 1 and re-tested.
+- **Outcome:** accepted by the PO on 2026-11-20 (D-72 s to v).
+- **Status:** PO accepted, awaiting owner local test.
+
+**Definition of Done items still open:**
+1. Owner local Chrome test (FU-89).
+2. Commit: `git add` the new files first (`api/crossword.php`, `sql/migrate-add-daily-crossword.sql`, `docs/sprints/us-58-*.md`), so the hash hook sees them. Do not commit `package*.json`, `.claude/launch.json` unless intended.
+3. PR with `CROSSWORD_LAUNCH_DATE` in `api/crossword.php` set to the live date.
+4. Hosted migration BEFORE the upload (FU-90): run `sql/migrate-add-daily-crossword.sql` on the hosted DB, then upload the PHP, hashed `js/` and `css/` files and every HTML page that references them.
+5. Live smoke, including the share sheet on a phone.
+
+---
+
 ## Change request "Earn the second chance" (US-57) — outside the sprint cycle, 2026-11-17
 
 **Change request (owner, 2026-11-17):** the Streak second chance (US-54) is no longer free. A run starts with 0 chances, the 1st after 5 correct answers, the 2nd after 10 more, at most 2; using one restarts the counter and keeps the streak (FU-82 closed, D-69 amended). Client-only, no migration (`game.js`, `i18n.js`, `index.html`, `style.css`, guide and `llms.txt`). Branch `us-57-earn-chance` (uncommitted). Dev and test notes: `docs/sprints/us-57-dev.md`, `docs/sprints/us-57-test-report.md`.

@@ -101,6 +101,16 @@
   const SQUARE_RIGHT = String.fromCodePoint(0x1f7e9); // green square, in the shared result
   const SQUARE_WRONG = String.fromCodePoint(0x1f7e5); // red square
 
+  // Daily Crossword (US-58, D-72): the server builds the day's grid; progress and the finished lock
+  // are saved under their own key on this device only.
+  const CROSSWORD_KEY = 'brainrush.crossword';
+  const CROSSWORD_VERSION = 1;
+  const CW_MAX_SIZE = 13;   // CROSSWORD_MAX_SIZE in api/crossword.php
+  const CW_MAX_WORDS = 20;  // a grid is never longer (the server's maximum is CROSSWORD_MAX_WORDS, 10)
+  const CW_FREE_HINTS = 3; // D-72 w: Reveal letter can be used 3 times per crossword, then the button hides
+  const CW_WORD_PATTERN = /^[A-Z]{3,10}$/; // CROSSWORD_WORD_PATTERN in api/crossword.php: keep the two the same (BUG-58-02)
+  const CW_TICK_MS = 250;   // the running time and the countdown
+
   // Final round (US-44, D-48): offer -> wagers (one contestant at a time) -> question -> done (Results).
   const FINAL_STAGES = ['offer', 'wager', 'question', 'done'];
   const WAGER_PATTERN = /^\d{1,9}$/; // a whole number typed by a contestant
@@ -134,7 +144,7 @@
   ];
 
   const SCREENS = ['setup', 'board', 'question', 'results', 'final']; // a saved board game may be on these
-  const ALL_SCREENS = SCREENS.concat(['leaderboard', 'daily']);
+  const ALL_SCREENS = SCREENS.concat(['leaderboard', 'daily', 'crossword']);
 
   // Central state. `setup` is the form being filled in (memory only);
   // `game` is the running game and is saved to localStorage on every change:
@@ -209,6 +219,20 @@
   let daily = null;
   let dailyTicker = null;        // interval of the countdown on the result screen
 
+  // Daily Crossword (US-58), saved under CROSSWORD_KEY on every change; null when none:
+  //   { version, date, number, nextAt, width, height, words: [{n, row, col, dir, length, answer, question,
+  //     question_ar, category_name, category_name_ar}], cells: {"row,col": letter}, revealed: ["row,col"],
+  //     wrong: ["row,col"], hints, startedAt, solvedMs, done, logged, onScreen, cur: {row, col, dir} }
+  // cells = the letters typed or revealed; revealed = locked cells (one hint each); wrong = cells marked
+  // by Check word until they change. startedAt = Date.now() ms of the first letter (null before), the
+  // timer is wall-clock from it (D-72 k); solvedMs = the time when done. logged = the game log line was
+  // sent (once per day). onScreen = the crossword screen is open, so a reload shows it again.
+  let crossword = null;
+  let cwCells = {};      // crosswordCells(crossword), memory only
+  let cwLang = {};       // word index -> 'en' | 'ar': the clue toggles, memory only (D-72 g)
+  let cwTicker = null;   // interval of the running time or the countdown
+  let cwTyping = false;  // the hidden field has the focus (the player types in the grid)
+
   // Report form (US-42), memory only: { questionId, sending } while it is open, else null. It never
   // touches the saved game or run, the timer or the scores.
   let report = null;
@@ -233,6 +257,7 @@
       results: byId('screen-results'),
       leaderboard: byId('screen-leaderboard'),
       daily: byId('screen-daily'),
+      crossword: byId('screen-crossword'),
       final: byId('screen-final'),
     },
     setupForm: byId('setup-form'),
@@ -247,6 +272,8 @@
     streakBoardBtn: byId('streak-board-btn'),
     dailyOpenBtn: byId('daily-open-btn'),
     dailyOpenLabel: byId('daily-open-label'),
+    crosswordOpenBtn: byId('crossword-open-btn'),
+    crosswordOpenLabel: byId('crossword-open-label'),
     loadMsg: byId('setup-load-msg'),
     newBanner: byId('new-banner'),
     modeInputs: Array.prototype.slice.call(document.querySelectorAll('input[name="mode"]')),
@@ -347,6 +374,30 @@
     dailyNext: byId('daily-next'),
     dailyMsg: byId('daily-msg'),
     dailyPlay: byId('daily-play'),
+    cwTitle: byId('cw-title'),
+    cwTimer: byId('cw-timer'),
+    cwHints: byId('cw-hints'),
+    cwBack: byId('cw-back'),
+    cwResult: byId('cw-result'),
+    cwSolved: byId('cw-solved'),
+    cwHintsLine: byId('cw-hints-line'),
+    cwShare: byId('cw-share'),
+    cwShareStatus: byId('cw-share-status'),
+    cwNext: byId('cw-next'),
+    cwResultMsg: byId('cw-result-msg'),
+    cwPlay: byId('cw-play'),
+    cwBarLabel: byId('cw-bar-label'),
+    cwBarText: byId('cw-bar-text'),
+    cwBarLang: byId('cw-bar-lang'),
+    cwBoard: byId('cw-board'),
+    cwGrid: byId('cw-grid'),
+    cwInput: byId('cw-input'),
+    cwCheck: byId('cw-check'),
+    cwReveal: byId('cw-reveal'),
+    cwMsg: byId('cw-msg'),
+    cwClues: byId('cw-clues'),
+    cwAcross: byId('cw-across'),
+    cwDown: byId('cw-down'),
     finalTitle: byId('final-title'),
     finalOffer: byId('final-offer'),
     finalLead: byId('final-lead'),
@@ -978,6 +1029,7 @@
       stopReading(); // US-48: closing the question stops the reading
     }
     if (name !== 'daily') stopDailyCountdown();
+    if (name !== 'crossword') stopCrosswordTicker();
     ALL_SCREENS.forEach((key) => { dom.screens[key].hidden = key !== name; });
     document.body.setAttribute('data-screen', name); // CSS: one-screen board layout (FU-03)
     window.scrollTo(0, 0);
@@ -1133,6 +1185,8 @@
       else onStreakEnd();                            // "End the run now?" confirm
     } else if (state.screen === 'daily') {
       onDailyNewGame();                              // the Daily result: back to setup, as New Game
+    } else if (state.screen === 'crossword') {
+      onCrosswordBack();                             // US-58: back to setup, progress kept, no confirm
     } else if (state.screen === 'board') {
       endGame();                                     // D-09 confirm while questions are left
     } else if (state.screen === 'results') {
@@ -1522,6 +1576,7 @@
       s.maintenance = settings.start_game_hidden === 1;
       s.helpersOn = settings.helpers_enabled !== 0; // a missing row means on
       s.finalRoundOn = settings.final_round_enabled === 1; // US-44: a missing row means off
+      s.crosswordOn = settings.crossword_enabled === 1; // US-58: a missing row means off
       s.playable = results[1].filter((c) => isPlainObject(c) && Number.isInteger(c.id) && typeof c.name === 'string')
         .map((c) => ({ id: c.id, name: c.name, nameAr: isFilled(c.name_ar) ? c.name_ar : null }));
       // Kilo Meshakkal (US-53) stays ticked like Surprise, as long as its tile is shown.
@@ -1657,6 +1712,9 @@
     // Daily Challenge (US-43): any mode and number of players; it needs no category pick either.
     dom.dailyOpenBtn.hidden = !s || down || s.streak;
     dom.dailyOpenBtn.disabled = !s || s.loading || s.starting || s.loadError === 'network';
+    // Daily Crossword (US-58): the same rules, and only when the admin turned it on (crossword_enabled).
+    dom.crosswordOpenBtn.hidden = !s || down || s.streak || !s.crosswordOn;
+    dom.crosswordOpenBtn.disabled = dom.dailyOpenBtn.disabled;
   }
 
   /** D-02: required, unique after trimming, case-insensitive. Marks each bad entry inline. */
@@ -3698,6 +3756,10 @@
 
   /** Enter anywhere on the answered question means Next (buttons and links handle Enter themselves). */
   function onKeyDown(event) {
+    if (crosswordPlaying()) { // US-58: the grid takes letters, Backspace and the arrows
+      onCrosswordKey(event);
+      return;
+    }
     if (event.key === 'Escape' && !dom.doubleOverlay.hidden) {
       closeDoublePopup();
       return;
@@ -4368,6 +4430,802 @@
     daily = run;
     if (run.current !== null) showDailyQuestion();
     else nextDailyQuestion();
+  }
+
+  // ---------- Daily Crossword (US-58, D-72) ----------
+  // One grid per UTC day for everyone: api/crossword.php builds it from the question bank (clue = the
+  // question, word = the cleaned answer, A-Z only) on the day's first request. The browser checks the
+  // letters (the answers are in the payload, D-37 g). Letters, revealed cells, hints, the time and the
+  // finished lock are saved on this device only (CROSSWORD_KEY), so a reload resumes the puzzle.
+
+  function cwKey(row, col) {
+    return row + ',' + col;
+  }
+
+  function cwOther(dir) {
+    return dir === 'across' ? 'down' : 'across';
+  }
+
+  /**
+   * The white cells of a puzzle: "row,col" -> { row, col, answer, n, across, down } where across/down
+   * is the index of the word running that way (or null). Null when the words leave the grid, overlap
+   * the same way or disagree on a crossing letter or a clue number.
+   */
+  function crosswordCells(p) {
+    const cells = {};
+    for (let i = 0; i < p.words.length; i++) {
+      const w = p.words[i];
+      for (let k = 0; k < w.length; k++) {
+        const row = w.row + (w.dir === 'down' ? k : 0);
+        const col = w.col + (w.dir === 'across' ? k : 0);
+        if (row >= p.height || col >= p.width) return null;
+        const key = cwKey(row, col);
+        if (!cells[key]) cells[key] = { row: row, col: col, answer: w.answer[k], n: null, across: null, down: null };
+        const cell = cells[key];
+        if (cell.answer !== w.answer[k] || cell[w.dir] !== null) return null;
+        cell[w.dir] = i;
+        if (k === 0) {
+          if (cell.n !== null && cell.n !== w.n) return null;
+          cell.n = w.n;
+        }
+      }
+    }
+    return cells;
+  }
+
+  const textOrNull = (value) => value === null || typeof value === 'string';
+
+  function isValidCrosswordWord(w) {
+    return isPlainObject(w) && Number.isInteger(w.n) && w.n >= 1 &&
+      Number.isInteger(w.row) && w.row >= 0 && Number.isInteger(w.col) && w.col >= 0 &&
+      (w.dir === 'across' || w.dir === 'down') &&
+      typeof w.answer === 'string' && CW_WORD_PATTERN.test(w.answer) && w.length === w.answer.length &&
+      textOrNull(w.question) && textOrNull(w.question_ar) &&
+      textOrNull(w.category_name) && textOrNull(w.category_name_ar);
+  }
+
+  /** Size and words of a puzzle (from the server or a save) make one consistent grid. */
+  function isValidPuzzle(p) {
+    return Number.isInteger(p.width) && p.width >= 1 && p.width <= CW_MAX_SIZE &&
+      Number.isInteger(p.height) && p.height >= 1 && p.height <= CW_MAX_SIZE &&
+      Array.isArray(p.words) && p.words.length >= 1 && p.words.length <= CW_MAX_WORDS &&
+      p.words.every(isValidCrosswordWord) && crosswordCells(p) !== null;
+  }
+
+  /** Only the fields the game uses, so a save never grows with unknown data. */
+  function parseCrosswordWord(w) {
+    return {
+      n: w.n, row: w.row, col: w.col, dir: w.dir, length: w.length, answer: w.answer,
+      question: w.question, question_ar: isFilled(w.question_ar) ? w.question_ar : null,
+      category_name: w.category_name, category_name_ar: isFilled(w.category_name_ar) ? w.category_name_ar : null,
+    };
+  }
+
+  /** Today's puzzle from api/crossword.php: { date, number, nextAt, width, height, words }. Throws on errors. */
+  async function fetchCrossword() {
+    const data = await apiGet('crossword.php');
+    const ok = isPlainObject(data) && typeof data.date === 'string' && DATE_PATTERN.test(data.date) &&
+      Number.isInteger(data.number) && data.number >= 1 &&
+      Number.isInteger(data.seconds_to_next) && data.seconds_to_next >= 0 && data.seconds_to_next * 1000 <= DAY_MS &&
+      isValidPuzzle(data);
+    if (!ok) throw textError('err.crossword');
+    return {
+      date: data.date,
+      number: data.number,
+      nextAt: Date.now() + data.seconds_to_next * 1000,
+      width: data.width,
+      height: data.height,
+      words: data.words.map(parseCrosswordWord),
+    };
+  }
+
+  function saveCrossword() {
+    try {
+      if (crossword) window.localStorage.setItem(CROSSWORD_KEY, JSON.stringify(crossword));
+      else window.localStorage.removeItem(CROSSWORD_KEY);
+    } catch (err) {
+      // Storage full or disabled: the puzzle still works, it just won't survive a reload.
+    }
+  }
+
+  /** The saved crossword, or null when nothing valid is saved (corrupt data is removed). */
+  function loadCrossword() {
+    let raw = null;
+    try {
+      raw = window.localStorage.getItem(CROSSWORD_KEY);
+    } catch (err) {
+      return null;
+    }
+    if (raw === null) return null;
+    try {
+      const saved = JSON.parse(raw);
+      if (isValidCrosswordRun(saved)) return saved;
+    } catch (err) {
+      // invalid JSON: discard it
+    }
+    try {
+      window.localStorage.removeItem(CROSSWORD_KEY);
+    } catch (err) {
+      // nothing to clear
+    }
+    return null;
+  }
+
+  function isValidCrosswordRun(run) {
+    if (!isPlainObject(run) || run.version !== CROSSWORD_VERSION ||
+        typeof run.date !== 'string' || !DATE_PATTERN.test(run.date) ||
+        !Number.isInteger(run.number) || run.number < 1 || !Number.isFinite(run.nextAt) ||
+        !isValidPuzzle(run) || !isPlainObject(run.cells) ||
+        !Array.isArray(run.revealed) || !Array.isArray(run.wrong) ||
+        !Number.isInteger(run.hints) || run.hints !== run.revealed.length ||
+        !(run.startedAt === null || Number.isFinite(run.startedAt)) ||
+        typeof run.done !== 'boolean' || typeof run.logged !== 'boolean' || typeof run.onScreen !== 'boolean') {
+      return false;
+    }
+    const cells = crosswordCells(run);
+    const lettersOk = Object.keys(run.cells).every((key) => hasOwn(cells, key) && /^[A-Z]$/.test(run.cells[key]));
+    const unique = (list) => list.every((key, i) => typeof key === 'string' && hasOwn(cells, key) && list.indexOf(key) === i);
+    const revealedOk = unique(run.revealed) && run.revealed.every((key) => run.cells[key] === cells[key].answer);
+    const cur = run.cur;
+    const curOk = isPlainObject(cur) && Number.isInteger(cur.row) && Number.isInteger(cur.col) &&
+      hasOwn(cells, cwKey(cur.row, cur.col)) && (cur.dir === 'across' || cur.dir === 'down') &&
+      cells[cwKey(cur.row, cur.col)][cur.dir] !== null;
+    if (!lettersOk || !unique(run.wrong) || !revealedOk || !curOk) return false;
+    if (!run.done) return run.solvedMs === null;
+    return Number.isFinite(run.solvedMs) && run.solvedMs >= 0 &&
+      Object.keys(cells).every((key) => run.cells[key] === cells[key].answer);
+  }
+
+  /** A crossword is open and still being solved. */
+  function crosswordPlaying() {
+    return state.screen === 'crossword' && !!crossword && !crossword.done;
+  }
+
+  /** The same grid (size, words and places): a save of it can go on with a fresh copy of the clues. */
+  function samePuzzle(a, b) {
+    const shape = (p) => JSON.stringify([p.width, p.height, p.words.map((w) => [w.row, w.col, w.dir, w.answer])]);
+    return shape(a) === shape(b);
+  }
+
+  /** "Daily Crossword" on setup: today's puzzle, resumed or finished on this device, or a fresh one. */
+  async function onCrosswordOpen() {
+    const s = state.setup;
+    if (!s || s.streak || dom.crosswordOpenBtn.disabled) return;
+    clearMessage(dom.startMsg);
+    s.starting = true;
+    dom.crosswordOpenLabel.textContent = t('common.loading');
+    updateStartButton();
+    try {
+      const puzzle = await fetchCrossword();
+      if (state.setup !== s || state.screen !== 'setup') return;
+      openCrossword(puzzle);
+    } catch (err) {
+      // Stay on setup with every input intact; a 503 (no grid today, no table) gets the friendly text.
+      showMessage(dom.startMsg, () => crosswordErrorText(err, 'cw.failed'), 'error');
+    } finally {
+      s.starting = false;
+      dom.crosswordOpenLabel.textContent = t('cw.name');
+      updateStartButton();
+    }
+  }
+
+  function crosswordErrorText(err, key) {
+    return err && err.status === 503 ? t('cw.unavailable') : t(key, { reason: errorText(err) });
+  }
+
+  /** Show today's puzzle: this device's progress on it when there is one, else a fresh start. */
+  function openCrossword(puzzle) {
+    const saved = crossword || loadCrossword();
+    if (saved && saved.date === puzzle.date && samePuzzle(saved, puzzle)) {
+      crossword = saved;
+      crossword.words = puzzle.words; // fresh clue texts (Admin fixes)
+      crossword.nextAt = puzzle.nextAt;
+      crossword.number = puzzle.number;
+    } else {
+      crossword = newCrosswordRun(puzzle); // an earlier day's save is dropped (D-72 q)
+    }
+    crossword.onScreen = true;
+    saveCrossword();
+    showCrossword();
+  }
+
+  function newCrosswordRun(p) {
+    const first = p.words[0]; // the server lists across words first, by number
+    return {
+      version: CROSSWORD_VERSION,
+      date: p.date,
+      number: p.number,
+      nextAt: p.nextAt,
+      width: p.width,
+      height: p.height,
+      words: p.words,
+      cells: {},
+      revealed: [],
+      wrong: [],
+      hints: 0,
+      startedAt: null,
+      solvedMs: null,
+      done: false,
+      logged: false,
+      onScreen: true,
+      cur: { row: first.row, col: first.col, dir: first.dir },
+    };
+  }
+
+  /** Open the crossword screen for `crossword` (also after a reload). */
+  function showCrossword() {
+    cwCells = crosswordCells(crossword);
+    cwLang = {};
+    clearCwMsg();
+    dom.cwShareStatus.textContent = '';
+    clearMessage(dom.cwResultMsg);
+    dom.cwPlay.hidden = true;
+    renderCrossword();
+    showScreen('crossword');
+    startCrosswordTicker();
+    if (crossword.done) dom.cwSolved.focus();
+    else dom.cwTitle.focus();
+  }
+
+  /** Back: to the setup screen; the progress stays saved on this device (D-72 q). */
+  function onCrosswordBack() {
+    if (crossword) {
+      crossword.onScreen = false;
+      saveCrossword();
+    }
+    stopCrosswordTicker();
+    if (state.setup) {
+      showScreen('setup');
+      updateStartButton();
+    } else {
+      startSetup();
+    }
+  }
+
+  // --- Cursor and words ---
+
+  function curKey() {
+    return cwKey(crossword.cur.row, crossword.cur.col);
+  }
+
+  function activeWordIndex() {
+    return cwCells[curKey()][crossword.cur.dir];
+  }
+
+  /** The cell keys of word i, first letter first. */
+  function cwWordKeys(i) {
+    const w = crossword.words[i];
+    const keys = [];
+    for (let k = 0; k < w.length; k++) {
+      keys.push(cwKey(w.row + (w.dir === 'down' ? k : 0), w.col + (w.dir === 'across' ? k : 0)));
+    }
+    return keys;
+  }
+
+  function isRevealed(key) {
+    return crossword.revealed.indexOf(key) !== -1;
+  }
+
+  function isRightCell(key) {
+    return crossword.cells[key] === cwCells[key].answer;
+  }
+
+  /** Put the cursor on a cell; the direction stays when a word runs that way there, else it switches. */
+  function moveCursor(key, dir) {
+    const cell = cwCells[key];
+    const want = dir || crossword.cur.dir;
+    crossword.cur = { row: cell.row, col: cell.col, dir: cell[want] !== null ? want : cwOther(want) };
+  }
+
+  // --- Typing ---
+
+  /** A letter A-Z: into the current cell (revealed cells are skipped), then on to the next cell of the word. */
+  function cwType(letter) {
+    if (!crosswordPlaying()) return;
+    const keys = cwWordKeys(activeWordIndex());
+    let at = keys.indexOf(curKey());
+    while (at < keys.length && isRevealed(keys[at])) at++;
+    if (at >= keys.length) return; // the rest of the word is revealed
+    setCwLetter(keys[at], letter);
+    let next = at + 1;
+    while (next < keys.length && isRevealed(keys[next])) next++;
+    moveCursor(keys[next < keys.length ? next : at]);
+    afterCwChange();
+  }
+
+  /** Backspace: clear the current cell, or when it is empty go back one cell of the word and clear that. */
+  function cwBackspace() {
+    if (!crosswordPlaying()) return;
+    const key = curKey();
+    if (crossword.cells[key] && !isRevealed(key)) {
+      setCwLetter(key, '');
+      afterCwChange();
+      return;
+    }
+    const keys = cwWordKeys(activeWordIndex());
+    let prev = keys.indexOf(key) - 1;
+    while (prev >= 0 && isRevealed(keys[prev])) prev--;
+    if (prev < 0) return;
+    moveCursor(keys[prev]);
+    setCwLetter(keys[prev], '');
+    afterCwChange();
+  }
+
+  /** An arrow key: the next white cell that way (dark cells are skipped); the direction follows the arrow's axis. */
+  function cwArrow(dr, dc) {
+    if (!crosswordPlaying()) return;
+    const axis = dr === 0 ? 'across' : 'down';
+    let row = crossword.cur.row + dr;
+    let col = crossword.cur.col + dc;
+    while (row >= 0 && col >= 0 && row < crossword.height && col < crossword.width && !cwCells[cwKey(row, col)]) {
+      row += dr;
+      col += dc;
+    }
+    const key = cwKey(row, col);
+    moveCursor(cwCells[key] ? key : curKey(), axis);
+    saveCrossword();
+    renderCrosswordPlay();
+  }
+
+  /** Set or clear one cell's letter; a changed cell loses its Check mark. The first letter starts the clock. */
+  function setCwLetter(key, letter) {
+    if (letter) crossword.cells[key] = letter;
+    else delete crossword.cells[key];
+    crossword.wrong = crossword.wrong.filter((k) => k !== key);
+    if (letter) startCrosswordClock();
+  }
+
+  /** The timer starts on the first letter typed or revealed; that is also when the game log line goes (D-72 o). */
+  function startCrosswordClock() {
+    if (crossword.startedAt === null) crossword.startedAt = Date.now();
+    if (!crossword.logged) {
+      crossword.logged = true;
+      postGameLog({ mode: 'crossword' });
+    }
+  }
+
+  /** After a letter changed: solved -> the end; a full but wrong grid -> "Not quite". */
+  function afterCwChange() {
+    const keys = Object.keys(cwCells);
+    if (keys.every(isRightCell)) {
+      finishCrossword();
+      return;
+    }
+    if (keys.every((key) => crossword.cells[key])) showCwMsg(() => t('cw.notQuite'), true);
+    else clearCwMsg();
+    saveCrossword();
+    renderCrosswordPlay();
+  }
+
+  // --- Tools ---
+
+  /** Check word: mark the wrong letters of the active word (free, unlimited). */
+  function onCwCheck() {
+    if (!crosswordPlaying()) return;
+    let wrong = 0;
+    cwWordKeys(activeWordIndex()).forEach((key) => {
+      if (!crossword.cells[key] || isRightCell(key)) return;
+      wrong++;
+      if (crossword.wrong.indexOf(key) === -1) crossword.wrong.push(key);
+    });
+    if (wrong) showCwMsg(() => tn('cw.checkWrong', wrong), true);
+    else showCwMsg(() => t('cw.checkNone'), false);
+    saveCrossword();
+    renderCrosswordPlay();
+    refocusCwInput();
+  }
+
+  /**
+   * Reveal letter (1 hint): the current cell. A cell that already shows its right letter (typed or
+   * revealed) reveals nothing and costs no hint (D-72 x); a short message says so.
+   */
+  function onCwReveal() {
+    if (!crosswordPlaying() || crossword.hints >= CW_FREE_HINTS) return;
+    const key = curKey();
+    if (!key) return;
+    if (isRightCell(key)) {
+      showCwMsg(() => t('cw.revealAlready'), false);
+      refocusCwInput();
+      return;
+    }
+    crossword.revealed.push(key);
+    crossword.hints = crossword.revealed.length;
+    setCwLetter(key, cwCells[key].answer);
+    afterCwChange();
+    refocusCwInput();
+  }
+
+  function finishCrossword() {
+    crossword.done = true;
+    crossword.solvedMs = Math.max(0, Date.now() - (crossword.startedAt || Date.now()));
+    crossword.wrong = [];
+    clearCwMsg();
+    saveCrossword();
+    renderCrossword();
+    startCrosswordTicker(); // now the countdown to the next crossword
+    dom.cwSolved.focus();
+  }
+
+  // --- Pointer and keyboard ---
+
+  /** A click on a white cell selects it; a second click on the same cell switches the direction. */
+  function onCwGridClick(event) {
+    const node = event.target.closest('.cw-cell');
+    if (!node || !crosswordPlaying()) return;
+    const key = node.getAttribute('data-key');
+    if (!cwCells[key]) return;
+    if (key === curKey()) {
+      const other = cwOther(crossword.cur.dir);
+      if (cwCells[key][other] !== null) crossword.cur.dir = other;
+    } else {
+      moveCursor(key);
+    }
+    saveCrossword();
+    renderCrosswordPlay();
+    focusCwInput();
+  }
+
+  /** A clue selects its word: the first empty cell, else the first cell. */
+  function onCwClueClick(event) {
+    const btn = event.target.closest('.cw-clue-btn');
+    if (!btn || !crosswordPlaying()) return;
+    const i = Number(btn.getAttribute('data-word'));
+    const w = crossword.words[i];
+    if (!w) return;
+    const keys = cwWordKeys(i);
+    moveCursor(keys.find((key) => !crossword.cells[key]) || keys[0], w.dir);
+    saveCrossword();
+    renderCrosswordPlay();
+    focusCwInput();
+  }
+
+  const CW_ARROWS = { ArrowLeft: [0, -1], ArrowRight: [0, 1], ArrowUp: [-1, 0], ArrowDown: [1, 0] };
+
+  /** Keys while the crossword is played: letters, Backspace / Delete and the arrows (other fields keep theirs). */
+  function onCrosswordKey(event) {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    const target = event.target;
+    if (target !== dom.cwInput && target && target.closest && target.closest('input, textarea, select')) return;
+    const key = event.key;
+    if (/^[a-zA-Z]$/.test(key)) {
+      event.preventDefault();
+      cwType(key.toUpperCase());
+    } else if (key === 'Backspace' || key === 'Delete') {
+      event.preventDefault();
+      cwBackspace();
+    } else if (hasOwn(CW_ARROWS, key)) {
+      event.preventDefault();
+      cwArrow(CW_ARROWS[key][0], CW_ARROWS[key][1]);
+    }
+  }
+
+  /**
+   * Phone keyboards often send no usable key code: the letter (or the deletion) arrives as an input
+   * event on the hidden field, which always holds one space so Backspace has something to delete.
+   */
+  function onCwInput(event) {
+    const value = dom.cwInput.value;
+    resetCwInput();
+    const letters = value.toUpperCase().replace(/[^A-Z]/g, '');
+    if (letters) letters.split('').forEach(cwType);
+    else if (value.length < 1 || (event.inputType && event.inputType.indexOf('delete') === 0)) cwBackspace();
+  }
+
+  function resetCwInput() {
+    dom.cwInput.value = ' ';
+    try {
+      dom.cwInput.setSelectionRange(1, 1);
+    } catch (err) {
+      // not focused: nothing to place
+    }
+  }
+
+  function focusCwInput() {
+    if (!crosswordPlaying()) return;
+    dom.cwInput.focus({ preventScroll: true });
+    resetCwInput();
+  }
+
+  /** After a tool button: back to the grid only when the player was typing in it (no keyboard pops up otherwise). */
+  function refocusCwInput() {
+    if (cwTyping) focusCwInput();
+  }
+
+  // --- Drawing ---
+
+  function renderCrossword() {
+    const run = crossword;
+    const screen = dom.screens.crossword;
+    screen.style.setProperty('--cw-cols', String(run.width));
+    screen.style.setProperty('--cw-rows', String(run.height));
+    screen.classList.toggle('is-done', run.done);
+    dom.cwTitle.textContent = t('cw.number', { n: run.number });
+    dom.cwGrid.setAttribute('aria-label', t('cw.grid'));
+    dom.cwResult.hidden = !run.done;
+    if (run.done) renderCwResult();
+    renderCrosswordPlay();
+  }
+
+  /** The grid, the active clue, the clue lists and the time; what changes while playing. */
+  function renderCrosswordPlay() {
+    renderCwGrid();
+    renderCwClues();
+    renderCwBar();
+    renderCwStats();
+    renderCwReveal();
+  }
+
+  /** Reveal letter shows the hints left (D-72 w) and hides once the 3 free hints are used. */
+  function renderCwReveal() {
+    const left = Math.max(0, CW_FREE_HINTS - crossword.hints);
+    dom.cwReveal.hidden = left === 0;
+    dom.cwReveal.textContent = tn('cw.revealLeft', left);
+  }
+
+  function renderCwGrid() {
+    const run = crossword;
+    const playing = !run.done;
+    const wordKeys = playing ? cwWordKeys(activeWordIndex()) : [];
+    const current = playing ? curKey() : null;
+    const grid = dom.cwGrid;
+    clear(grid);
+    for (let row = 0; row < run.height; row++) {
+      for (let col = 0; col < run.width; col++) {
+        const key = cwKey(row, col);
+        const cell = cwCells[key];
+        if (!cell) {
+          grid.appendChild(h('div', { className: 'cw-block' }));
+          continue;
+        }
+        let className = 'cw-cell';
+        if (wordKeys.indexOf(key) !== -1) className += ' is-word';
+        if (key === current) className += ' is-current';
+        if (run.wrong.indexOf(key) !== -1) className += ' is-wrong';
+        if (isRevealed(key)) className += ' is-revealed';
+        grid.appendChild(h('div', { className: className, 'data-key': key }, [
+          cell.n !== null ? h('span', { className: 'cw-num', text: String(cell.n) }) : null,
+          h('span', { className: 'cw-letter', text: run.cells[key] || '' }),
+        ]));
+      }
+    }
+    if (playing) {
+      dom.cwBoard.style.setProperty('--cw-r', String(run.cur.row));
+      dom.cwBoard.style.setProperty('--cw-c', String(run.cur.col));
+      dom.cwInput.setAttribute('aria-label', cwClueLabel(activeWordIndex()) + ': ' + cwClue(activeWordIndex()).text);
+    }
+  }
+
+  /** The clue's language: the player's toggle, else Arabic in the Arabic interface when it has Arabic (D-72 g). */
+  function cwClueLang(i) {
+    const w = crossword.words[i];
+    if (!isFilled(w.question_ar)) return 'en';
+    if (hasOwn(cwLang, i)) return cwLang[i];
+    return i18n.isArabic() ? 'ar' : 'en';
+  }
+
+  /** { text, lang } of word i's clue; a deleted question reads "Clue removed: use Reveal letter." */
+  function cwClue(i) {
+    const w = crossword.words[i];
+    if (w.question === null) return { text: t('cw.clueRemoved'), lang: i18n.lang() };
+    const lang = cwClueLang(i);
+    return { text: lang === 'ar' ? w.question_ar : w.question, lang: lang };
+  }
+
+  /** "3 Across" */
+  function cwClueLabel(i) {
+    const w = crossword.words[i];
+    return t(w.dir === 'across' ? 'cw.acrossLabel' : 'cw.downLabel', { n: w.n });
+  }
+
+  function renderCwClues() {
+    const active = crossword.done ? -1 : activeWordIndex();
+    let activeNode = null;
+    [['across', dom.cwAcross], ['down', dom.cwDown]].forEach((pair) => {
+      const list = pair[1];
+      clear(list);
+      crossword.words.forEach((w, i) => {
+        if (w.dir !== pair[0]) return;
+        const clue = cwClue(i);
+        const item = h('li', { className: 'cw-clue' + (i === active ? ' is-active' : '') }, [
+          h('button', { type: 'button', className: 'cw-clue-btn', 'data-word': String(i), disabled: crossword.done }, [
+            h('span', { className: 'cw-clue-n', text: w.n + '. ' }),
+            h('span', { text: clue.text, lang: clue.lang, dir: 'auto' }),
+            h('span', { className: 'cw-clue-len', text: ' (' + w.length + ')' }),
+          ]),
+        ]);
+        if (i === active) {
+          item.firstChild.setAttribute('aria-current', 'true');
+          activeNode = item;
+        }
+        list.appendChild(item);
+      });
+    });
+    if (activeNode) scrollClueIntoPanel(activeNode);
+  }
+
+  /** Keep the active clue in view inside the clue panel only (the page itself never scrolls for it). */
+  function scrollClueIntoPanel(node) {
+    const panel = dom.cwClues;
+    if (panel.scrollHeight <= panel.clientHeight + 1) return; // not a scrolling panel (phones)
+    const top = node.offsetTop;
+    const bottom = top + node.offsetHeight;
+    if (top < panel.scrollTop) panel.scrollTop = top;
+    else if (bottom > panel.scrollTop + panel.clientHeight) panel.scrollTop = bottom - panel.clientHeight;
+  }
+
+  /** The active clue above the grid: "3 Across · Category", the clue with its length, and the EN/AR toggle. */
+  function renderCwBar() {
+    if (crossword.done) return;
+    const i = activeWordIndex();
+    const w = crossword.words[i];
+    const clue = cwClue(i);
+    const category = w.category_name === null ? '' : ' ' + DOT + ' ' + iso(localName(w.category_name, w.category_name_ar));
+    dom.cwBarLabel.textContent = cwClueLabel(i) + category;
+    dom.cwBarText.textContent = clue.text + ' (' + w.length + ')';
+    dom.cwBarText.lang = clue.lang;
+    const hasArabic = w.question !== null && isFilled(w.question_ar);
+    dom.cwBarLang.hidden = !hasArabic;
+    if (hasArabic) dom.cwBarLang.textContent = t(clue.lang === 'ar' ? 'lang.showEnglish' : 'lang.showArabic');
+  }
+
+  /** EN/AR on the active clue (per clue, not saved: a reload shows the default again, D-72 g). */
+  function onCwLangToggle() {
+    if (!crosswordPlaying()) return;
+    const i = activeWordIndex();
+    if (!isFilled(crossword.words[i].question_ar)) return;
+    cwLang[i] = cwClueLang(i) === 'ar' ? 'en' : 'ar';
+    renderCwClues();
+    renderCwBar();
+    renderCwGrid(); // the hidden field's label reads the clue too
+  }
+
+  function cwHintsText(hints) {
+    return hints === 0 ? t('cw.noHints') : tn('cw.hints', hints);
+  }
+
+  /** "4:05" (minutes) or "1:02:09" after an hour. */
+  function formatDuration(ms) {
+    const seconds = Math.max(0, Math.floor(ms / 1000));
+    const hours = Math.floor(seconds / 3600);
+    const mmss = String(Math.floor(seconds / 60) % 60).padStart(hours ? 2 : 1, '0') + ':' + String(seconds % 60).padStart(2, '0');
+    return hours ? hours + ':' + mmss : mmss;
+  }
+
+  function crosswordElapsed() {
+    if (crossword.done) return crossword.solvedMs;
+    return crossword.startedAt === null ? 0 : Date.now() - crossword.startedAt;
+  }
+
+  function renderCwStats() {
+    dom.cwTimer.textContent = ltr(formatDuration(crosswordElapsed()));
+    dom.cwHints.textContent = cwHintsText(crossword.hints);
+  }
+
+  function showCwMsg(text, bad) {
+    setText(dom.cwMsg, text);
+    dom.cwMsg.classList.toggle('is-bad', bad);
+  }
+
+  function clearCwMsg() {
+    setText(dom.cwMsg, '');
+    dom.cwMsg.classList.remove('is-bad');
+  }
+
+  // --- Result, share and the next puzzle ---
+
+  function renderCwResult() {
+    dom.cwSolved.textContent = t('cw.solved', { time: ltr(formatDuration(crossword.solvedMs)) });
+    dom.cwHintsLine.textContent = cwHintsText(crossword.hints);
+    tickCrosswordCountdown();
+  }
+
+  /** "Mokh Rush Crossword #12: solved in 4:05 with 2 hints" (js/share.js adds the site link). */
+  function crosswordShareText(run) {
+    const hints = run.hints === 0 ? t('cw.shareNoHints') : tn('cw.shareHints', run.hints);
+    return t('cw.share', { n: run.number, time: ltr(formatDuration(run.solvedMs)), hints: hints });
+  }
+
+  function onCrosswordShare() {
+    if (crossword && crossword.done && state.screen === 'crossword') shareText(crosswordShareText(crossword), dom.cwShareStatus);
+  }
+
+  /** One interval while the screen is open: the running time, or once solved the countdown. */
+  function startCrosswordTicker() {
+    stopCrosswordTicker();
+    cwTicker = window.setInterval(tickCrossword, CW_TICK_MS);
+  }
+
+  function stopCrosswordTicker() {
+    if (cwTicker !== null) window.clearInterval(cwTicker);
+    cwTicker = null;
+  }
+
+  function tickCrossword() {
+    if (!crossword || state.screen !== 'crossword') {
+      stopCrosswordTicker();
+      return;
+    }
+    if (crossword.done) tickCrosswordCountdown();
+    else renderCwStats();
+  }
+
+  /** "Next crossword in 13:05:22" to midnight UTC; at 0 the "Play the new crossword" button. */
+  function tickCrosswordCountdown() {
+    const left = Math.min(crossword.nextAt - Date.now(), DAY_MS);
+    dom.cwNext.hidden = left <= 0;
+    dom.cwPlay.hidden = left > 0;
+    if (left > 0) dom.cwNext.textContent = t('cw.next', { time: ltr(formatCountdown(left)) });
+    else stopCrosswordTicker();
+  }
+
+  /** "Play the new crossword": the server's date decides whether a new one has started. */
+  async function onCrosswordPlayNew() {
+    if (!crossword || state.screen !== 'crossword' || dom.cwPlay.disabled) return;
+    clearMessage(dom.cwResultMsg);
+    dom.cwPlay.disabled = true;
+    dom.cwPlay.textContent = t('common.loading');
+    try {
+      const puzzle = await fetchCrossword();
+      if (state.screen !== 'crossword') return;
+      if (puzzle.date === crossword.date) { // this device's clock ran ahead of the server's day
+        crossword.nextAt = puzzle.nextAt;
+        saveCrossword();
+        renderCrossword();
+        startCrosswordTicker();
+        return;
+      }
+      openCrossword(puzzle);
+    } catch (err) {
+      showMessage(dom.cwResultMsg, () => crosswordErrorText(err, 'cw.newFailed'), 'error');
+    } finally {
+      dom.cwPlay.disabled = false;
+      dom.cwPlay.textContent = t('cw.playNew');
+    }
+  }
+
+  /**
+   * A reload while the crossword screen was open (US-58): the same day's puzzle or result comes back.
+   * A save from a day that is over goes to setup; the button then loads today's puzzle.
+   */
+  function restoreSavedCrossword() {
+    const saved = loadCrossword();
+    if (!saved || !saved.onScreen) return false;
+    crossword = saved;
+    if (Date.now() >= saved.nextAt) {
+      crossword.onScreen = false;
+      saveCrossword();
+      return false;
+    }
+    try {
+      showCrossword();
+      return true;
+    } catch (err) {
+      stopCrosswordTicker();
+      crossword = null;
+      saveCrossword();
+      return false;
+    }
+  }
+
+  function bindCrosswordEvents() {
+    dom.crosswordOpenBtn.addEventListener('click', onCrosswordOpen);
+    dom.cwBack.addEventListener('click', onCrosswordBack);
+    dom.cwGrid.addEventListener('click', onCwGridClick);
+    dom.cwClues.addEventListener('click', onCwClueClick);
+    dom.cwCheck.addEventListener('click', onCwCheck);
+    dom.cwReveal.addEventListener('click', onCwReveal);
+    dom.cwBarLang.addEventListener('click', onCwLangToggle);
+    dom.cwShare.addEventListener('click', onCrosswordShare);
+    dom.cwPlay.addEventListener('click', onCrosswordPlayNew);
+    dom.cwInput.addEventListener('input', onCwInput);
+    dom.cwInput.addEventListener('focus', () => { cwTyping = true; });
+    dom.cwInput.addEventListener('blur', () => {
+      // a tool button takes the focus for a moment; anything else ends the typing
+      window.setTimeout(() => {
+        const active = document.activeElement;
+        cwTyping = active === dom.cwInput || active === dom.cwCheck || active === dom.cwReveal || active === dom.cwBarLang;
+      }, 0);
+    });
   }
 
   // ---------- Final round: Golden Goal (US-44, D-48, D-50, D-51) ----------
@@ -5170,6 +6028,8 @@
       renderDailyTexts();
       if (dailyTicker !== null) tickDailyCountdown();
       else if (!dom.dailyPlay.hidden) dom.dailyNext.textContent = t('daily.ready');
+    } else if (state.screen === 'crossword' && crossword) {
+      renderCrossword(); // progress, the toggled clues and the timer stay (US-58)
     }
   }
 
@@ -5280,6 +6140,7 @@
     dom.newGameBtn.addEventListener('click', newGame);
     bindStreakEvents();
     bindDailyEvents();
+    bindCrosswordEvents();
     bindReportEvents();
     bindFinalEvents();
     dom.uiLangBtns.forEach((btn) => btn.addEventListener('click', onUiLangClick)); // US-49
@@ -5340,6 +6201,7 @@
         saveStreak();
       }
     }
+    if (!INTEGRATION && restoreSavedCrossword()) return;
     if (!INTEGRATION && restoreSavedDaily()) return;
     startSetup();
   }

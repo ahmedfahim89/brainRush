@@ -10,6 +10,7 @@
 - Each player or team has 3 helpers per game: 3 choices, Swap (a random new question) and Skip (lose only half the points).
 - Playing alone, the Streak Challenge asks multiple-choice questions from every category until a wrong answer or time's up ends the run (the player earns a second chance after 5 correct answers and another after 10 more, 2 at most per run; using one restarts the count); the longest streaks go on a shared top-10 leaderboard under the challenger name the player enters, for this week (Monday to Sunday, UTC) and of all time.
 - The Daily Challenge gives everyone the same 3 multiple-choice questions each day (a new set at midnight UTC); the result, such as "Mokh Rush Daily #12: 2/3" with a row of green and red squares, can be shared, as can the final standings of a board game.
+- The Daily Crossword gives everyone the same small crossword each day (6 to 10 words, English letters, a new one at midnight UTC): the clues are Mokh Rush questions and the words their answers; the solve time and hints, such as "Mokh Rush Crossword #12: solved in 4:05 with 2 hints", can be shared.
 - Many questions are in Arabic and English, and some show a picture, such as a flag or a famous place.
 - The game itself can be shown in English or Arabic (right to left) with the EN / AR switch in its header; the choice is saved on the device.
 - A wrong or unclear question can be reported from the game with the Report button on the question screen (in the Streak Challenge and the Daily Challenge, once the question is answered).
@@ -21,7 +22,7 @@ This file lists no questions or answers, on purpose.
 ## Play
 
 - [Play Mokh Rush](https://brainrush.integration.ninja/): set up players or teams, pick categories and start a game
-- [How to play](https://brainrush.integration.ninja/how-to-play.html): player guide covering setup, the board, answering, scoring, helpers, ending the game, the Golden Goal tiebreaker, the Streak Challenge and the Daily Challenge
+- [How to play](https://brainrush.integration.ninja/how-to-play.html): player guide covering setup, the board, answering, scoring, helpers, ending the game, the Golden Goal tiebreaker, the Streak Challenge, the Daily Challenge and the Daily Crossword
 
 ## Optional
 

@@ -515,6 +515,8 @@ body[data-screen="board"] .site-footer, body[data-screen="question"] .site-foote
 /* Mode toggle with the Streak Challenge buttons beside it; they wrap under it on narrow screens */
 .mode-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0.3rem 0 0.2rem; }
 .mode-row .mode-toggle { margin: 0; }
+/* Streak, Daily Challenge and Daily Crossword wrap as one group (BUG-58-01) */
+.mode-extras { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .mode-toggle { display: inline-flex; margin: 0.3rem 0 0.2rem; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
 .mode-option { position: relative; margin: 0; font-size: 1rem; color: var(--text); }
 .mode-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
@@ -1377,6 +1379,168 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 .daily-next { margin: 1rem 0 0; font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .daily .msg { text-align: left; }
 .daily #daily-play { margin-top: 0.6rem; }
+
+/* ---------- Daily Crossword (US-58, D-72) ---------- */
+/* game.js sets --cw-cols / --cw-rows on the section. A cell is as big as the screen allows: at
+   1366 x 768 (D-30) a 13 x 13 grid, the active clue and the tools fit without page scrolling, and
+   the clue lists scroll inside their panel. Phones: one column, the grid as wide as the screen. */
+.crossword {
+  --cw-gap: 2px;
+  --cw-side: 3.2rem; /* the page's side padding plus the grid's frame */
+  --cw-cell: clamp(1.4rem, min(calc((100vw - 28rem) / var(--cw-cols, 13)), calc((100vh - 20.5rem) / var(--cw-rows, 13))), 2.9rem);
+  max-width: 68rem;
+  margin: 0 auto;
+}
+@supports (height: 100dvh) {
+  .crossword { --cw-cell: clamp(1.4rem, min(calc((100vw - 28rem) / var(--cw-cols, 13)), calc((100dvh - 20.5rem) / var(--cw-rows, 13))), 2.9rem); }
+}
+body[data-screen="crossword"] .site-footer { display: none; }
+.cw-head { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 1rem; margin: 0 0 0.5rem; }
+.cw-head h2 { flex: 1 1 auto; margin: 0; }
+.cw-head h2:focus { outline: none; }
+.cw-stats { display: flex; align-items: baseline; gap: 0.8rem; margin: 0; font-variant-numeric: tabular-nums; }
+.cw-timer { color: var(--gold); font-size: 1.3rem; font-weight: 800; }
+.cw-hints { color: var(--muted); font-size: 0.9rem; }
+.cw-layout { display: grid; grid-template-columns: auto minmax(16rem, 1fr); gap: 0.5rem 1.5rem; align-items: start; }
+.cw-play { width: calc(var(--cw-cols, 13) * (var(--cw-cell) + var(--cw-gap)) + var(--cw-gap)); min-width: 18rem; max-width: 100%; }
+
+/* Active clue, across the whole width: number, direction and category, then the clue and its EN/AR toggle */
+.cw-bar {
+  grid-column: 1 / -1;
+  min-height: 3.4rem;
+  margin: 0;
+  padding: 0.35rem 0.7rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-inline-start: 4px solid var(--gold);
+  border-radius: var(--radius);
+}
+.cw-bar-label { margin: 0; color: var(--muted); font-size: 0.85rem; font-weight: 600; }
+.cw-bar-clue { margin: 0.1rem 0 0; line-height: 1.35; overflow-wrap: anywhere; }
+.cw-bar-lang { margin-inline-start: 0.3rem; }
+
+/* The grid: white word cells on a dark frame; always left to right (dir="ltr" in the page) */
+.cw-board { position: relative; width: max-content; max-width: 100%; margin: 0 auto; }
+.cw-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cw-cols, 13), var(--cw-cell));
+  grid-auto-rows: var(--cw-cell);
+  gap: var(--cw-gap);
+  padding: var(--cw-gap);
+  background: var(--border);
+  border-radius: 4px;
+}
+.cw-block { background: var(--bg); }
+.cw-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0b1026;
+  background: #ffffff;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.cw-num { position: absolute; top: 1px; left: 2px; font-size: calc(var(--cw-cell) * 0.3); font-weight: 600; line-height: 1; }
+.cw-letter { padding-top: 10%; font-size: calc(var(--cw-cell) * 0.56); font-weight: 700; line-height: 1; }
+.cw-cell.is-word { background: #ffe9a3; }
+.cw-cell.is-current { background: var(--gold); box-shadow: inset 0 0 0 2px #0b1026; }
+.cw-board:focus-within .cw-cell.is-current { box-shadow: inset 0 0 0 3px #0b1026; }
+/* Check word: a wrong letter is dark red and struck through (not by colour alone) */
+.cw-cell.is-wrong .cw-letter { color: #a30000; }
+.cw-cell.is-wrong::after {
+  content: "";
+  position: absolute;
+  inset: 18%;
+  background: linear-gradient(to top right, transparent calc(50% - 1px), #a30000 calc(50% - 1px), #a30000 calc(50% + 1px), transparent calc(50% + 1px));
+  pointer-events: none;
+}
+/* Reveal letter: dark blue letter and a corner flag */
+.cw-cell.is-revealed .cw-letter { color: #1e3a8a; }
+.cw-cell.is-revealed::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  border-style: solid;
+  border-width: 0 calc(var(--cw-cell) * 0.3) calc(var(--cw-cell) * 0.3) 0;
+  border-color: transparent #1e3a8a transparent transparent;
+}
+/* Takes the typing (and keeps the phone keyboard open); invisible, on the current cell */
+.cw-input {
+  position: absolute;
+  top: calc(var(--cw-gap) + var(--cw-r, 0) * (var(--cw-cell) + var(--cw-gap)));
+  left: calc(var(--cw-gap) + var(--cw-c, 0) * (var(--cw-cell) + var(--cw-gap)));
+  width: var(--cw-cell);
+  height: var(--cw-cell);
+  padding: 0;
+  font-size: 16px; /* iOS zooms into smaller inputs */
+  color: transparent;
+  caret-color: transparent;
+  background: transparent;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.cw-tools { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-top: 0.5rem; }
+.cw-msg { min-height: 1.4em; margin: 0.35rem 0 0; color: var(--muted); text-align: center; }
+.cw-msg.is-bad { color: #ffb3b3; }
+
+/* Clue lists: "3. clue text (5)", the active clue highlighted; they scroll inside the panel */
+.cw-clues {
+  position: relative; /* offsetTop of a clue is measured from here */
+  max-height: calc(100vh - 15rem);
+  overflow-y: auto;
+  padding: 0.5rem 0.7rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.cw-clues h3 { margin: 0.2rem 0 0.3rem; color: var(--gold); }
+.cw-clue-list { margin: 0 0 0.6rem; padding: 0; list-style: none; }
+.cw-clue-btn {
+  display: block;
+  width: 100%;
+  padding: 0.3rem 0.5rem;
+  color: var(--text);
+  font: inherit;
+  line-height: 1.35;
+  text-align: start;
+  background: transparent;
+  border: 0;
+  border-inline-start: 3px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+@media (hover: hover) { .cw-clue-btn:hover { background: var(--panel-2); } }
+.cw-clue-btn:focus-visible { outline: none; box-shadow: var(--focus); }
+.cw-clue.is-active .cw-clue-btn { background: var(--panel-2); border-inline-start-color: var(--gold); }
+.cw-clue-n { color: var(--gold); font-weight: 700; }
+.cw-clue-len { color: var(--muted); }
+
+/* Solved: the result on top, the finished grid read-only below */
+.cw-result { margin: 0 0 1rem; padding: 0.6rem 0.8rem 0.9rem; text-align: center; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); }
+.cw-result:focus, #cw-solved:focus { outline: none; }
+.cw-result .actions { justify-content: center; }
+.cw-result .msg { text-align: start; }
+.cw-hints-line { margin: 0 0 0.3rem; }
+.cw-result #cw-play { margin-top: 0.6rem; }
+.crossword.is-done .cw-bar, .crossword.is-done .cw-tools, .crossword.is-done .cw-msg, .crossword.is-done .cw-input { display: none; }
+.crossword.is-done .cw-cell, .crossword.is-done .cw-clue-btn { cursor: default; }
+
+@media (max-width: 760px) {
+  .cw-layout { grid-template-columns: minmax(0, 1fr); }
+  .crossword { --cw-cell: min(2.6rem, calc((100vw - var(--cw-side) - (var(--cw-cols, 13) + 1) * var(--cw-gap)) / var(--cw-cols, 13))); }
+  .cw-play { width: auto; min-width: 0; }
+  .cw-clues { max-height: none; overflow: visible; }
+}
+@media (max-width: 600px) {
+  .crossword { --cw-side: 1.6rem; }
+  .cw-tools .btn { flex: 1 1 0; min-height: 48px; }
+  .cw-clue-btn { min-height: 44px; }
+}
 
 /* Ads (D-41): AdSense banner under the Streak leaderboard buttons, well apart from them so it is never
    clicked by mistake. No reserved height: nothing sits below it, so a late ad moves nothing (D-30). */

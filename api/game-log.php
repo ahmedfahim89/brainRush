@@ -1,23 +1,27 @@
 <?php
-// POST /api/game-log.php  body { mode: 'players'|'teams'|'streak'|'integration', players: [name, ...], categories: [id, ...] } -> 201 { logged: true }
+// POST /api/game-log.php  body { mode: 'players'|'teams'|'streak'|'integration'|'crossword', players: [name, ...], categories: [id, ...] } -> 201 { logged: true }
 // mode is optional and defaults to 'players'; players holds the player or team names.
 // A Streak Challenge run (US-33) sends mode 'streak', one name (the challenger name) and no categories
 // (its questions come from every category). An Integration Quiz run (integration-quiz.html) sends
-// mode 'integration' the same way; its questions have no category.
+// mode 'integration' the same way; its questions have no category. A Daily Crossword (US-58) sends mode
+// 'crossword' once per device per day, on the first letter, with no name and no categories (players is not read).
 // Appends one line per started game to that day's log file, logs/game-YYYY-MM-DD.log:
 //   <YYYY-MM-DD HH:MM, server time> | players: <name>, <name> | categories: <name>, <name>
 //   <YYYY-MM-DD HH:MM, server time> | teams: <name>, <name> | categories: <name>, <name>
 //   <YYYY-MM-DD HH:MM, server time> | streak: <name> | categories: all
 //   <YYYY-MM-DD HH:MM, server time> | integration: <name> | categories: Integration Quiz
+//   <YYYY-MM-DD HH:MM, server time> | crossword: - | categories: all
 // Category names come from the database, so the log never holds client-made category text. The
 // built-in Kilo Meshakkal column (US-53 / D-53) is MIX_ID (-1) and is logged as MIX_NAME (both in db.php).
 // Public on purpose (every game start calls it); read_json_body() forces a CORS preflight.
 require_once __DIR__ . '/db.php';
 
 const GAME_LOG_DIR = __DIR__ . '/../logs';
-const GAME_LOG_MAX_BY_MODE = ['players' => 6, 'teams' => 4, 'streak' => 1, 'integration' => 1]; // MODES limits in js/game.js
+const GAME_LOG_MAX_BY_MODE = ['players' => 6, 'teams' => 4, 'streak' => 1, 'integration' => 1, 'crossword' => 1]; // MODES limits in js/game.js
 // The solo modes: exactly 1 name, no categories sent, and what the line logs as its categories.
-const GAME_LOG_SOLO_CATEGORIES = ['streak' => ['all'], 'integration' => ['Integration Quiz']];
+const GAME_LOG_SOLO_CATEGORIES = ['streak' => ['all'], 'integration' => ['Integration Quiz'], 'crossword' => ['all']];
+// Modes logged without a name (the Daily Crossword, US-58, D-72 o): the line shows "-".
+const GAME_LOG_NO_NAME = ['crossword'];
 const GAME_LOG_NAME_MAX = 30;      // NAME_MAX in js/game.js (D-22); also the challenger name
 const GAME_LOG_MAX_CATEGORIES = 10; // categories_per_game upper bound
 
@@ -89,7 +93,7 @@ switch ($_SERVER['REQUEST_METHOD']) {
     case 'POST':
         $body = read_json_body();
         $mode = read_mode($body['mode'] ?? null);
-        $players = read_players($body['players'] ?? null, $mode);
+        $players = in_array($mode, GAME_LOG_NO_NAME, true) ? ['-'] : read_players($body['players'] ?? null, $mode);
         // A streak plays every category and the Integration Quiz its own questions, so they send none.
         $categories = GAME_LOG_SOLO_CATEGORIES[$mode] ?? read_category_names(db(), $body['categories'] ?? null);
 
