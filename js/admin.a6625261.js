@@ -82,6 +82,7 @@
     settingStartHidden: byId('setting-start-hidden'),
     settingHelpersEnabled: byId('setting-helpers-enabled'),
     settingFinalRound: byId('setting-final-round'),
+    settingCrossword: byId('setting-crossword'), // US-58
     settingAdsEnabled: byId('setting-ads-enabled'),
     settingAdsClient: byId('setting-ads-client'),
     settingAdsSlot: byId('setting-ads-slot'),
@@ -405,6 +406,7 @@
     dom.settingStartHidden.checked = settings.start_game_hidden === 1;
     dom.settingHelpersEnabled.checked = settings.helpers_enabled !== 0; // a missing row means on
     dom.settingFinalRound.checked = settings.final_round_enabled === 1; // US-44: a missing row means off
+    dom.settingCrossword.checked = settings.crossword_enabled === 1; // US-58: a missing row means off
     dom.settingBannerText.value = typeof settings.banner_text === 'string' ? settings.banner_text : BANNER_DEFAULT;
     dom.settingAdsEnabled.checked = settings.ads_enabled === 1; // a missing row means off
     // CHRISTMAS (US-55): a missing row means off / empty greeting
@@ -459,6 +461,7 @@
         start_game_hidden: dom.settingStartHidden.checked ? 1 : 0,
         helpers_enabled: dom.settingHelpersEnabled.checked ? 1 : 0,
         final_round_enabled: dom.settingFinalRound.checked ? 1 : 0,
+        crossword_enabled: dom.settingCrossword.checked ? 1 : 0, // US-58
         ads_enabled: adsEnabled ? 1 : 0,
         ads_client: adsClient,
         ads_slot: adsSlot,
