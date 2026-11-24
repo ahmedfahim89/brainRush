@@ -51,6 +51,7 @@ How to read the tables:
 | Wake word | | Word that wakes a voice assistant | 2026-10-19 | general-genz-ai-egyptians-review.md |
 | Computer vision | 500 | Field of AI that teaches computers to understand photos and video (self-driving cars spotting people and road signs) | 2026-11-01 | auto-2026-11-01-review.md |
 | A cyborg | 400 | Being that is part human and part machine ("cybernetic organism") | 2026-11-11 | auto-2026-11-11-2-review.md |
+| The Mitchells vs. the Machines | 600 | 2021 animated film where the AI assistant PAL turns home robots on humans (owner asked for an easier question) | 2026-11-24 | auto-2026-11-24-review.md |
 
 Unknown: the owner removed 19 AI suggestions on 2026-10-19 (all 5 at 500), and only the ones above are still named. The owner's ai-2 feedback also rules out whole types: film robots, product feature names, viral incidents, model or version trivia and country-policy news.
 
