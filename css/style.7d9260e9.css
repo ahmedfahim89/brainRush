@@ -1772,7 +1772,15 @@ body[data-screen="crossword"] .site-footer { display: none; }
      (Android guideline). The board cells keep their size, so the board still fits 375x812 (D-30).
      Header links: vertical padding on an inline link enlarges the tap area without moving anything.
      Text links inside a sentence (the setup intro) are exempt, as WCAG 2.5.8 allows. */
-  .page-header .nav-link { padding: 0.8rem 0.15rem; }
+  /* FU-99: the links used to be inline with 0.8rem padding, so when they wrapped to a second line the
+     tap areas of the two lines overlapped ("How to play" over "Admin" at 320px). Now each link is a
+     real 48px box in a wrapping row, so wrapped rows sit 48px apart; the negative block margin keeps a
+     single row as tall in the layout as before (the tap area reaches into the header padding). */
+  .page-header nav { display: flex; flex-wrap: wrap; align-items: center; column-gap: 0.3em; margin-block: -0.8rem; }
+  .page-header .nav-link { display: inline-flex; align-items: center; min-height: 48px; padding: 0 0.15rem; }
+  /* Below 361px slightly smaller link text keeps the game page's four links on one line (Arabic needs
+     about 320px at 17px, about 264px at 14px, of the 289px available at 320px), so the board keeps its room (D-30). */
+  @media (max-width: 360px) { .page-header nav { font-size: 0.875rem; } }
   .site-footer nav a { min-height: 48px; padding: 0.8rem 0.3rem; } /* footer links (US-41): same 48px rule */
   .game .btn, .game input[type="text"], .game input[type="number"] { min-height: 48px; }
   .mode-option > span { padding-top: 0.7rem; padding-bottom: 0.7rem; }
