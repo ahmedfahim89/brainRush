@@ -769,3 +769,35 @@ US-56 Challenge a friend (Should, M: new `challenges` table and API) is in `docs
 - **Outcome:** accepted by the PO on 2026-11-17 (D-70). Follow-ups FU-83..FU-86 in `docs/product-backlog.md`.
 - **CR hearts (owner, 2026-11-17, D-71):** the held count text replaced by 2 heart slots (red = held, gray = not earned or used) with a pop on earn and a break on use. Branch `chance-hearts` (uncommitted). Test 58 PASS / 0 FAIL; PO accepted 2026-11-17 (D-71 f).
 - **Status:** US-57 merged to `main` (PR #125) and live (verified 2026-11-17). **CR hearts accepted, awaiting the owner's local test** (FU-83), then commit and PR, then live deploy (FU-85): client-only, so upload the new hashed `js/` and `css/` files and every HTML page that references them.
+
+## Change request "Speed Round" (US-59, Epic E20) — outside the sprint cycle, 2026-11-25
+
+**Goal:** a new solo mode where speed matters: one clock for the whole run (45 s at the start, D-73 aa; at most 60 s), a correct answer is a point and adds time by how fast it came (+5 / +3 / +2 / +1 s), a wrong answer costs 3 s, the run ends at 0 (D-73). Personal best on the device only; no leaderboard, no new table, no migration. Questions reuse `POST api/questions.php?streak=1` (no API change there). Admin switch `speed_enabled` (missing row = off). Client changes in `game.js`, `i18n.js`, `admin.js`, `index.html`, `admin.html`, `style.css`, guide, privacy, README and `llms.txt`; server changes in `api/settings.php` and `api/game-log.php` (mode `speed`). Branch `speed-round` (uncommitted). Dev note: `docs/sprints/us-59-dev.md`. Plan approved by the owner 2026-11-25.
+
+- **Story:** US-59 (Should, M).
+- **Pipeline:** game-developer (done 2026-11-25), then game-tester (at most 2 fix loops), PO acceptance, scrum-master; then the owner's local Chrome test on :8000 before the commit.
+- **Status:** Built, tested (one fix loop), PO-accepted with follow-ups 2026-11-25 (D-73 s to x). **Awaiting the owner's local Chrome test and commit (FU-98).** Not committed.
+- **Test:** `docs/sprints/us-59-test-report.md`: 82 PASS, 0 FAIL, 6 PENDING (environment: phone, Android app, screen reader, live site, Python gate scripts, 320 px check). Fix loop 1: BUG-59-03 and BUG-59-02 fixed and re-tested; BUG-59-04 applied; BUG-59-01 kept as built (D-73 s). No Critical or Major bugs.
+- **Outcome:** story accepted; no carry-over into the sprint cycle. Known issues: the "+N s" float shows the tier value at the 60 s cap (owner may ask for the real gain after the local test); 14 PASS rows are code-only and M1/M3 are partial runs (accepted, D-73 v).
+
+**Follow-ups (`docs/product-backlog.md`, "Follow-ups after US-59"):**
+
+| ID | Item | Priority | Owner |
+|---|---|---|---|
+| FU-91 | Native review of the Arabic `speed.*` strings | Should | Owner / Arabic speaker |
+| FU-92 | Android Back device check | Should | Owner |
+| FU-93 | Phone share sheet check | Should | Owner |
+| FU-94 | Screen reader check (NVDA / TalkBack) | Could | Owner / Tester |
+| FU-95 | Hosted deploy and live check after the merge | Must | Owner |
+| FU-96 | Run gate scripts on a machine with Python | Should | Developer / Tester |
+| FU-97 | Streak failure lines: sentence break; separate small change, not in the `speed-round` commit (D-73 w) | Could | Developer |
+| FU-98 | Local Chrome check and commit | Must | Owner |
+| FU-99 | Header nav overlap at 320 px (predates US-59, D-73 x) | Could | Developer |
+
+**Definition of Done items still open:**
+1. ~~Test report and PO acceptance~~ Done 2026-11-25.
+2. Owner local Chrome test (FU-98): tick Speed Round in Admin, play runs, hide the tab, reload mid-run, check EN and AR, 375 px and reduced motion; then tune the numbers in the constants block if wanted.
+3. Commit (FU-98): `git add docs/sprints/us-59-*.md` first, then the changed files (the hash hook renames the changed js/css and updates every page). Leave out `package*.json`, `.claude/launch.json`, `googlebbe9a71d60b82d1a.html` and `InternalUse/`.
+4. Live deploy (FU-95), **no migration**: upload the changed `api/` (`settings.php`, `game-log.php`), the re-hashed `js/` and `css/` files and every HTML page that references them, then **tick "Speed Round" in live Admin and save**. Delete old js/css only after the pages are up, then purge the CDN cache (`docs/deploy-hostinger.md`, section 8). Native review of the Arabic strings (FU-91).
+
+---

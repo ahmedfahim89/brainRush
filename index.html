@@ -48,11 +48,11 @@
   <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="css/style.e9159325.css">
+  <link rel="stylesheet" href="css/style.9b8d3ebb.css">
   <!-- CHRISTMAS (US-55, D-66): seasonal theme, only active under body.theme-christmas; remove after Christmas -->
   <link rel="stylesheet" href="css/christmas.717dbe43.css">
   <!-- Interface language (US-49): loaded first, so an Arabic page is right to left from its first paint -->
-  <script src="js/i18n.a7643303.js"></script>
+  <script src="js/i18n.b0de0bd3.js"></script>
 </head>
 <body class="game">
   <!-- CHRISTMAS (US-55, D-66): first in <body> so the last known theme is applied before the first paint; remove after Christmas -->
@@ -90,6 +90,28 @@
       <div class="chance-actions">
         <button type="button" id="chance-use" class="btn btn-primary btn-large" data-i18n="streak.secondChance">Use second chance</button>
         <button type="button" id="chance-end" class="btn btn-large" data-i18n="run.seeResults">See results</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Speed Round (US-59, D-73): one opaque card over the question screen, so the question is never seen
+       early. It shows the first-run rules (once per device), the 3-2-1 countdown, or "Paused" while the
+       run waits for a tap (hidden tab, page reload). game.js shows one part at a time. -->
+  <div id="speed-overlay" class="double-overlay speed-overlay" role="dialog" aria-modal="true" aria-labelledby="speed-overlay-title" hidden>
+    <div class="double-card speed-card">
+      <p id="speed-overlay-title" class="double-title speed-card-title" data-i18n="speed.name">Speed Round</p>
+      <div id="speed-intro" hidden>
+        <ul class="speed-rules">
+          <li data-i18n="speed.rule1">Answer fast to earn time</li>
+          <li id="speed-rule2">Wrong costs 3 s</li>
+          <li data-i18n="speed.rule3">Every correct answer is a point</li>
+        </ul>
+        <button type="button" id="speed-go" class="btn btn-primary btn-large" data-i18n="speed.go">Start</button>
+      </div>
+      <p id="speed-count" class="speed-count" aria-live="polite" hidden></p>
+      <div id="speed-paused" hidden>
+        <p class="speed-paused-text" data-i18n="speed.paused">Paused</p>
+        <button type="button" id="speed-resume" class="btn btn-primary btn-large" data-i18n="speed.resume">Tap to resume</button>
       </div>
     </div>
   </div>
@@ -165,6 +187,8 @@
             <button type="button" id="daily-open-btn" class="btn btn-daily" hidden><span aria-hidden="true">📅</span> <span id="daily-open-label" data-i18n="daily.name">Daily Challenge</span></button>
             <!-- Daily Crossword (US-58, D-72): shown when the admin turned it on (crossword_enabled) -->
             <button type="button" id="crossword-open-btn" class="btn btn-daily" hidden><span aria-hidden="true">&#9638;</span> <span id="crossword-open-label" data-i18n="cw.name">Daily Crossword</span></button>
+            <!-- Speed Round (US-59, D-73): shown when the admin turned it on (speed_enabled); one tap starts a run -->
+            <button type="button" id="speed-open-btn" class="btn btn-daily btn-speed" hidden><span aria-hidden="true">&#9889;</span> <span id="speed-open-label" data-i18n="speed.name">Speed Round</span></button>
             </div>
           </div>
           <p class="hint" data-i18n="setup.colorHint">Click a color circle to switch to the next free color.</p>
@@ -280,6 +304,8 @@
               <button type="button" id="timer-reset" class="btn" data-i18n="timer.reset">Reset</button>
             </div>
             <p id="timer-status" class="timer-status" aria-live="polite"></p>
+            <!-- Speed Round (US-59): the "+5 s" / "−3 s" that floats by the clock (the feedback line announces it) -->
+            <span id="speed-delta" class="speed-delta" aria-hidden="true" hidden></span>
           </div>
 
           <div class="answer-block">
@@ -407,6 +433,20 @@
       <button type="button" id="daily-play" class="btn btn-primary btn-large" hidden data-i18n="daily.playNew">Play the new challenge</button>
     </section>
 
+    <!-- Speed Round result (US-59, D-73): the score, the personal best of this device, Play again (a new run with the countdown only), Share and New Game -->
+    <section id="screen-speed" class="screen daily speed-result" aria-labelledby="speed-title" hidden>
+      <h2 id="speed-title" tabindex="-1" data-i18n="speed.name">Speed Round</h2>
+      <p class="speed-score-line"><span id="speed-score" class="speed-score"></span> <span id="speed-score-label" class="speed-score-label"></span></p>
+      <p id="speed-best" class="speed-best"></p>
+      <div class="actions start-row">
+        <button type="button" id="speed-again" class="btn btn-primary btn-large" data-i18n="lb.again">Play again</button>
+        <button type="button" id="speed-share" class="btn btn-large" data-i18n="common.share">Share</button>
+        <button type="button" id="speed-new-game" class="btn btn-large" data-i18n="common.newGame">New Game</button>
+        <span id="speed-share-status" class="share-status" role="status"></span>
+      </div>
+      <div id="speed-msg" class="msg" role="alert" hidden></div>
+    </section>
+
     <!-- Daily Crossword (US-58, D-72): today's grid (the same for everyone, UTC day), the clues and the
          tools; once solved, the result with Share and the countdown. game.js draws the grid, the clues
          and every text set at run time. The grid is always left to right, also in Arabic. -->
@@ -468,6 +508,6 @@
   <script src="js/share.4fcf5fb3.js"></script>
   <!-- Read aloud (US-48): loaded before game.js, which uses it -->
   <script src="js/speech.019a1850.js"></script>
-  <script src="js/game.3d7ac9bd.js"></script>
+  <script src="js/game.404c3ea1.js"></script>
 </body>
 </html>

@@ -17,7 +17,7 @@
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0b1026">
-  <link rel="stylesheet" href="css/style.e9159325.css">
+  <link rel="stylesheet" href="css/style.9b8d3ebb.css">
   <link rel="stylesheet" href="css/guide.70c9a392.css">
 </head>
 <body class="guide">
@@ -46,6 +46,7 @@
         <li><a href="#streak">💀 Sudden Death Streak (solo)</a></li>
         <li><a href="#daily">📅 Daily Challenge</a></li>
         <li><a href="#crossword"><span aria-hidden="true">&#9638;</span> Daily Crossword</a></li>
+        <li><a href="#speed">Speed Round (solo)</a></li>
         <li><a href="#tips">Tips and questions</a></li>
       </ol>
     </nav>
@@ -267,6 +268,22 @@
         <li><strong>Check word</strong> marks the wrong letters of the active word in red. It is free. <strong>Reveal letter</strong> fills in one right letter and counts as a hint. You get 3 hints per crossword; after the third, the button disappears. Revealing a letter that is already right costs no hint.</li>
         <li>The timer starts with your first letter and keeps running while you are away. The crossword ends by itself when every letter is right: you see your time, such as <strong>Solved in 4:05</strong>, and your hints. <strong>Share</strong> sends "Mokh Rush Crossword #12: solved in 4:05 with 2 hints" to your friends (or copies it on a computer).</li>
         <li>Your progress is kept on your device, so you can leave with <strong>Back</strong> or close the page and carry on later the same day. Once solved, opening it again shows your result and a countdown to the next crossword. Nothing about you is saved on our server.</li>
+      </ul>
+    </section>
+
+    <!-- US-59 / D-73: Speed Round -->
+    <section id="speed" class="guide-section">
+      <h2>Speed Round (solo)</h2>
+      <p>A race against the clock: the faster you answer, the longer you keep playing.</p>
+      <ul>
+        <li>Click <strong>Speed Round</strong> next to the Daily Challenge button on the setup screen (when the site has it turned on). It starts at once: no name, no setup. The first time, a short card shows the rules; after that, just a <strong>3, 2, 1</strong> countdown with race-start beeps.</li>
+        <li>There is <strong>one clock for the whole run</strong>. It starts at <strong>45 seconds</strong> and never holds more than <strong>60 seconds</strong>. The run ends when it reaches 0.</li>
+        <li>Each question shows <strong>3 answers</strong>. Every correct answer is <strong>1 point</strong> and adds time: <strong>+5 s</strong> if you answered in 2 seconds or less, <strong>+3 s</strong> in 4 seconds or less, <strong>+2 s</strong> in 6 seconds or less, and <strong>+1 s</strong> if you were slower.</li>
+        <li>A <strong>wrong answer</strong> takes <strong>3 seconds</strong> off and shows the right answer for a moment. Your score stays and the run goes on.</li>
+        <li>The timing is fair: the clock only runs while the question is on screen (a picture question starts once its picture has loaded), and it stops while the right answer or your "+5 s" shows. The clock turns red under 10 seconds.</li>
+        <li>Switch to another tab or app and the run <strong>pauses</strong>: tap <strong>Tap to resume</strong> to go on. Refreshing the page keeps your run and the time that was left. <strong>End run</strong> stops early.</li>
+        <li>At the end you see your score and your <strong>personal best</strong> ("New personal best!" or how far you are from it). <strong>Play again</strong> starts a new run in one tap, and <strong>Share</strong> sends your score, such as "Mokh Rush Speed Round: 18 correct".</li>
+        <li>Questions come from every category, picked at random; a question never comes up twice in the same run. Your best is kept on your device only; there is no leaderboard and nothing about you is saved on our server.</li>
       </ul>
     </section>
 

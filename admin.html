@@ -8,7 +8,7 @@
   <link rel="icon" href="img/mokh-favicon.svg" type="image/svg+xml">
   <link rel="icon" href="img/mokh-favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.e9159325.css">
+  <link rel="stylesheet" href="css/style.9b8d3ebb.css">
 </head>
 <body class="admin">
   <header class="page-header">
@@ -66,12 +66,24 @@
           <span>Golden Goal <span aria-hidden="true">&#9917;</span>: a tiebreaker question with bets, offered only when players are tied for first</span>
         </label>
         <p class="hint">When on, and 2 or more players are tied for first when a new game ends, End Game asks "It's a tie! Golden Goal?" ("Go for goal" or "Skip to results"). Everyone bets from 0 up to their score or the largest point value, whichever is higher. Rounds repeat while the tie lasts. With no tie, the results show as usual.</p>
+        <!-- Daily Challenge (US-43, D-74): shows or hides the Daily Challenge button on the game page -->
+        <label class="check-label" for="setting-daily">
+          <input id="setting-daily" name="daily_enabled" type="checkbox">
+          Daily Challenge
+        </label>
+        <p class="hint">When on, a "Daily Challenge" button shows on the game page: the same 3 questions for everyone each day (UTC). When off, the button is hidden; a challenge a player already started on their device can still be finished.</p>
         <!-- Daily Crossword (US-58, D-72): shows or hides the crossword button on the game page -->
         <label class="check-label" for="setting-crossword">
           <input id="setting-crossword" name="crossword_enabled" type="checkbox">
           Daily Crossword
         </label>
         <p class="hint">When on, a "Daily Crossword" button shows next to the Daily Challenge button: one small crossword a day for everyone, built from text questions at enabled point values. Run sql/migrate-add-daily-crossword.sql first.</p>
+        <!-- Speed Round (US-59, D-73): shows or hides the Speed Round button on the game page -->
+        <label class="check-label" for="setting-speed">
+          <input id="setting-speed" name="speed_enabled" type="checkbox">
+          Speed Round
+        </label>
+        <p class="hint">When on, a "Speed Round" button shows next to the Daily Challenge button: a solo race against one clock, where fast correct answers earn extra time. The personal best is kept on each device only; nothing is saved on the server.</p>
         <!-- Ads (D-41): Google AdSense banner on the Streak leaderboard screen -->
         <label class="check-label" for="setting-ads-enabled">
           <input id="setting-ads-enabled" name="ads_enabled" type="checkbox">
@@ -280,6 +292,6 @@
     </section>
   </main>
 
-  <script src="js/admin.a6625261.js"></script>
+  <script src="js/admin.a29fa091.js"></script>
 </body>
 </html>
