@@ -776,7 +776,7 @@ US-56 Challenge a friend (Should, M: new `challenges` table and API) is in `docs
 
 - **Story:** US-59 (Should, M).
 - **Pipeline:** game-developer (done 2026-11-25), then game-tester (at most 2 fix loops), PO acceptance, scrum-master; then the owner's local Chrome test on :8000 before the commit.
-- **Status:** Built, tested (one fix loop), PO-accepted with follow-ups 2026-11-25 (D-73 s to x). **Awaiting the owner's local Chrome test and commit (FU-98).** Not committed.
+- **Status:** Built, tested (one fix loop), PO-accepted with follow-ups 2026-11-25 (D-73 s to x). Owner local test with changes D-73 y to ad and D-74 (FU-98 done); commit 30cdc69, **merged via PR #146 and live 2026-11-25** (FU-95 done; Speed Round ticked in live Admin).
 - **Test:** `docs/sprints/us-59-test-report.md`: 82 PASS, 0 FAIL, 6 PENDING (environment: phone, Android app, screen reader, live site, Python gate scripts, 320 px check). Fix loop 1: BUG-59-03 and BUG-59-02 fixed and re-tested; BUG-59-04 applied; BUG-59-01 kept as built (D-73 s). No Critical or Major bugs.
 - **Outcome:** story accepted; no carry-over into the sprint cycle. Known issues: the "+N s" float shows the tier value at the 60 s cap (owner may ask for the real gain after the local test); 14 PASS rows are code-only and M1/M3 are partial runs (accepted, D-73 v).
 
@@ -796,8 +796,8 @@ US-56 Challenge a friend (Should, M: new `challenges` table and API) is in `docs
 
 **Definition of Done items still open:**
 1. ~~Test report and PO acceptance~~ Done 2026-11-25.
-2. Owner local Chrome test (FU-98): tick Speed Round in Admin, play runs, hide the tab, reload mid-run, check EN and AR, 375 px and reduced motion; then tune the numbers in the constants block if wanted.
-3. Commit (FU-98): `git add docs/sprints/us-59-*.md` first, then the changed files (the hash hook renames the changed js/css and updates every page). Leave out `package*.json`, `.claude/launch.json`, `googlebbe9a71d60b82d1a.html` and `InternalUse/`.
-4. Live deploy (FU-95), **no migration**: upload the changed `api/` (`settings.php`, `game-log.php`), the re-hashed `js/` and `css/` files and every HTML page that references them, then **tick "Speed Round" in live Admin and save**. Delete old js/css only after the pages are up, then purge the CDN cache (`docs/deploy-hostinger.md`, section 8). Native review of the Arabic strings (FU-91).
+2. ~~Owner local Chrome test (FU-98)~~ Done 2026-11-25.
+3. ~~Commit (FU-98)~~ Done 2026-11-25 (30cdc69, PR #146).
+4. ~~Live deploy (FU-95)~~ Done 2026-11-25: uploaded, Speed Round ticked in live Admin, desktop live check passed. The phone run moves to FU-93.
 
 ---
