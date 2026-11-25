@@ -86,6 +86,20 @@
   const CHANCE_MAX = 2;         // chances earned per run at most
   const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/; // "YYYY-MM-DD" from the API
   const LB_PERIODS = ['week', 'all']; // leaderboard tabs (US-45): GET streaks.php?period=
+  // The leaderboards the leaderboard screen shows (US-34, US-60): the API and the texts of each.
+  // title null = the page's own heading (the Streak's, or the Integration Quiz's).
+  const LB_BOARDS = {
+    streak: {
+      title: null, headline: 'lb.headline', none: 'lb.noStreak', saving: 'lb.saving', saveFailed: 'lb.saveFailed',
+      onlyOne: 'lb.onlyOne', empty: 'lb.empty', emptyWeek: 'lb.emptyWeek', topAll: 'lb.topAll', topWeek: 'lb.topWeek',
+      count: 'lb.questions',
+    },
+    speed: {
+      title: 'speed.leaderboard', headline: 'speed.lbHeadline', none: 'speed.noScore', saving: 'speed.lbSaving',
+      saveFailed: 'speed.lbSaveFailed', onlyOne: 'speed.lbOnlyOne', empty: 'speed.lbEmpty', emptyWeek: 'speed.lbEmptyWeek',
+      topAll: 'speed.lbTopAll', topWeek: 'speed.lbTopWeek', count: 'speed.correctCount',
+    },
+  };
   const REPORT_NOTE_MAX = 200; // REPORT_NOTE_MAX in api/reports.php (US-42, D-45)
   // Question difficulty stats (US-47, D-55): what a closed board question or an answered Streak
   // question sends to api/question-stats.php (STAT_OUTCOMES there), once per question per game.
@@ -138,9 +152,14 @@
   const SPEED_SAVE_MS = 1000;      // the time left is saved this often while the clock runs (BUG-59-03)
   const SPEED_IMAGE_WAIT_MS = 5000; // a picture that has not loaded by then: the question starts anyway
   const SPEED_KEY = 'brainrush.speed';
-  const SPEED_SEEN_KEY = 'brainrush.speed.seen'; // '1' after this device's first run: no rules card
-  const SPEED_VERSION = 1;
+  const SPEED_VERSION = 2;         // 2 (US-60): the run and its result carry the challenger name
   const SPEED_MAX_TIMES = 5000;    // a saved run never holds more answer times
+  const SPEED_API = 'speed-scores.php'; // the shared Speed leaderboard (US-60, D-76)
+  // The result's leaderboard save (US-60): 'none' (score 0, or a result from before US-60), 'pending'
+  // (not saved yet: sent now, and again after a reload), 'saved', or 'dropped' (left unsaved after a confirm).
+  const SPEED_SAVES = ['none', 'pending', 'saved', 'dropped'];
+  // The name last used in a Streak or Speed run on this device: the Speed name step is prefilled with it (US-60).
+  const CHALLENGER_KEY = 'brainrush.challengerName';
   // The solo run started last on this device ({mode, at}): with a Streak, Daily and Speed run all saved,
   // a reload brings back only that one (the others stay saved).
   const LAST_SOLO_KEY = 'brainrush.lastSolo';
@@ -241,6 +260,7 @@
   let leaderboardLoads = 0;      // drops leaderboard responses that arrive after a newer request
   let lbPeriod = 'all';          // the leaderboard tab shown (US-45), memory only
   let lastLeaderboard = null;    // the rows on screen, drawn again after a language switch (US-49)
+  let lbBoard = 'streak';        // the leaderboard on the screen: a key of LB_BOARDS (US-60), memory only
 
   // Daily Challenge (US-43), saved under DAILY_KEY on every change; null when none:
   //   { version, date, number, timerSeconds, nextAt, questions: [question], results: [boolean],
@@ -271,16 +291,20 @@
   // Speed Round (US-59), saved under SPEED_KEY on every change; null until first used:
   //   { version, best, bestAt, run, last, onResult }
   // best = this device's highest score (0 = none yet), bestAt = Date.now() ms when it was set (or null).
-  // run = null | { score, answered, times: [ms], queue: [question], usedIds: [id], statsSent: [id],
+  // run = null | { name, score, answered, times: [ms], queue: [question], usedIds: [id], statsSent: [id],
   //   lang, leftMs, deadline, started, current: null | { q, lang, picked, elapsedMs } }
+  // name = the challenger name of the leaderboard (US-60), null until the name step's Start.
   // score = right answers; times = how long each right answer took (ms, the time the question was
   // visible, pauses left out). leftMs = the clock while it is stopped; deadline = Date.now() ms when the
   // clock reaches 0 while it runs, else null (kept as a record; a reload uses leftMs, saved every second
   // while it runs, BUG-59-03). lang = the language the player last chose ('en' | 'ar' | null = Arabic first). started = the
   // countdown is over. picked = null (open), the tapped choice or STREAK_TIME_UP; elapsedMs = the time
-  // the question has been visible so far. last = the result on show ({ score, prevBest,
-  // newBest }); onResult = the result screen is open, so a reload shows it again.
+  // the question has been visible so far. last = the result on show ({ score, prevBest, newBest,
+  // name, save, saved }: save is one of SPEED_SAVES, saved = the server's { rank, best, week_rank,
+  // week_best } once saved, else null); onResult = the result screen is open, so a reload shows it again.
   let speed = null;
+  let speedSaving = false;       // the result's leaderboard POST is in flight (memory only)
+  let speedSaveError = null;     // why the last POST failed, shown with Try again (memory only: a reload sends again)
   // While the clock runs, leftMs and the open question's elapsedMs are saved every SPEED_SAVE_MS, so a
   // page that closes with no pagehide (a crash) comes back with at most that much more time than it had.
   // Memory only: 'idle' | 'intro' | 'countdown' | 'loading' | 'wait' (the question waits to be visible)
@@ -338,9 +362,14 @@
     crosswordOpenLabel: byId('crossword-open-label'),
     speedOpenBtn: byId('speed-open-btn'),     // US-59: only in index.html (stand-ins in the Integration Quiz)
     speedOpenLabel: byId('speed-open-label'),
+    speedPair: byId('speed-pair'),            // the Speed Round button and its trophy, kept on one line
     speedOverlay: byId('speed-overlay'),
-    speedIntro: byId('speed-intro'),
+    speedIntro: byId('speed-intro'),          // US-60: the name step (a form), with the rules on the first run
+    speedRules: byId('speed-rules'),
     speedRule2: byId('speed-rule2'),
+    speedNameInput: byId('speed-name'),
+    speedNameError: byId('speed-name-error'),
+    speedCancel: byId('speed-cancel'),
     speedGo: byId('speed-go'),
     speedCount: byId('speed-count'),
     speedPaused: byId('speed-paused'),
@@ -350,6 +379,9 @@
     speedScore: byId('speed-score'),
     speedScoreLabel: byId('speed-score-label'),
     speedBest: byId('speed-best'),
+    speedRank: byId('speed-rank'),            // US-60: "You are #2 this week and #7 of all time."
+    speedSaveMsg: byId('speed-save-msg'),     // US-60: the save failure with Try again
+    speedBoard: byId('speed-board'),
     speedAgain: byId('speed-again'),
     speedShare: byId('speed-share'),
     speedNewGame: byId('speed-new-game'),
@@ -512,6 +544,8 @@
     uiLangBtns: Array.prototype.slice.call(document.querySelectorAll('[data-ui-lang]')), // US-49
   };
   if (INTEGRATION) addStandIns(dom);
+  // The leaderboard heading's own text key: the Speed leaderboard swaps it and puts it back (US-60).
+  const LB_TITLE_KEY = dom.lbTitle.getAttribute('data-i18n');
 
   /**
    * Integration Quiz: the board game's elements the page leaves out become detached, hidden stand-ins,
@@ -1188,6 +1222,10 @@
     if (isApp || INTEGRATION) return; // no ads in the Android app (D-43) or the Integration Quiz
     const slot = dom.adSlots[name];
     if (!slot) return;
+    if (name === 'leaderboard' && lbBoard !== 'streak') { // US-60: the Speed leaderboard has no ad
+      slot.hidden = true;
+      return;
+    }
     const config = await loadAdConfig();
     if (!config || ads.failed || state.screen !== name) return;
     loadAdScript(config);
@@ -1279,8 +1317,8 @@
     } else if (state.screen === 'results') {
       newGame();
     } else if (state.screen === 'leaderboard') {
-      if (leaderboardResult) onLeaderboardNewGame(); // asks first if the streak was not saved
-      else onLeaderboardBack();
+      if (leaderboardResult && lbBoard === 'streak') onLeaderboardNewGame(); // asks first if the streak was not saved
+      else onLeaderboardBack();                      // US-60: the Speed board goes back to its result or setup
     } else if (state.setup && state.setup.streak) {
       onStreakCancel();
     }
@@ -1810,6 +1848,7 @@
     // Speed Round (US-59): the same rules, only when the admin turned it on (speed_enabled).
     dom.speedOpenBtn.hidden = !s || down || s.streak || !s.speedOn;
     dom.speedOpenBtn.disabled = dom.dailyOpenBtn.disabled;
+    dom.speedPair.hidden = dom.speedOpenBtn.hidden;
   }
 
   /** D-02: required, unique after trimming, case-insensitive. Marks each bad entry inline. */
@@ -3162,11 +3201,34 @@
 
   /** Challenger name: required, at most NAME_MAX characters (D-22). Marks the field inline when bad. */
   function validateStreakName() {
-    const name = cleanName(dom.streakNameInput.value);
+    return validateNameField(dom.streakNameInput, dom.streakNameError);
+  }
+
+  /** A challenger name field (Streak setup, Speed name step): the same rules and inline error. */
+  function validateNameField(input, errorNode) {
+    const name = cleanName(input.value);
     const message = !name ? () => t('streak.nameRequired')
       : name.length > NAME_MAX ? () => t('streak.nameTooLong', { max: NAME_MAX }) : '';
-    setFieldError(dom.streakNameInput, dom.streakNameError, message);
+    setFieldError(input, errorNode, message);
     return message === '';
+  }
+
+  /** The name last used in a Streak or Speed run on this device (US-60), or ''. */
+  function loadChallengerName() {
+    try {
+      const name = window.localStorage.getItem(CHALLENGER_KEY);
+      return isValidStreakName(name) ? cleanName(name) : '';
+    } catch (err) {
+      return '';
+    }
+  }
+
+  function saveChallengerName(name) {
+    try {
+      window.localStorage.setItem(CHALLENGER_KEY, name);
+    } catch (err) {
+      // storage full or disabled: the next name step is prefilled from the players instead
+    }
   }
 
   /** Start a run from the setup screen: name and timer checked like the board game's (no categories). */
@@ -3460,7 +3522,10 @@
       chances: { earned: 0, used: 0, progress: 0, earnedAt: 0 }, // US-57: none at the start, earned by right answers
     };
     lastStreakProfile = profile;
-    if (!INTEGRATION) markSoloRun('streak'); // US-59: the newest solo run is the one a reload brings back
+    if (!INTEGRATION) {
+      markSoloRun('streak'); // US-59: the newest solo run is the one a reload brings back
+      saveChallengerName(profile.name); // US-60: the Speed name step offers it next
+    }
     addToQueue(streak, questions);
     postGameLog({ mode: INTEGRATION ? 'integration' : 'streak', players: [streak.name] });
     nextStreakQuestion();
@@ -3928,10 +3993,7 @@
     if (result.saving) {
       try {
         const saved = await apiPost(STREAK_API, { name: run.name, streak: run.count });
-        if (!isPlainObject(saved) || !Number.isInteger(saved.rank) || !Number.isInteger(saved.best) ||
-            !(saved.week_rank === undefined || saved.week_rank === null || Number.isInteger(saved.week_rank))) {
-          throw textError('err.response');
-        }
+        if (!isValidRankReply(saved)) throw textError('err.response');
         result.saved = saved;
       } catch (err) {
         result.saveError = err; // shown with errorText(), in the language on screen
@@ -3967,7 +4029,10 @@
     nextStreakQuestion();
   }
 
-  // ---------- Streak leaderboard (US-34) ----------
+  // ---------- Leaderboards: Streak (US-34) and Speed Round (US-60) ----------
+  // One screen for both: lbBoard picks the API and the texts (LB_BOARDS). The Streak board after a run
+  // has Play again and New Game; the Speed board (from its result or from setup) and a board opened
+  // from setup have Back.
 
   /** "2026-10-18" -> "18 Oct 2026" (the server date of the run, not "5 days ago"); Arabic month names in Arabic. */
   function formatRunDate(date) {
@@ -3976,51 +4041,82 @@
     return t('date.format', { d: Number(parts[2]), m: months[Number(parts[1]) - 1], y: parts[0] });
   }
 
-  /** The leaderboard screen: after a run (`result`) with headline, rank, Play again and New Game; from setup (null) with Back. */
-  function openLeaderboard(result) {
+  /**
+   * The leaderboard screen of `board` ('streak' when left out): after a run (`result`) with headline and
+   * rank; from setup (null) without them. Play again and New Game only after a Streak run, else Back.
+   */
+  function openLeaderboard(result, board) {
+    lbBoard = board || 'streak';
+    leaderboardLoads += 1; // rows still on their way for the other board are dropped
     leaderboardResult = result;
     lastLeaderboard = null;
     clearMessage(dom.lbMsg);
+    renderLeaderboardTitle();
     renderLeaderboardHead(result);
     showLeaderboardLoading();
-    dom.lbAgain.hidden = !result;
-    dom.lbNew.hidden = !result;
-    dom.lbBack.hidden = !!result;
+    const afterStreak = !!result && lbBoard === 'streak';
+    dom.lbAgain.hidden = !afterStreak;
+    dom.lbNew.hidden = !afterStreak;
+    dom.lbBack.hidden = afterStreak;
     renderLeaderboardTabs();
     showScreen('leaderboard');
     dom.lbTitle.focus();
     if (!result || !result.saving) loadLeaderboardRows();
   }
 
-  /** Headline ("Ahmed Fahim: 13 in a row!") and the rank line, or the save error with Try again. */
+  /** The heading: "Streak leaderboard" (the page's own) or "Speed leaderboard"; kept through a language switch. */
+  function renderLeaderboardTitle() {
+    const key = LB_BOARDS[lbBoard].title || LB_TITLE_KEY;
+    dom.lbTitle.setAttribute('data-i18n', key);
+    dom.lbTitle.textContent = t(key);
+  }
+
+  /** Headline ("Ahmed Fahim: 13 in a row!", "Ahmed Fahim: 18 correct!") and the rank line, or the save error with Try again. */
   function renderLeaderboardHead(result) {
+    const board = LB_BOARDS[lbBoard];
+    if (result && typeof result.name !== 'string') result = null; // BUG-60-01: no name, no headline or rank
     dom.lbHeadline.hidden = !result;
     dom.lbRank.hidden = !result;
     dom.lbAgain.disabled = !!result && result.saving;
     dom.lbNew.disabled = !!result && result.saving;
     if (!result) return;
     dom.lbHeadline.textContent = result.count > 0
-      ? t('lb.headline', { name: iso(result.name), n: result.count })
-      : t('lb.noStreak');
+      ? t(board.headline, { name: iso(result.name), n: result.count, count: tn(board.count, result.count) })
+      : t(board.none);
     if (result.saving) {
-      dom.lbRank.textContent = t('lb.saving');
+      dom.lbRank.textContent = t(board.saving);
     } else if (result.saved) {
-      // US-45: both ranks, "You are #2 this week and #7 of all time."
-      const saved = result.saved;
-      const best = saved.best > result.count ? t('lb.best', { best: saved.best }) : '';
-      dom.lbRank.textContent = best + (Number.isInteger(saved.week_rank)
-        ? t('lb.rankWeek', { week: saved.week_rank, rank: saved.rank })
-        : t('lb.rank', { rank: saved.rank }));
+      dom.lbRank.textContent = rankText(result.saved, result.count);
     } else if (result.saveError) {
       dom.lbRank.hidden = true;
-      clear(dom.lbMsg);
-      dom.lbMsg.className = 'msg msg-error';
-      dom.lbMsg.appendChild(h('span', { text: t('lb.saveFailed', { reason: errorText(result.saveError) }) }));
-      dom.lbMsg.appendChild(h('button', { type: 'button', className: 'btn btn-small', text: t('common.tryAgain'), onclick: finishStreak }));
-      dom.lbMsg.hidden = false;
+      showSaveFailure(dom.lbMsg, t(board.saveFailed, { reason: errorText(result.saveError) }),
+        lbBoard === 'speed' ? saveSpeedScore : finishStreak);
     } else {
-      dom.lbRank.textContent = t('lb.onlyOne');
+      dom.lbRank.textContent = t(board.onlyOne);
     }
+  }
+
+  /** US-45: "Your best is still 15. You are #2 this week and #7 of all time." from the server's reply. */
+  function rankText(saved, count) {
+    const best = saved.best > count ? t('lb.best', { best: saved.best }) : '';
+    return best + (Number.isInteger(saved.week_rank)
+      ? t('lb.rankWeek', { week: saved.week_rank, rank: saved.rank })
+      : t('lb.rank', { rank: saved.rank }));
+  }
+
+  /** A leaderboard POST reply: { rank, best, week_rank, week_best } (week values null or absent outside the week). */
+  function isValidRankReply(saved) {
+    return isPlainObject(saved) && Number.isInteger(saved.rank) && Number.isInteger(saved.best) &&
+      (saved.week_rank === undefined || saved.week_rank === null || Number.isInteger(saved.week_rank));
+  }
+
+  /** "Your score could not be saved: ..." and a Try again button that calls `retry`. */
+  function showSaveFailure(node, text, retry) {
+    clear(node);
+    node.className = 'msg msg-error';
+    node.appendChild(h('span', { text: text }));
+    node.appendChild(h('button', { type: 'button', className: 'btn btn-small', text: t('common.tryAgain'), onclick: retry }));
+    node.hidden = false;
   }
 
   function showLeaderboardLoading() {
@@ -4031,7 +4127,8 @@
   /** The "This week" / "All time" tabs (US-45): the shown one is pressed; the list's name follows it. */
   function renderLeaderboardTabs() {
     dom.lbTabs.forEach((tab) => tab.setAttribute('aria-pressed', String(tab.getAttribute('data-period') === lbPeriod)));
-    dom.lbList.setAttribute('aria-label', lbPeriod === 'week' ? t('lb.topWeek') : t('lb.topAll'));
+    const board = LB_BOARDS[lbBoard];
+    dom.lbList.setAttribute('aria-label', lbPeriod === 'week' ? t(board.topWeek) : t(board.topAll));
   }
 
   function onLeaderboardTab(event) {
@@ -4050,10 +4147,11 @@
     const load = ++leaderboardLoads;
     const result = leaderboardResult;
     const period = lbPeriod;
+    const api = lbBoard === 'speed' ? SPEED_API : STREAK_API;
     let rows = null;
     let failure = null;
     try {
-      const data = await apiGet(STREAK_API + '?period=' + encodeURIComponent(period));
+      const data = await apiGet(api + '?period=' + encodeURIComponent(period));
       if (!Array.isArray(data)) throw textError('err.leaderboard');
       rows = data.filter((r) => isPlainObject(r) && typeof r.name === 'string' &&
         Number.isInteger(r.streak) &&
@@ -4067,21 +4165,22 @@
   }
 
   /**
-   * Rows reading "1. Ahmed Fahim · 13 questions · 18 Oct 2026" (rendered with textContent only).
+   * Rows reading "1. Ahmed Fahim · 13 questions · 18 Oct 2026" (Speed: "· 18 correct ·"; rendered with textContent only).
    * The name sits left and "· 13 questions · 18 Oct 2026" right; the space text nodes between the
    * flex items are not drawn but keep the row's text (and what screen readers read) in that format.
    */
   function renderLeaderboardRows(rows, result, failure, period) {
+    const board = LB_BOARDS[lbBoard];
     clear(dom.lbList);
     if (failure || !rows.length) {
-      const empty = period === 'week' ? t('lb.emptyWeek') : t('lb.empty');
+      const empty = period === 'week' ? t(board.emptyWeek) : t(board.empty);
       dom.lbList.appendChild(h('li', {
         className: 'lb-empty',
         text: failure ? t('lb.failed', { reason: errorText(failure) }) : empty,
       }));
       return;
     }
-    const me = result ? result.name.toLowerCase() : null;
+    const me = result && typeof result.name === 'string' ? result.name.toLowerCase() : null; // BUG-60-01
     rows.forEach((r, index) => {
       const name = r.name;
       const isMe = me !== null && name.toLowerCase() === me;
@@ -4092,7 +4191,7 @@
         document.createTextNode(' '),
         h('span', {
           className: 'lb-meta',
-          text: DOT + ' ' + tn('lb.questions', r.streak) + ' ' + DOT + ' ' + formatRunDate(r.date),
+          text: DOT + ' ' + tn(board.count, r.streak) + ' ' + DOT + ' ' + formatRunDate(r.date),
         }),
       ]));
     });
@@ -4135,6 +4234,10 @@
   }
 
   function onLeaderboardBack() {
+    if (lbBoard === 'speed') {
+      onSpeedBoardBack();
+      return;
+    }
     showScreen('setup');
     dom.streakBoardBtn.focus();
   }
@@ -4588,23 +4691,6 @@
     }
   }
 
-  /** This device has played a Speed Round (no rules card). */
-  function loadSpeedSeen() {
-    try {
-      return window.localStorage.getItem(SPEED_SEEN_KEY) === '1';
-    } catch (err) {
-      return false;
-    }
-  }
-
-  function markSpeedSeen() {
-    try {
-      window.localStorage.setItem(SPEED_SEEN_KEY, '1');
-    } catch (err) {
-      // storage full or disabled: the badge shows again next time
-    }
-  }
-
   function saveSpeed() {
     try {
       if (speed) window.localStorage.setItem(SPEED_KEY, JSON.stringify(speed));
@@ -4617,7 +4703,11 @@
     return { version: SPEED_VERSION, best: 0, bestAt: null, run: null, last: null, onResult: false };
   }
 
-  /** The saved Speed Round data. A bad run or result is dropped; the personal best is kept when it is valid. */
+  /**
+   * The saved Speed Round data. A bad run or result is dropped; the personal best is kept when it is valid.
+   * A save from before US-60 (version 1) keeps its best; its run has no name, so it is dropped, and its
+   * result is shown without the leaderboard.
+   */
   function loadSpeed() {
     let saved = null;
     try {
@@ -4625,14 +4715,20 @@
     } catch (err) {
       saved = null;
     }
-    if (!isPlainObject(saved) || saved.version !== SPEED_VERSION) return null;
+    if (!isPlainObject(saved) || (saved.version !== SPEED_VERSION && saved.version !== 1)) return null;
     const data = freshSpeed();
     if (Number.isInteger(saved.best) && saved.best >= 0) {
       data.best = saved.best;
       data.bestAt = Number.isFinite(saved.bestAt) ? saved.bestAt : null;
     }
-    data.run = isValidSpeedRun(saved.run) ? saved.run : null;
-    data.last = isValidSpeedResult(saved.last) ? saved.last : null;
+    const old = saved.version === 1;
+    // A result from before US-60 (version 1, or any result without a save state) is shown without the
+    // leaderboard: no name, nothing to save (BUG-60-01).
+    const last = isPlainObject(saved.last) && (old || saved.last.save === undefined)
+      ? Object.assign({}, saved.last, { name: null, save: 'none', saved: null })
+      : saved.last;
+    data.run = !old && isValidSpeedRun(saved.run) ? saved.run : null;
+    data.last = isValidSpeedResult(last) ? last : null;
     data.onResult = saved.onResult === true && data.last !== null;
     return data;
   }
@@ -4647,7 +4743,8 @@
 
   function isValidSpeedRun(run) {
     if (!isPlainObject(run)) return false;
-    return Number.isInteger(run.score) && run.score >= 0 &&
+    return (run.name === null ? !run.started : isValidStreakName(run.name)) && // US-60: named before the countdown
+      Number.isInteger(run.score) && run.score >= 0 &&
       Number.isInteger(run.answered) && run.answered >= run.score &&
       Array.isArray(run.times) && run.times.length === run.score && run.times.length <= SPEED_MAX_TIMES &&
       run.times.every(isMs) &&
@@ -4671,9 +4768,13 @@
     return langOk && pickedOk && isMs(cur.elapsedMs);
   }
 
+  /** A result: the score and best, and its leaderboard save (US-60; a pending one has a name and a score of 1 or more). */
   function isValidSpeedResult(r) {
     return isPlainObject(r) && Number.isInteger(r.score) && r.score >= 0 &&
-      Number.isInteger(r.prevBest) && r.prevBest >= 0 && typeof r.newBest === 'boolean';
+      Number.isInteger(r.prevBest) && r.prevBest >= 0 && typeof r.newBest === 'boolean' &&
+      (r.name === null || isValidStreakName(r.name)) && SPEED_SAVES.indexOf(r.save) !== -1 &&
+      (r.save !== 'pending' || (r.name !== null && r.score >= 1)) &&
+      (r.save === 'saved' ? isValidRankReply(r.saved) : r.saved === null);
   }
 
   /** A Speed Round question is on the question screen (the layout class is set only by the Speed Round). */
@@ -4684,7 +4785,7 @@
 
   function newSpeedRun() {
     return {
-      score: 0, answered: 0, times: [], queue: [], usedIds: [], statsSent: [],
+      name: null, score: 0, answered: 0, times: [], queue: [], usedIds: [], statsSent: [],
       lang: null, leftMs: SPEED_START_S * 1000, deadline: null, started: false, current: null,
     };
   }
@@ -4734,8 +4835,8 @@
   }
 
   /**
-   * A new run: the first batch first (nothing changes when it fails), then the rules card on this
-   * device's first run, else the countdown. A saved Streak run is never touched.
+   * A new run: the first batch first (nothing changes when it fails), then the name step (with the
+   * rules on this device's first run), then the countdown. A saved Streak run is never touched.
    */
   async function startSpeedRun() {
     const questions = await fetchStreakBatch([], false);
@@ -4751,11 +4852,10 @@
     addToQueue(data.run, questions); // also fetches their pictures
     markSoloRun('speed');
     saveSpeed();
-    if (loadSpeedSeen()) startSpeedCountdown();
-    else showSpeedIntro();
+    showSpeedIntro();
   }
 
-  /** Which part of the Speed overlay shows: 'intro' | 'count' | 'paused', or null to close it. */
+  /** Which part of the Speed overlay shows: 'intro' (the name step) | 'count' | 'paused', or null to close it. */
   function showSpeedOverlay(part) {
     dom.speedIntro.hidden = part !== 'intro';
     dom.speedCount.hidden = part !== 'count';
@@ -4770,14 +4870,38 @@
     return !dom.speedOverlay.hidden;
   }
 
+  /** The name step (US-60): every run asks, prefilled; the rules show above it every time. */
   function showSpeedIntro() {
     speedPhase = 'intro';
+    dom.speedNameInput.value = speedNamePrefill();
+    setFieldError(dom.speedNameInput, dom.speedNameError, '');
     showSpeedOverlay('intro');
-    dom.speedGo.focus();
+    dom.speedNameInput.focus();
   }
 
-  function onSpeedGo() {
-    if (speedPhase === 'intro') startSpeedCountdown();
+  /** The run's own name (a reload on the name step), the name last used in a Streak or Speed run, or the first player's. */
+  function speedNamePrefill() {
+    const run = speed && speed.run;
+    if (run && run.name) return run.name;
+    const last = loadChallengerName();
+    if (last) return last;
+    const s = state.setup;
+    return s && s.entries.length ? cleanName(s.entries[0].name).slice(0, NAME_MAX) : '';
+  }
+
+  /** Start on the name step (also Enter): the name is checked like the Streak's, kept with the run, then 3-2-1. */
+  function onSpeedGo(event) {
+    event.preventDefault();
+    const run = speed && speed.run;
+    if (speedPhase !== 'intro' || !run) return;
+    if (!validateNameField(dom.speedNameInput, dom.speedNameError)) {
+      dom.speedNameInput.focus();
+      return;
+    }
+    run.name = cleanName(dom.speedNameInput.value);
+    saveChallengerName(run.name);
+    saveSpeed();
+    startSpeedCountdown();
   }
 
   let beepAudio = null; // one AudioContext for the page, made on the first beep
@@ -4835,13 +4959,12 @@
     const run = speed && speed.run;
     if (!run) return;
     run.started = true;
-    markSpeedSeen(); // no rules card from now on
     postGameLog({ mode: 'speed' });
     showSpeedOverlay(null);
     nextSpeedQuestion();
   }
 
-  /** Back on the rules card or the countdown: no run; on Paused: "End the run now?". */
+  /** Back on the name step or the countdown: no run; on Paused: "End the run now?". */
   function onSpeedOverlayBack() {
     if (speedPhase === 'paused' && speed.run && speed.run.started) {
       if (window.confirm(t('speed.endConfirm', { n: speed.run.score }))) finishSpeed();
@@ -4860,6 +4983,8 @@
     showSpeedOverlay(null);
     if (state.screen === 'setup' && !state.setup) startSetup(); // a reload during the countdown
     else if (state.screen === 'setup') updateStartButton();
+    if (state.screen === 'setup' && !dom.speedOpenBtn.hidden) dom.speedOpenBtn.focus();
+    else if (state.screen === 'speed') dom.speedAgain.focus();
   }
 
   // --- Questions ---
@@ -5207,7 +5332,7 @@
 
   // --- Result ---
 
-  /** The run is over: the result (with the personal best) is saved and shown. */
+  /** The run is over: the result (with the personal best) is saved and shown, and sent to the leaderboard (US-60). */
   function finishSpeed() {
     const data = speed;
     const run = data && data.run;
@@ -5221,7 +5346,11 @@
       score: run.score,
       prevBest: data.best,
       newBest: run.score > data.best,
+      name: run.name,
+      save: run.score >= 1 && run.name ? 'pending' : 'none', // only runs with 1 or more correct answers go on the board
+      saved: null,
     };
+    speedSaveError = null;
     if (result.newBest) {
       data.best = run.score;
       data.bestAt = Date.now();
@@ -5234,6 +5363,7 @@
     showSpeedResult();
   }
 
+  /** The result screen; a run not on the leaderboard yet is sent (again after a reload, as the Streak's). */
   function showSpeedResult() {
     speedPhase = 'idle';
     renderSpeedResult();
@@ -5241,6 +5371,7 @@
     clearMessage(dom.speedMsg);
     showScreen('speed');
     dom.speedTitle.focus();
+    if (speed.last.save === 'pending' && !speedSaving && !speedSaveError) saveSpeedScore();
   }
 
   function renderSpeedResult() {
@@ -5254,6 +5385,108 @@
     else best = t('speed.noScore');
     dom.speedBest.textContent = best;
     dom.speedBest.classList.toggle('is-new', r.newBest);
+    renderSpeedRank();
+  }
+
+  /**
+   * US-60: the leaderboard line under the best: "Saving your score...", the ranks, "Only runs with 1 or
+   * more ...", or the save failure with Try again. Play again and New Game wait while it saves.
+   */
+  function renderSpeedRank() {
+    const r = speed.last;
+    const board = LB_BOARDS.speed;
+    clearMessage(dom.speedSaveMsg);
+    dom.speedRank.hidden = false;
+    if (r.save === 'saved') {
+      dom.speedRank.textContent = rankText(r.saved, r.score);
+    } else if (r.save === 'pending' && speedSaveError && !speedSaving) {
+      dom.speedRank.hidden = true;
+      showSaveFailure(dom.speedSaveMsg, t(board.saveFailed, { reason: errorText(speedSaveError) }), saveSpeedScore);
+    } else if (r.save === 'pending') {
+      dom.speedRank.textContent = t(board.saving);
+    } else if (r.save === 'none' && r.name !== null && r.score === 0) {
+      dom.speedRank.textContent = t(board.onlyOne);
+    } else {
+      dom.speedRank.hidden = true; // a result from before US-60, or left unsaved
+    }
+    dom.speedAgain.disabled = speedSaving;
+    dom.speedNewGame.disabled = speedSaving;
+  }
+
+  /**
+   * The leaderboard screen's view of the result (the Streak's `result` shape), or null when the result is
+   * not on the board (BUG-60-01: a result from before US-60 has no name; a score of 0 or a dropped save):
+   * the board then shows no headline, no rank line and no highlighted row.
+   */
+  function speedBoardResult() {
+    const r = speed.last;
+    if (typeof r.name !== 'string' || (r.save !== 'pending' && r.save !== 'saved')) return null;
+    return { name: r.name, count: r.score, saving: speedSaving, saved: r.saved, saveError: speedSaveError };
+  }
+
+  /** POST the result to the Speed leaderboard (US-60); on failure it stays pending, with Try again. */
+  async function saveSpeedScore() {
+    const r = speed && speed.last;
+    if (!r || r.save !== 'pending' || speedSaving) return;
+    speedSaving = true;
+    speedSaveError = null;
+    showSpeedSave();
+    try {
+      const saved = await apiPost(SPEED_API, { name: r.name, streak: r.score });
+      if (!isValidRankReply(saved)) throw textError('err.response');
+      r.saved = { rank: saved.rank, best: saved.best, week_rank: saved.week_rank, week_best: saved.week_best };
+      r.save = 'saved';
+    } catch (err) {
+      speedSaveError = err; // shown with errorText(), in the language on screen
+    }
+    speedSaving = false;
+    if (speed && speed.last === r) {
+      saveSpeed();
+      showSpeedSave();
+    }
+  }
+
+  /** Draw the save state where it shows: the result screen or the Speed leaderboard opened from it. */
+  function showSpeedSave() {
+    if (state.screen === 'speed') {
+      renderSpeedRank();
+    } else if (state.screen === 'leaderboard' && lbBoard === 'speed' && leaderboardResult && speedBoardResult()) {
+      leaderboardResult = speedBoardResult();
+      clearMessage(dom.lbMsg);
+      renderLeaderboardHead(leaderboardResult);
+      if (!speedSaving) loadLeaderboardRows(); // the rows wait for the save, as the Streak's
+    }
+  }
+
+  /** Leaving a result whose save failed loses it: ask first (as the Streak's lb.unsaved). */
+  function confirmDropSpeedUnsaved() {
+    const r = speed && speed.last;
+    if (!r || r.save !== 'pending') return true;
+    if (!window.confirm(t('speed.unsaved', { n: r.score }))) return false;
+    r.save = 'dropped';
+    speedSaveError = null;
+    saveSpeed();
+    renderSpeedRank();
+    return true;
+  }
+
+  /** "Leaderboard" on the result: the Speed leaderboard with this run's headline and rank. */
+  function onSpeedBoard() {
+    if (state.screen !== 'speed' || !speed || !speed.last) return;
+    openLeaderboard(speedBoardResult(), 'speed');
+  }
+
+  /** Back on the Speed leaderboard: to the result it came from, or to setup. */
+  function onSpeedBoardBack() {
+    if (speed && speed.last && speed.onResult) { // opened from the result (setup clears onResult)
+      showSpeedResult();
+      dom.speedBoard.focus();
+    } else if (state.setup) {
+      showScreen('setup');
+      updateStartButton();
+    } else {
+      startSetup();
+    }
   }
 
   /** "Mokh Rush Speed Round: 18 correct" (js/share.js adds the site link). */
@@ -5265,9 +5498,9 @@
     if (speed && speed.last && state.screen === 'speed') shareText(speedShareText(speed.last), dom.speedShareStatus);
   }
 
-  /** Play again: a new run with the countdown only (the rules card was seen on the first run). */
+  /** Play again: a new run, from the name step (prefilled with this run's name). */
   async function onSpeedAgain() {
-    if (dom.speedAgain.disabled || state.screen !== 'speed') return;
+    if (dom.speedAgain.disabled || state.screen !== 'speed' || !confirmDropSpeedUnsaved()) return;
     clearMessage(dom.speedMsg);
     dom.speedAgain.disabled = true;
     dom.speedAgain.textContent = t('setup.starting');
@@ -5276,13 +5509,14 @@
     } catch (err) {
       showMessage(dom.speedMsg, () => t('speed.failed', { reason: errorText(err) }), 'error');
     } finally {
-      dom.speedAgain.disabled = false;
+      dom.speedAgain.disabled = speedSaving;
       dom.speedAgain.textContent = t('lb.again');
     }
   }
 
   /** New Game on the result: back to setup. Never newGame(): that would clear a saved Streak run. */
   function onSpeedNewGame() {
+    if (dom.speedNewGame.disabled || !confirmDropSpeedUnsaved()) return;
     if (speed) {
       speed.onResult = false;
       saveSpeed();
@@ -5328,8 +5562,8 @@
       return;
     }
     if (!run.started || !run.current) {
-      if (loadSpeedSeen()) startSpeedCountdown();
-      else showSpeedIntro();
+      if (run.name === null) showSpeedIntro(); // US-60: closed on the name step
+      else startSpeedCountdown();
       return;
     }
     speedPauseWanted = true; // the question opens under "Paused, tap to resume"
@@ -5338,12 +5572,15 @@
 
   function bindSpeedEvents() {
     dom.speedOpenBtn.addEventListener('click', onSpeedOpen);
-    dom.speedGo.addEventListener('click', onSpeedGo);
+    dom.speedIntro.addEventListener('submit', onSpeedGo); // Start, or Enter in the name field
+    dom.speedCancel.addEventListener('click', onSpeedOverlayBack);
+    dom.speedNameInput.addEventListener('input', () => setFieldError(dom.speedNameInput, dom.speedNameError, ''));
+    dom.speedBoard.addEventListener('click', onSpeedBoard);
     dom.speedResume.addEventListener('click', onSpeedResume);
     dom.speedAgain.addEventListener('click', onSpeedAgain);
     dom.speedShare.addEventListener('click', onSpeedShare);
     dom.speedNewGame.addEventListener('click', onSpeedNewGame);
-    setText(dom.speedRule2, () => t('speed.rule2', { time: t('speed.seconds', { n: SPEED_WRONG_S }) }));
+    setText(dom.speedRule2, () => t('speed.rule2', { n: SPEED_WRONG_S }));
     document.addEventListener('visibilitychange', onSpeedVisibility);
     window.addEventListener('pagehide', pauseSpeed); // a reload keeps the time left exactly
   }
@@ -6900,8 +7137,10 @@
       if (limit) limit.textContent = t('mode.limit', { n: MODES[key].limit });
     });
     // Names are typed left to right or right to left by their own letters in the Arabic page.
-    if (i18n.isArabic()) dom.streakNameInput.dir = 'auto';
-    else dom.streakNameInput.removeAttribute('dir');
+    [dom.streakNameInput, dom.speedNameInput].forEach((input) => { // US-60: the Speed name step too
+      if (i18n.isArabic()) input.dir = 'auto';
+      else input.removeAttribute('dir');
+    });
   }
 
   function onUiLangClick(event) {

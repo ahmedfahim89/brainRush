@@ -8,7 +8,7 @@
   <link rel="icon" href="img/mokh-favicon.svg" type="image/svg+xml">
   <link rel="icon" href="img/mokh-favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.7d9260e9.css">
+  <link rel="stylesheet" href="css/style.ba1c892a.css">
 </head>
 <body class="admin">
   <header class="page-header">
@@ -83,7 +83,7 @@
           <input id="setting-speed" name="speed_enabled" type="checkbox">
           Speed Round
         </label>
-        <p class="hint">When on, a "Speed Round" button shows next to the Daily Challenge button: a solo race against one clock, where fast correct answers earn extra time. The personal best is kept on each device only; nothing is saved on the server.</p>
+        <p class="hint">When on, a "Speed Round" button shows next to the Daily Challenge button: a solo race against one clock, where fast correct answers earn extra time. The personal best is kept on each device; a run with 1 or more correct answers goes on the shared Speed leaderboard under the name the player enters (see the Speed leaderboard panel below).</p>
         <!-- Ads (D-41): Google AdSense banner on the Streak leaderboard screen -->
         <label class="check-label" for="setting-ads-enabled">
           <input id="setting-ads-enabled" name="ads_enabled" type="checkbox">
@@ -220,7 +220,7 @@
       </div>
       <p id="question-stats-msg" class="msg" role="status" aria-live="polite" hidden></p>
       <p id="question-stats-reset-msg" class="msg" role="status" aria-live="polite" hidden></p>
-      <!-- FU-59: up to 800px wide the Questions, Reports, Streaks and Logs tables show each row as a card with
+      <!-- FU-59: up to 800px wide the Questions, Reports, Streaks, Speed runs and Logs tables show each row as a card with
            column labels (labelCells in admin.js); the Questions table keeps its sort buttons above the cards -->
       <div class="table-wrap">
         <table class="data-table card-table" id="questions-table">
@@ -268,6 +268,24 @@
       </div>
     </section>
 
+    <!-- Speed leaderboard (US-60, D-76): every saved Speed Round run, so junk or offensive names can be removed -->
+    <section class="panel panel-wide" id="speed-runs-panel" aria-labelledby="speed-runs-title">
+      <h2 id="speed-runs-title">Speed leaderboard</h2>
+      <p class="hint">Every saved Speed Round run (1 or more correct answers), newest first. The game's leaderboard shows each challenger's best run (one per challenger name, not case-sensitive). Delete a run to take it off the leaderboard.</p>
+      <div class="actions">
+        <button type="button" id="speed-runs-reload" class="btn btn-small">Reload</button>
+      </div>
+      <p id="speed-runs-msg" class="msg" role="status" aria-live="polite" hidden></p>
+      <div class="table-wrap">
+        <table class="data-table card-table">
+          <thead>
+            <tr><th scope="col">Name</th><th scope="col">Correct</th><th scope="col">Played</th><th scope="col">Actions</th></tr>
+          </thead>
+          <tbody id="speed-runs-body"></tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- Game logs: read-only view of the .log/.txt files in the logs folder -->
     <section class="panel panel-wide" id="logs-panel" aria-labelledby="logs-title">
       <h2 id="logs-title">Game logs</h2>
@@ -292,6 +310,6 @@
     </section>
   </main>
 
-  <script src="js/admin.a29fa091.js"></script>
+  <script src="js/admin.962f09ef.js"></script>
 </body>
 </html>

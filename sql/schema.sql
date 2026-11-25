@@ -188,6 +188,19 @@ CREATE TABLE IF NOT EXISTS integration_scores (
   KEY idx_integration_scores_streak (streak)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
+-- Speed Round leaderboard (US-60, D-76): one row per finished Speed Round with 1 or more correct
+-- answers. The same columns, keys and rules as streaks; `streak` holds the run's correct answers,
+-- so the shared leaderboard code in api/streaks.php works unchanged.
+CREATE TABLE IF NOT EXISTS speed_scores (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name       VARCHAR(30)  NOT NULL,
+  streak     INT UNSIGNED NOT NULL,
+  created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_speed_scores_name (name),
+  KEY idx_speed_scores_streak (streak)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
 -- ---------------------------------------------------------------------------
 -- Seed data
 -- ---------------------------------------------------------------------------

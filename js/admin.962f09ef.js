@@ -1,4 +1,4 @@
-// Mokh Rush admin page: settings, point values, categories, questions, question reports, the streak leaderboard and the game logs.
+// Mokh Rush admin page: settings, point values, categories, questions, question reports, the Streak and Speed leaderboards and the game logs.
 // Question bank (D-31 amended): every question has a point value, a category may have
 // several questions per value, and it is playable when every enabled point value has one.
 // All API/user text is rendered with textContent / DOM APIs (never innerHTML).
@@ -56,7 +56,7 @@
     reports: [],       // open reports per question, most reported first (US-42): [{ question: {id, category_id,
                        //    category_name, points, question, answer, image}, count, reasons: {reason: count},
                        //    reports: [{ id, reason, note, created_at }] newest first, last_at }]
-    streaks: [],       // [{ id, name, streak, created_at }] newest first (US-34)
+    runs: { streaks: [], speed: [] }, // per leaderboard (RUN_BOARDS): [{ id, name, streak, created_at }] newest first (US-34, US-60)
     logs: [],          // [{ name, size, modified }] newest first
     openLog: null,     // name of the log file shown in the viewer, or null
     renamingId: null,  // category currently being renamed inline
@@ -133,9 +133,6 @@
     reportsCount: byId('reports-count'),
     reportsMsg: byId('reports-msg'),
     reportsBody: byId('reports-body'),
-    streaksReload: byId('streaks-reload'),
-    streaksMsg: byId('streaks-msg'),
-    streaksBody: byId('streaks-body'),
     logsReload: byId('logs-reload'),
     logsMsg: byId('logs-msg'),
     logsBody: byId('logs-body'),
@@ -354,7 +351,7 @@
     if (await checkAuth()) {
       loadSettings();
       loadReports();
-      loadStreaks();
+      loadAllRuns();
       loadLogs();
       await loadData();
     }
@@ -1402,66 +1399,99 @@
     });
   }
 
-  // ---------- Streak leaderboard (US-34) ----------
-  // Loaded on its own, so a database without the streaks table (migration not run yet)
-  // only breaks this panel.
+  // ---------- Leaderboards: Streak (US-34) and Speed Round (US-60) ----------
+  // Every saved run of each leaderboard, newest first, with Delete, so junk or offensive names can be
+  // removed. Each is loaded on its own, so a database without its table (migration not run yet) only
+  // breaks that panel. `streak` is the run's score: the streak, or the Speed Round's correct answers.
+  const RUN_BOARDS = {
+    streaks: {
+      api: 'streaks.php',
+      run: 'streak run',
+      empty: 'No streak runs yet.',
+      score: (n) => plural(n, 'question'),
+      reload: byId('streaks-reload'),
+      msg: byId('streaks-msg'),
+      body: byId('streaks-body'),
+    },
+    speed: {
+      api: 'speed-scores.php',
+      run: 'Speed Round run',
+      empty: 'No Speed Round runs yet.',
+      score: (n) => n + ' correct',
+      reload: byId('speed-runs-reload'),
+      msg: byId('speed-runs-msg'),
+      body: byId('speed-runs-body'),
+    },
+  };
 
-  async function loadStreaks() {
-    dom.streaksReload.disabled = true;
+  function loadAllRuns() {
+    Object.keys(RUN_BOARDS).forEach(loadRuns);
+  }
+
+  async function loadRuns(key) {
+    const board = RUN_BOARDS[key];
+    board.reload.disabled = true;
     try {
-      state.streaks = ensureArray(await api('streaks.php?all=1'), 'streak');
-      renderStreaks();
+      state.runs[key] = ensureArray(await api(board.api + '?all=1'), board.run);
+      renderRuns(key);
     } catch (err) {
-      showError(dom.streaksMsg, 'Could not load the streak runs: ' + errorText(err));
+      showError(board.msg, 'Could not load the ' + board.run + 's: ' + errorText(err));
     } finally {
-      dom.streaksReload.disabled = false;
+      board.reload.disabled = false;
     }
   }
 
-  function onStreaksReload() {
-    clearMessage(dom.streaksMsg);
-    loadStreaks();
+  function onRunsReload(key) {
+    clearMessage(RUN_BOARDS[key].msg);
+    loadRuns(key);
   }
 
-  function renderStreaks() {
-    clear(dom.streaksBody);
-    if (!state.streaks.length) {
-      dom.streaksBody.appendChild(h('tr', {}, [
-        h('td', { className: 'empty-row', colSpan: 4, text: 'No streak runs yet.' }),
+  function renderAllRuns() {
+    Object.keys(RUN_BOARDS).forEach(renderRuns);
+  }
+
+  function renderRuns(key) {
+    const board = RUN_BOARDS[key];
+    clear(board.body);
+    if (!state.runs[key].length) {
+      board.body.appendChild(h('tr', {}, [
+        h('td', { className: 'empty-row', colSpan: 4, text: board.empty }),
       ]));
       return;
     }
-    state.streaks.forEach((run) => {
-      dom.streaksBody.appendChild(h('tr', {}, [
+    state.runs[key].forEach((run) => {
+      board.body.appendChild(h('tr', {}, [
         h('td', { className: 'name-cell', text: run.name }),
-        h('td', { className: 'num', text: plural(run.streak, 'question') }),
+        h('td', { className: 'num', text: board.score(run.streak) }),
         h('td', { className: 'num', text: String(run.created_at) }),
         h('td', { className: 'row-actions' }, [
           h('button', {
             type: 'button',
             className: 'btn btn-small btn-danger',
             text: 'Delete',
-            'aria-label': 'Delete the streak run of ' + run.name + ' (' + run.created_at + ')',
-            onclick: () => deleteStreak(run),
+            'aria-label': 'Delete the ' + board.run + ' of ' + run.name + ' (' + run.created_at + ')',
+            onclick: () => deleteRun(key, run),
           }),
         ]),
       ]));
     });
-    labelCells(dom.streaksBody);
+    labelCells(board.body);
   }
 
   /** Delete one run (confirm first, D-18); the leaderboard then shows the person's next best run, if any. */
-  function deleteStreak(run) {
-    const prompt = 'Delete the streak run of "' + run.name + '" (' + plural(run.streak, 'question') +
+  function deleteRun(key, run) {
+    const board = RUN_BOARDS[key];
+    const prompt = 'Delete the ' + board.run + ' of "' + run.name + '" (' + board.score(run.streak) +
       ', ' + run.created_at + ')?';
     if (!window.confirm(prompt)) return;
-    runAction(dom.streaksMsg, [], async () => {
+    runAction(board.msg, [], async () => {
       try {
-        await api('streaks.php?id=' + encodeURIComponent(run.id), 'DELETE');
+        await api(board.api + '?id=' + encodeURIComponent(run.id), 'DELETE');
       } finally {
-        await loadStreaks(); // also after a 404: the run was already gone
+        await loadRuns(key); // also after a 404: the run was already gone
       }
-      showSuccess(dom.streaksMsg, 'Streak run of ' + run.name + ' deleted.');
+      const label = board.run.charAt(0).toUpperCase() + board.run.slice(1);
+      showSuccess(board.msg, label + ' of ' + run.name + ' deleted.');
     });
   }
 
@@ -1571,7 +1601,9 @@
     dom.qStatsReset.addEventListener('click', onStatsResetClick);
     dom.authRetry.addEventListener('click', onAuthRetry);
     dom.reportsReload.addEventListener('click', onReportsReload);
-    dom.streaksReload.addEventListener('click', onStreaksReload);
+    Object.keys(RUN_BOARDS).forEach((key) => {
+      RUN_BOARDS[key].reload.addEventListener('click', () => onRunsReload(key));
+    });
     dom.logsReload.addEventListener('click', onLogsReload);
     dom.qColsToggle.addEventListener('click', onColsToggle);
   }
@@ -1589,13 +1621,13 @@
     setFormMode();
     renderAll();
     // Reports: the table stays empty until loaded, so a failed load shows only its error (BUG-7-01).
-    renderStreaks();
+    renderAllRuns();
     renderLogs();
     // Log in first: nothing (questions and answers included) is loaded until it succeeds.
     if (await checkAuth()) {
       loadSettings();
       loadReports();
-      loadStreaks();
+      loadAllRuns();
       loadLogs();
       await loadData();
     }

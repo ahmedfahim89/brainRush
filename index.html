@@ -48,11 +48,11 @@
   <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="css/style.7d9260e9.css">
+  <link rel="stylesheet" href="css/style.ba1c892a.css">
   <!-- CHRISTMAS (US-55, D-66): seasonal theme, only active under body.theme-christmas; remove after Christmas -->
   <link rel="stylesheet" href="css/christmas.717dbe43.css">
   <!-- Interface language (US-49): loaded first, so an Arabic page is right to left from its first paint -->
-  <script src="js/i18n.b0de0bd3.js"></script>
+  <script src="js/i18n.fa40ed1b.js"></script>
 </head>
 <body class="game">
   <!-- CHRISTMAS (US-55, D-66): first in <body> so the last known theme is applied before the first paint; remove after Christmas -->
@@ -95,19 +95,30 @@
   </div>
 
   <!-- Speed Round (US-59, D-73): one opaque card over the question screen, so the question is never seen
-       early. It shows the first-run rules (once per device), the 3-2-1 countdown, or "Paused" while the
-       run waits for a tap (hidden tab, page reload). game.js shows one part at a time. -->
+       early. It shows the name step (US-60: every run, prefilled; with the rules every time),
+       the 3-2-1 countdown, or "Paused" while the run waits for a tap (hidden tab, page reload).
+       game.js shows one part at a time. -->
   <div id="speed-overlay" class="double-overlay speed-overlay" role="dialog" aria-modal="true" aria-labelledby="speed-overlay-title" hidden>
     <div class="double-card speed-card">
       <p id="speed-overlay-title" class="double-title speed-card-title" data-i18n="speed.name">Speed Round</p>
-      <div id="speed-intro" hidden>
-        <ul class="speed-rules">
+      <form id="speed-intro" class="speed-intro" novalidate hidden>
+        <ul id="speed-rules" class="speed-rules">
           <li data-i18n="speed.rule1">Answer fast to earn time</li>
-          <li id="speed-rule2">Wrong costs 3 s</li>
+          <li id="speed-rule2">Wrong costs 3 seconds</li>
           <li data-i18n="speed.rule3">Every correct answer is a point</li>
         </ul>
-        <button type="button" id="speed-go" class="btn btn-primary btn-large" data-i18n="speed.go">Start</button>
-      </div>
+        <!-- US-60: the challenger name of the shared Speed leaderboard, checked like the Streak's -->
+        <div class="field speed-name-field">
+          <label for="speed-name" data-i18n="streak.nameLabel">Challenger name</label>
+          <input id="speed-name" type="text" maxlength="30" autocomplete="off" aria-describedby="speed-name-hint speed-name-error">
+          <p id="speed-name-hint" class="hint speed-name-hint" data-i18n="speed.nameHint">Your score goes on the shared Speed leaderboard with this name.</p>
+          <p id="speed-name-error" class="field-error" hidden></p>
+        </div>
+        <div class="actions speed-intro-actions">
+          <button type="button" id="speed-cancel" class="btn btn-large" data-i18n="common.back">Back</button>
+          <button type="submit" id="speed-go" class="btn btn-primary btn-large" data-i18n="speed.go">Start</button>
+        </div>
+      </form>
       <p id="speed-count" class="speed-count" aria-live="polite" hidden></p>
       <div id="speed-paused" hidden>
         <p class="speed-paused-text" data-i18n="speed.paused">Paused</p>
@@ -188,7 +199,9 @@
             <!-- Daily Crossword (US-58, D-72): shown when the admin turned it on (crossword_enabled) -->
             <button type="button" id="crossword-open-btn" class="btn btn-daily" hidden><span aria-hidden="true">&#9638;</span> <span id="crossword-open-label" data-i18n="cw.name">Daily Crossword</span></button>
             <!-- Speed Round (US-59, D-73): shown when the admin turned it on (speed_enabled); one tap starts a run -->
+            <span id="speed-pair" class="speed-pair" hidden>
             <button type="button" id="speed-open-btn" class="btn btn-daily btn-speed" hidden><span aria-hidden="true">&#9889;</span> <span id="speed-open-label" data-i18n="speed.name">Speed Round</span></button>
+            </span>
             </div>
           </div>
           <p class="hint" data-i18n="setup.colorHint">Click a color circle to switch to the next free color.</p>
@@ -395,7 +408,8 @@
       </div>
     </section>
 
-    <!-- Streak leaderboard (US-34): after a run, or from the setup screen -->
+    <!-- Streak leaderboard (US-34): after a run, or from the setup screen; also the Speed leaderboard
+         (US-60): game.js swaps the heading's text key, the API and the texts -->
     <section id="screen-leaderboard" class="screen leaderboard" aria-labelledby="leaderboard-title" hidden>
       <h2 id="leaderboard-title" tabindex="-1" data-i18n="streak.leaderboard">Streak leaderboard</h2>
       <p id="lb-headline" class="lb-headline" hidden></p>
@@ -433,13 +447,17 @@
       <button type="button" id="daily-play" class="btn btn-primary btn-large" hidden data-i18n="daily.playNew">Play the new challenge</button>
     </section>
 
-    <!-- Speed Round result (US-59, D-73): the score, the personal best of this device, Play again (a new run with the countdown only), Share and New Game -->
+    <!-- Speed Round result (US-59, D-73): the score, the personal best of this device, the leaderboard rank
+         (US-60), Play again (a new run from the name step), Leaderboard, Share and New Game -->
     <section id="screen-speed" class="screen daily speed-result" aria-labelledby="speed-title" hidden>
       <h2 id="speed-title" tabindex="-1" data-i18n="speed.name">Speed Round</h2>
       <p class="speed-score-line"><span id="speed-score" class="speed-score"></span> <span id="speed-score-label" class="speed-score-label"></span></p>
       <p id="speed-best" class="speed-best"></p>
+      <p id="speed-rank" class="lb-rank speed-rank" hidden></p>
+      <div id="speed-save-msg" class="msg" role="alert" hidden></div>
       <div class="actions start-row">
         <button type="button" id="speed-again" class="btn btn-primary btn-large" data-i18n="lb.again">Play again</button>
+        <button type="button" id="speed-board" class="btn btn-large btn-leaderboard"><span aria-hidden="true">🏆</span> <span data-i18n="speed.boardBtn">Leaderboard</span></button>
         <button type="button" id="speed-share" class="btn btn-large" data-i18n="common.share">Share</button>
         <button type="button" id="speed-new-game" class="btn btn-large" data-i18n="common.newGame">New Game</button>
         <span id="speed-share-status" class="share-status" role="status"></span>
@@ -508,6 +526,6 @@
   <script src="js/share.4fcf5fb3.js"></script>
   <!-- Read aloud (US-48): loaded before game.js, which uses it -->
   <script src="js/speech.019a1850.js"></script>
-  <script src="js/game.30c7287b.js"></script>
+  <script src="js/game.838bee3e.js"></script>
 </body>
 </html>
