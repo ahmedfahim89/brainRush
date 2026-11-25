@@ -1380,6 +1380,57 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 .daily .msg { text-align: left; }
 .daily #daily-play { margin-top: 0.6rem; }
 
+/* ---------- Speed Round (US-59, D-73) ---------- */
+/* Rules card, countdown and Paused: an opaque cover, so the question is never seen before its clock runs */
+.speed-overlay { background: var(--bg); }
+.speed-card { min-width: min(20rem, 100%); }
+.speed-card .speed-card-title { animation: none; }
+.speed-rules { margin: 0 0 1.2rem; padding: 0; list-style: none; font-weight: 700; }
+.speed-rules li + li { margin-top: 0.5rem; }
+.speed-count { margin: 0.2rem 0 0.6rem; color: var(--gold); font-size: 5rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.speed-count[hidden] { display: none; }
+.speed-count.is-pop { animation: speed-pop 0.9s ease-out; }
+.speed-paused-text { font-size: 1.4rem; font-weight: 700; }
+@keyframes speed-pop { 0% { opacity: 0; transform: scale(0.5); } 30% { opacity: 1; transform: scale(1); } 100% { opacity: 1; transform: scale(1); } }
+/* Question screen: the question shows all at once, once its picture has loaded (game.js sets .is-waiting) */
+.question.speed.is-waiting .question-main > :not(.timer),
+.question.speed.is-waiting .streak-choices { visibility: hidden; }
+/* "+5 s" / "-3 s" floating up by the clock; the polite feedback line says the same for screen readers */
+.timer { position: relative; }
+.speed-delta {
+  position: absolute;
+  inset-inline-start: 0;
+  bottom: 100%;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1;
+  pointer-events: none;
+  white-space: nowrap;
+  animation: speed-float 0.8s ease-out forwards;
+}
+.speed-delta[hidden] { display: none; }
+.speed-delta.is-gain { color: var(--success); }
+.speed-delta.is-loss { color: var(--danger); }
+@keyframes speed-float { 0% { opacity: 0; transform: translateY(0.6rem); } 20% { opacity: 1; } 100% { opacity: 1; transform: translateY(-0.4rem); } }
+/* Under 10 s (the red clock, SPEED_LOW_S) the seconds shake (owner request 2026-11-25, D-73 ad); Speed Round only */
+.question.speed .timer.is-low .timer-value { animation: speed-shake 0.5s ease-in-out infinite; }
+@keyframes speed-shake {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  20% { transform: translateX(-3px) rotate(-3deg); }
+  40% { transform: translateX(3px) rotate(3deg); }
+  60% { transform: translateX(-2px) rotate(-2deg); }
+  80% { transform: translateX(2px) rotate(2deg); }
+}
+/* Result: a big score, the personal best line and the answer times */
+.speed-score-line { margin: 0.4rem 0 0.4rem; }
+.speed-score { display: block; color: var(--gold); font-size: clamp(3.4rem, 9vw, 5.5rem); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.speed-score-label { font-size: 1.2rem; font-weight: 700; }
+.speed-best { margin: 0 0 0.4rem; font-size: 1.2rem; font-weight: 700; }
+.speed-best.is-new { color: var(--success); }
+@media (prefers-reduced-motion: reduce) {
+  .speed-count.is-pop, .speed-delta, .question.speed .timer.is-low .timer-value { animation: none; }
+}
+
 /* ---------- Daily Crossword (US-58, D-72) ---------- */
 /* game.js sets --cw-cols / --cw-rows on the section. A cell is as big as the screen allows: at
    1366 x 768 (D-30) a 13 x 13 grid, the active clue and the tools fit without page scrolling, and

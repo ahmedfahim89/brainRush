@@ -111,6 +111,40 @@
   const CW_WORD_PATTERN = /^[A-Z]{3,10}$/; // CROSSWORD_WORD_PATTERN in api/crossword.php: keep the two the same (BUG-58-02)
   const CW_TICK_MS = 250;   // the running time and the countdown
 
+  // Speed Round (US-59, D-73): one clock for the whole run; fast right answers add time, a wrong one
+  // takes some off; the score is the number of right answers. The run and this device's personal best
+  // are saved under SPEED_KEY (no server table). All the rules' numbers are here.
+  // PLAYTEST AND TUNE: the owner may adjust these after the local test (only answers of about 3 s or
+  // less gain more time than they use, so first runs may be short).
+  const SPEED_START_S = 45;        // the clock at the start of a run
+  const SPEED_CAP_S = 60;          // the clock never holds more
+  const SPEED_TIERS = [            // a right answer within maxS seconds adds addS seconds (first match)
+    { maxS: 2, addS: 5, label: 'speed.lightning' },
+    { maxS: 4, addS: 3, label: 'speed.quick' },
+    { maxS: 6, addS: 2, label: 'speed.nice' },
+    { maxS: Infinity, addS: 1, label: 'speed.correct' },
+  ];
+  const SPEED_WRONG_S = 3;         // a wrong answer takes this off the clock
+  const SPEED_LOW_S = 10;          // the clock turns red below this
+  const SPEED_FEEDBACK_MS = 800;   // the clock is frozen while the answer's feedback shows
+  const SPEED_COUNTDOWN_S = 3;     // "3, 2, 1" before a run
+  // Race-start beeps on the countdown (owner request 2026-11-25): a short low beep on 3, 2 and 1,
+  // then a long high one as the run starts. Made with Web Audio, no sound file.
+  const SPEED_BEEP_HZ = 440;
+  const SPEED_BEEP_S = 0.18;
+  const SPEED_GO_HZ = 880;
+  const SPEED_GO_S = 0.6;
+  const SPEED_BEEP_GAIN = 0.15;    // quiet: the page has no volume control
+  const SPEED_SAVE_MS = 1000;      // the time left is saved this often while the clock runs (BUG-59-03)
+  const SPEED_IMAGE_WAIT_MS = 5000; // a picture that has not loaded by then: the question starts anyway
+  const SPEED_KEY = 'brainrush.speed';
+  const SPEED_SEEN_KEY = 'brainrush.speed.seen'; // '1' after this device's first run: no rules card
+  const SPEED_VERSION = 1;
+  const SPEED_MAX_TIMES = 5000;    // a saved run never holds more answer times
+  // The solo run started last on this device ({mode, at}): with a Streak, Daily and Speed run all saved,
+  // a reload brings back only that one (the others stay saved).
+  const LAST_SOLO_KEY = 'brainrush.lastSolo';
+
   // Final round (US-44, D-48): offer -> wagers (one contestant at a time) -> question -> done (Results).
   const FINAL_STAGES = ['offer', 'wager', 'question', 'done'];
   const WAGER_PATTERN = /^\d{1,9}$/; // a whole number typed by a contestant
@@ -144,7 +178,7 @@
   ];
 
   const SCREENS = ['setup', 'board', 'question', 'results', 'final']; // a saved board game may be on these
-  const ALL_SCREENS = SCREENS.concat(['leaderboard', 'daily', 'crossword']);
+  const ALL_SCREENS = SCREENS.concat(['leaderboard', 'daily', 'crossword', 'speed']);
 
   // Central state. `setup` is the form being filled in (memory only);
   // `game` is the running game and is saved to localStorage on every change:
@@ -182,7 +216,8 @@
   // Countdown of the open question (memory only; restarts at full length after a refresh, D-04).
   // onExpire runs when it reaches 0 (the Streak Challenge ends the run then; a board question notes
   // it for its stats outcome, US-47).
-  const timer = { totalMs: 0, remainingMs: 0, endAt: 0, running: false, handle: null, onExpire: null };
+  // lowMs: the clock turns red at or below it (null = the last third; the Speed Round passes 10 s).
+  const timer = { totalMs: 0, remainingMs: 0, endAt: 0, running: false, handle: null, onExpire: null, lowMs: null };
   let scoringRows = []; // DOM references of the question screen's scoring rows
   let swapping = null; // id of the contestant whose Swap request is running (memory only)
 
@@ -233,6 +268,32 @@
   let cwTicker = null;   // interval of the running time or the countdown
   let cwTyping = false;  // the hidden field has the focus (the player types in the grid)
 
+  // Speed Round (US-59), saved under SPEED_KEY on every change; null until first used:
+  //   { version, best, bestAt, run, last, onResult }
+  // best = this device's highest score (0 = none yet), bestAt = Date.now() ms when it was set (or null).
+  // run = null | { score, answered, times: [ms], queue: [question], usedIds: [id], statsSent: [id],
+  //   lang, leftMs, deadline, started, current: null | { q, lang, picked, elapsedMs } }
+  // score = right answers; times = how long each right answer took (ms, the time the question was
+  // visible, pauses left out). leftMs = the clock while it is stopped; deadline = Date.now() ms when the
+  // clock reaches 0 while it runs, else null (kept as a record; a reload uses leftMs, saved every second
+  // while it runs, BUG-59-03). lang = the language the player last chose ('en' | 'ar' | null = Arabic first). started = the
+  // countdown is over. picked = null (open), the tapped choice or STREAK_TIME_UP; elapsedMs = the time
+  // the question has been visible so far. last = the result on show ({ score, prevBest,
+  // newBest }); onResult = the result screen is open, so a reload shows it again.
+  let speed = null;
+  // While the clock runs, leftMs and the open question's elapsedMs are saved every SPEED_SAVE_MS, so a
+  // page that closes with no pagehide (a crash) comes back with at most that much more time than it had.
+  // Memory only: 'idle' | 'intro' | 'countdown' | 'loading' | 'wait' (the question waits to be visible)
+  // | 'live' (the clock runs) | 'hold' (End run confirm) | 'feedback' | 'paused' | 'over'.
+  // The clock only runs in 'live'.
+  let speedPhase = 'idle';
+  let speedShownAt = 0;          // now() when the open question became visible (or was resumed)
+  let speedTicker = null;        // timeout of the countdown, the feedback or the time's-up pause
+  let speedToken = 0;            // a picture load that belongs to an earlier question is ignored
+  let speedPauseWanted = false;  // the tab was hidden during feedback or loading: pause at the next question
+  let speedRequest = null;       // { run, promise } of the batch request in flight
+  let speedSaver = null;         // interval that saves the time left while the clock runs (BUG-59-03)
+
   // Report form (US-42), memory only: { questionId, sending } while it is open, else null. It never
   // touches the saved game or run, the timer or the scores.
   let report = null;
@@ -258,6 +319,7 @@
       leaderboard: byId('screen-leaderboard'),
       daily: byId('screen-daily'),
       crossword: byId('screen-crossword'),
+      speed: byId('screen-speed'),
       final: byId('screen-final'),
     },
     setupForm: byId('setup-form'),
@@ -274,6 +336,25 @@
     dailyOpenLabel: byId('daily-open-label'),
     crosswordOpenBtn: byId('crossword-open-btn'),
     crosswordOpenLabel: byId('crossword-open-label'),
+    speedOpenBtn: byId('speed-open-btn'),     // US-59: only in index.html (stand-ins in the Integration Quiz)
+    speedOpenLabel: byId('speed-open-label'),
+    speedOverlay: byId('speed-overlay'),
+    speedIntro: byId('speed-intro'),
+    speedRule2: byId('speed-rule2'),
+    speedGo: byId('speed-go'),
+    speedCount: byId('speed-count'),
+    speedPaused: byId('speed-paused'),
+    speedResume: byId('speed-resume'),
+    speedDelta: byId('speed-delta'),
+    speedTitle: byId('speed-title'),
+    speedScore: byId('speed-score'),
+    speedScoreLabel: byId('speed-score-label'),
+    speedBest: byId('speed-best'),
+    speedAgain: byId('speed-again'),
+    speedShare: byId('speed-share'),
+    speedNewGame: byId('speed-new-game'),
+    speedShareStatus: byId('speed-share-status'),
+    speedMsg: byId('speed-msg'),
     loadMsg: byId('setup-load-msg'),
     newBanner: byId('new-banner'),
     modeInputs: Array.prototype.slice.call(document.querySelectorAll('input[name="mode"]')),
@@ -1171,6 +1252,12 @@
       closeDoublePopup();
     } else if (isReportOpen()) {
       closeReport();                                 // US-42: the report form, as Cancel
+    } else if (isSpeedOverlayOpen()) {
+      onSpeedOverlayBack();                          // US-59: rules or countdown -> no run; Paused -> "End the run now?"
+    } else if (speedOnScreen()) {
+      onSpeedEnd();                                  // US-59: "End the run now?" confirm
+    } else if (state.screen === 'speed') {
+      onSpeedNewGame();                              // US-59: the result -> setup, as New Game
     } else if (state.screen === 'final') {
       onFinalBack();                                 // final round (US-44): offer -> board, wagers -> ask
     } else if (state.screen === 'question') {
@@ -1263,7 +1350,9 @@
       maintenance: false, // start_game_hidden from settings (maintenance mode)
       helpersOn: true,    // helpers_enabled from settings; a new game keeps it
       finalRoundOn: false, // final_round_enabled from settings (US-44); a new game keeps it
-      perGame: null,      // categories_per_game from settings
+      dailyOn: true,      // daily_enabled from settings (D-74): the Daily Challenge button
+      speedOn: false,     // speed_enabled from settings (US-59): the Speed Round button
+      perGame: null,     // categories_per_game from settings
       timerDefault: null, // timer_seconds from settings
       playable: [],       // [{id, name}] from categories.php?playable=1
       played: null,       // { played, total } from questions.php?played=1, null until loaded
@@ -1576,7 +1665,9 @@
       s.maintenance = settings.start_game_hidden === 1;
       s.helpersOn = settings.helpers_enabled !== 0; // a missing row means on
       s.finalRoundOn = settings.final_round_enabled === 1; // US-44: a missing row means off
+      s.dailyOn = settings.daily_enabled !== 0; // D-74: a missing row means on
       s.crosswordOn = settings.crossword_enabled === 1; // US-58: a missing row means off
+      s.speedOn = settings.speed_enabled === 1; // US-59: a missing row means off
       s.playable = results[1].filter((c) => isPlainObject(c) && Number.isInteger(c.id) && typeof c.name === 'string')
         .map((c) => ({ id: c.id, name: c.name, nameAr: isFilled(c.name_ar) ? c.name_ar : null }));
       // Kilo Meshakkal (US-53) stays ticked like Surprise, as long as its tile is shown.
@@ -1710,11 +1801,15 @@
     dom.streakBtn.hidden = !s || down || !s.streak;
     dom.streakBtn.disabled = !s || s.loading || s.starting || s.loadError === 'network';
     // Daily Challenge (US-43): any mode and number of players; it needs no category pick either.
-    dom.dailyOpenBtn.hidden = !s || down || s.streak;
+    // Hidden when the admin turned it off (daily_enabled, D-74).
+    dom.dailyOpenBtn.hidden = !s || down || s.streak || !s.dailyOn;
     dom.dailyOpenBtn.disabled = !s || s.loading || s.starting || s.loadError === 'network';
     // Daily Crossword (US-58): the same rules, and only when the admin turned it on (crossword_enabled).
     dom.crosswordOpenBtn.hidden = !s || down || s.streak || !s.crosswordOn;
     dom.crosswordOpenBtn.disabled = dom.dailyOpenBtn.disabled;
+    // Speed Round (US-59): the same rules, only when the admin turned it on (speed_enabled).
+    dom.speedOpenBtn.hidden = !s || down || s.streak || !s.speedOn;
+    dom.speedOpenBtn.disabled = dom.dailyOpenBtn.disabled;
   }
 
   /** D-02: required, unique after trimming, case-insensitive. Marks each bad entry inline. */
@@ -2482,6 +2577,10 @@
 
   function toggleLang() {
     stopReading(); // US-48: the text changes; the speaker reads the new language on the next click
+    if (speedOnScreen()) {
+      toggleSpeedLang();
+      return;
+    }
     if (finalOnScreen()) {
       toggleFinalLang();
       return;
@@ -2831,23 +2930,36 @@
 
   /**
    * Start the countdown at full length. The Streak Challenge passes the time left until its saved
-   * deadline (so a refresh keeps it) and onExpire, which ends the run at 0.
+   * deadline (so a refresh keeps it) and onExpire, which ends the run at 0. lowMs: see `timer`.
    */
-  function startTimer(seconds, remainingMs, onExpire) {
+  function startTimer(seconds, remainingMs, onExpire, lowMs) {
     stopTimer();
     timer.totalMs = seconds * 1000;
     timer.remainingMs = remainingMs === undefined ? timer.totalMs : Math.max(0, Math.min(remainingMs, timer.totalMs));
     timer.onExpire = onExpire || null;
+    timer.lowMs = lowMs === undefined ? null : lowMs;
     setTimeUp(false);
     resumeTimer();
   }
 
   /** A stopped countdown showing `remainingMs` (a streak question that was already answered). */
-  function showTimerAt(seconds, remainingMs) {
+  function showTimerAt(seconds, remainingMs, lowMs) {
     stopTimer();
     timer.totalMs = seconds * 1000;
     timer.remainingMs = Math.max(0, Math.min(remainingMs, timer.totalMs));
     timer.onExpire = null;
+    timer.lowMs = lowMs === undefined ? null : lowMs;
+    renderTimer();
+  }
+
+  /**
+   * Move the end of the countdown by `ms` (Speed Round, US-59: plus for a fast right answer, minus for
+   * a wrong one), running or stopped, kept between 0 and the full length.
+   */
+  function extendDeadline(ms) {
+    const left = timer.running ? timer.endAt - now() : timer.remainingMs;
+    timer.remainingMs = Math.max(0, Math.min(left + ms, timer.totalMs));
+    if (timer.running) timer.endAt = now() + timer.remainingMs;
     renderTimer();
   }
 
@@ -2888,7 +3000,9 @@
     const fraction = timer.totalMs > 0 ? timer.remainingMs / timer.totalMs : 0;
     dom.timerValue.textContent = String(Math.ceil(timer.remainingMs / 1000));
     dom.timerBar.style.transform = 'scaleX(' + fraction + ')';
-    dom.timerBox.classList.toggle('is-low', timer.remainingMs <= timer.totalMs / 3); // red in the last third
+    // red in the last third, or under lowMs (Speed Round)
+    dom.timerBox.classList.toggle('is-low', timer.lowMs !== null ? timer.remainingMs < timer.lowMs
+      : timer.remainingMs <= timer.totalMs / 3);
     dom.timerPause.textContent = timer.running || timer.remainingMs <= 0 ? t('timer.pause') : t('timer.resume');
     dom.timerPause.disabled = timer.remainingMs <= 0;
   }
@@ -3267,17 +3381,21 @@
 
   /** The streak question screen is showing (state.game is null during a run). */
   function streakOnScreen() {
-    return state.screen === 'question' && !state.game && !!streak && !!streak.current;
+    return state.screen === 'question' && !state.game && !!streak && !!streak.current && !speedOnScreen();
   }
 
   /**
    * Up to 20 questions from every category, none of `exclude`, unseen first (the Integration Quiz:
    * its own questions in random order; the played list holds public ids only). Throws on errors.
    */
-  async function fetchStreakBatch(exclude) {
+  /**
+   * A batch from the Streak pool. useSeen = false (Speed Round, D-73 ac) sends no played-questions
+   * list, so the server picks at random from everything except `exclude` (this run's questions).
+   */
+  async function fetchStreakBatch(exclude, useSeen = true) {
     const data = INTEGRATION
       ? await apiPost('integration-quiz.php?batch=1', { exclude: exclude })
-      : await apiPost('questions.php?streak=1', { exclude: exclude, seen: loadSeen() });
+      : await apiPost('questions.php?streak=1', useSeen ? { exclude: exclude, seen: loadSeen() } : { exclude: exclude });
     if (!isPlainObject(data) || !Array.isArray(data.questions) ||
         !data.questions.every((q) => isValidStreakQuestion(q))) {
       throw textError('err.questions');
@@ -3342,6 +3460,7 @@
       chances: { earned: 0, used: 0, progress: 0, earnedAt: 0 }, // US-57: none at the start, earned by right answers
     };
     lastStreakProfile = profile;
+    if (!INTEGRATION) markSoloRun('streak'); // US-59: the newest solo run is the one a reload brings back
     addToQueue(streak, questions);
     postGameLog({ mode: INTEGRATION ? 'integration' : 'streak', players: [streak.name] });
     nextStreakQuestion();
@@ -3397,6 +3516,8 @@
   /** The streak layout of the question screen: the streak panel replaces scoring, answer and Pause/Reset (CSS). */
   function setStreakLayout(on) {
     dom.screens.question.classList.toggle('streak', on);
+    dom.screens.question.classList.remove('speed', 'is-waiting'); // the Speed Round sets them after (US-59)
+    dom.speedDelta.hidden = true;
     dom.streakPanel.hidden = !on;
     if (on) { // the 3 choices helper list of the board game is not used
       clear(dom.qChoices);
@@ -4108,7 +4229,7 @@
 
   /** A Daily Challenge question is on the question screen (state.game is null during the run). */
   function dailyOnScreen() {
-    return state.screen === 'question' && !state.game && !streakOnScreen() && !!daily && !!daily.current;
+    return state.screen === 'question' && !state.game && !streakOnScreen() && !speedOnScreen() && !!daily && !!daily.current;
   }
 
   function dailyQuestion() {
@@ -4177,6 +4298,7 @@
       onResult: false,
     };
     challenge.questions.forEach((q) => { if (q.image) new Image().src = q.image; });
+    markSoloRun('daily'); // US-59: the newest solo run is the one a reload brings back
     nextDailyQuestion();
   }
 
@@ -4286,8 +4408,15 @@
 
   /** "Next question" / "See result" (and Enter) for whichever run is on the question screen. */
   function onRunNext() {
-    if (dailyOnScreen()) onDailyNext();
+    if (speedOnScreen()) onSpeedRetry(); // US-59: "Try again" after a failed batch load
+    else if (dailyOnScreen()) onDailyNext();
     else onStreakNext();
+  }
+
+  /** End run for whichever run is on the question screen (the Speed Round has its own, US-59). */
+  function onRunEnd() {
+    if (speedOnScreen()) onSpeedEnd();
+    else onStreakEnd();
   }
 
   /** Android Back on an open question (US-40): leave after a confirm; the questions left score 0. */
@@ -4430,6 +4559,793 @@
     daily = run;
     if (run.current !== null) showDailyQuestion();
     else nextDailyQuestion();
+  }
+
+  // ---------- Speed Round (US-59, D-73) ----------
+  // A solo race against one clock (SPEED_START_S, at most SPEED_CAP_S). A right answer is a point and
+  // adds time by how fast it came (SPEED_TIERS); a wrong one takes SPEED_WRONG_S off and shows the right
+  // choice. The run ends when the clock reaches 0. Fair timing: the clock only runs while the question
+  // is visible (its picture loaded), it is frozen during the answer's feedback, a hidden tab pauses it
+  // ("Paused, tap to resume") and a reload brings the run back paused with the same time left. Questions
+  // are the Streak Challenge's batches (questions.php?streak=1). The best score stays on this device.
+
+  /** Remember which solo mode started last (see LAST_SOLO_KEY). */
+  function markSoloRun(mode) {
+    try {
+      window.localStorage.setItem(LAST_SOLO_KEY, JSON.stringify({ mode: mode, at: Date.now() }));
+    } catch (err) {
+      // storage full or disabled: a reload uses the usual order
+    }
+  }
+
+  /** 'streak' | 'daily' | 'speed', or null when unknown (saves from before US-59). */
+  function lastSoloMode() {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(LAST_SOLO_KEY));
+      return isPlainObject(saved) && ['streak', 'daily', 'speed'].indexOf(saved.mode) !== -1 ? saved.mode : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  /** This device has played a Speed Round (no rules card). */
+  function loadSpeedSeen() {
+    try {
+      return window.localStorage.getItem(SPEED_SEEN_KEY) === '1';
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function markSpeedSeen() {
+    try {
+      window.localStorage.setItem(SPEED_SEEN_KEY, '1');
+    } catch (err) {
+      // storage full or disabled: the badge shows again next time
+    }
+  }
+
+  function saveSpeed() {
+    try {
+      if (speed) window.localStorage.setItem(SPEED_KEY, JSON.stringify(speed));
+    } catch (err) {
+      // Storage full or disabled: the run still works, it just won't survive a refresh.
+    }
+  }
+
+  function freshSpeed() {
+    return { version: SPEED_VERSION, best: 0, bestAt: null, run: null, last: null, onResult: false };
+  }
+
+  /** The saved Speed Round data. A bad run or result is dropped; the personal best is kept when it is valid. */
+  function loadSpeed() {
+    let saved = null;
+    try {
+      saved = JSON.parse(window.localStorage.getItem(SPEED_KEY));
+    } catch (err) {
+      saved = null;
+    }
+    if (!isPlainObject(saved) || saved.version !== SPEED_VERSION) return null;
+    const data = freshSpeed();
+    if (Number.isInteger(saved.best) && saved.best >= 0) {
+      data.best = saved.best;
+      data.bestAt = Number.isFinite(saved.bestAt) ? saved.bestAt : null;
+    }
+    data.run = isValidSpeedRun(saved.run) ? saved.run : null;
+    data.last = isValidSpeedResult(saved.last) ? saved.last : null;
+    data.onResult = saved.onResult === true && data.last !== null;
+    return data;
+  }
+
+  /** The data in memory, loaded (or made) on first use. */
+  function speedData() {
+    if (!speed) speed = loadSpeed() || freshSpeed();
+    return speed;
+  }
+
+  const isMs = (v) => Number.isFinite(v) && v >= 0;
+
+  function isValidSpeedRun(run) {
+    if (!isPlainObject(run)) return false;
+    return Number.isInteger(run.score) && run.score >= 0 &&
+      Number.isInteger(run.answered) && run.answered >= run.score &&
+      Array.isArray(run.times) && run.times.length === run.score && run.times.length <= SPEED_MAX_TIMES &&
+      run.times.every(isMs) &&
+      Array.isArray(run.queue) && run.queue.length <= STREAK_MAX_QUEUE && run.queue.every(isValidStreakQuestion) &&
+      Array.isArray(run.usedIds) && run.usedIds.length <= SEEN_MAX && run.usedIds.every((id) => Number.isInteger(id) && id > 0) &&
+      isValidStatsSent(run.statsSent) &&
+      (run.lang === null || run.lang === 'en' || run.lang === 'ar') &&
+      isMs(run.leftMs) && run.leftMs <= SPEED_CAP_S * 1000 &&
+      (run.deadline === null || Number.isFinite(run.deadline)) &&
+      typeof run.started === 'boolean' &&
+      isValidSpeedCurrent(run.current, run);
+  }
+
+  /** The open question: one of the run's, a known language and pick, and the time it was visible. */
+  function isValidSpeedCurrent(cur, run) {
+    if (cur === null) return true;
+    if (!isPlainObject(cur) || !isValidStreakQuestion(cur.q) || run.usedIds.indexOf(cur.q.id) === -1) return false;
+    const langOk = cur.lang === 'en' || (cur.lang === 'ar' && isFilled(cur.q.question_ar));
+    const pickedOk = cur.picked === null || cur.picked === STREAK_TIME_UP ||
+      (Number.isInteger(cur.picked) && cur.picked >= 0 && cur.picked < CHOICE_LETTERS.length);
+    return langOk && pickedOk && isMs(cur.elapsedMs);
+  }
+
+  function isValidSpeedResult(r) {
+    return isPlainObject(r) && Number.isInteger(r.score) && r.score >= 0 &&
+      Number.isInteger(r.prevBest) && r.prevBest >= 0 && typeof r.newBest === 'boolean';
+  }
+
+  /** A Speed Round question is on the question screen (the layout class is set only by the Speed Round). */
+  function speedOnScreen() {
+    return state.screen === 'question' && dom.screens.question.classList.contains('speed') &&
+      !!speed && !!speed.run && !!speed.run.current;
+  }
+
+  function newSpeedRun() {
+    return {
+      score: 0, answered: 0, times: [], queue: [], usedIds: [], statsSent: [],
+      lang: null, leftMs: SPEED_START_S * 1000, deadline: null, started: false, current: null,
+    };
+  }
+
+  /** The tier of a right answer that took `ms`. */
+  function speedTier(ms) {
+    return SPEED_TIERS.find((tier) => ms <= tier.maxS * 1000);
+  }
+
+  /** "1.2 s" (one decimal), left to right inside Arabic text. */
+  function speedSeconds(ms) {
+    return t('speed.seconds', { n: ltr((ms / 1000).toFixed(1)) });
+  }
+
+  /** "+5 s" / "−3 s" */
+  function speedDeltaText(seconds) {
+    return t('speed.seconds', { n: seconds < 0 ? signed(MINUS, -seconds) : signed('+', seconds) });
+  }
+
+  function stopSpeedTimers() {
+    if (speedTicker !== null) window.clearTimeout(speedTicker);
+    speedTicker = null;
+    stopSpeedSaver();
+    speedToken += 1; // a picture still loading no longer starts its question
+  }
+
+  // --- Start: the button, the rules card (first run only) and the countdown ---
+
+  /** "Speed Round" on setup: one tap loads the first questions and starts. */
+  async function onSpeedOpen() {
+    const s = state.setup;
+    if (!s || s.streak || dom.speedOpenBtn.disabled) return;
+    clearMessage(dom.startMsg);
+    s.starting = true;
+    dom.speedOpenLabel.textContent = t('common.loading');
+    updateStartButton();
+    try {
+      await startSpeedRun();
+    } catch (err) {
+      // Stay on setup with every input intact (as US-06).
+      showMessage(dom.startMsg, () => t('speed.failed', { reason: errorText(err) }), 'error');
+    } finally {
+      s.starting = false;
+      dom.speedOpenLabel.textContent = t('speed.name');
+      updateStartButton();
+    }
+  }
+
+  /**
+   * A new run: the first batch first (nothing changes when it fails), then the rules card on this
+   * device's first run, else the countdown. A saved Streak run is never touched.
+   */
+  async function startSpeedRun() {
+    const questions = await fetchStreakBatch([], false);
+    if (!questions.length) throw textError('err.noQuestions');
+    stopTimer();
+    stopSpeedTimers();
+    state.game = null;
+    clearSavedState();
+    const data = speedData();
+    data.run = newSpeedRun();
+    data.onResult = false;
+    speedPauseWanted = false;
+    addToQueue(data.run, questions); // also fetches their pictures
+    markSoloRun('speed');
+    saveSpeed();
+    if (loadSpeedSeen()) startSpeedCountdown();
+    else showSpeedIntro();
+  }
+
+  /** Which part of the Speed overlay shows: 'intro' | 'count' | 'paused', or null to close it. */
+  function showSpeedOverlay(part) {
+    dom.speedIntro.hidden = part !== 'intro';
+    dom.speedCount.hidden = part !== 'count';
+    dom.speedPaused.hidden = part !== 'paused';
+    const open = part !== null;
+    if (dom.speedOverlay.hidden !== open) return; // already in that state
+    dom.speedOverlay.hidden = !open;
+    setPageInert(open); // keyboard focus stays on the card
+  }
+
+  function isSpeedOverlayOpen() {
+    return !dom.speedOverlay.hidden;
+  }
+
+  function showSpeedIntro() {
+    speedPhase = 'intro';
+    showSpeedOverlay('intro');
+    dom.speedGo.focus();
+  }
+
+  function onSpeedGo() {
+    if (speedPhase === 'intro') startSpeedCountdown();
+  }
+
+  let beepAudio = null; // one AudioContext for the page, made on the first beep
+
+  /** One race-start beep; silent when the browser has no Web Audio or blocks it. */
+  function playBeep(hz, seconds) {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!beepAudio) beepAudio = new Ctx();
+      if (beepAudio.state === 'suspended') beepAudio.resume().catch(() => {});
+      const now = beepAudio.currentTime;
+      const osc = beepAudio.createOscillator();
+      const gain = beepAudio.createGain();
+      osc.type = 'square';
+      osc.frequency.value = hz;
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(SPEED_BEEP_GAIN, now + 0.01); // no click at the start
+      gain.gain.setValueAtTime(SPEED_BEEP_GAIN, now + seconds - 0.05);
+      gain.gain.linearRampToValueAtTime(0, now + seconds);           // nor at the end
+      osc.connect(gain);
+      gain.connect(beepAudio.destination);
+      osc.start(now);
+      osc.stop(now + seconds + 0.02);
+    } catch (err) {
+      // No sound is fine: the numbers still show.
+    }
+  }
+
+  /** 3, 2, 1, then the first question (the clock has not started yet). */
+  function startSpeedCountdown() {
+    stopSpeedTimers();
+    speedPhase = 'countdown';
+    showSpeedOverlay('count');
+    let n = SPEED_COUNTDOWN_S;
+    const step = () => {
+      if (n === 0) {
+        speedTicker = null;
+        playBeep(SPEED_GO_HZ, SPEED_GO_S);
+        beginSpeedRun();
+        return;
+      }
+      dom.speedCount.textContent = String(n);
+      dom.speedCount.classList.remove('is-pop');
+      void dom.speedCount.offsetWidth; // restart the pop animation for each number
+      dom.speedCount.classList.add('is-pop');
+      playBeep(SPEED_BEEP_HZ, SPEED_BEEP_S);
+      n -= 1;
+      speedTicker = window.setTimeout(step, 1000);
+    };
+    step();
+  }
+
+  function beginSpeedRun() {
+    const run = speed && speed.run;
+    if (!run) return;
+    run.started = true;
+    markSpeedSeen(); // no rules card from now on
+    postGameLog({ mode: 'speed' });
+    showSpeedOverlay(null);
+    nextSpeedQuestion();
+  }
+
+  /** Back on the rules card or the countdown: no run; on Paused: "End the run now?". */
+  function onSpeedOverlayBack() {
+    if (speedPhase === 'paused' && speed.run && speed.run.started) {
+      if (window.confirm(t('speed.endConfirm', { n: speed.run.score }))) finishSpeed();
+      return;
+    }
+    cancelSpeedStart();
+  }
+
+  /** Drop a run that has not started; the screen behind (setup or a result) stays. */
+  function cancelSpeedStart() {
+    stopSpeedTimers();
+    speedPhase = 'idle';
+    speed.run = null;
+    speed.onResult = state.screen === 'speed' && speed.last !== null;
+    saveSpeed();
+    showSpeedOverlay(null);
+    if (state.screen === 'setup' && !state.setup) startSetup(); // a reload during the countdown
+    else if (state.screen === 'setup') updateStartButton();
+  }
+
+  // --- Questions ---
+
+  /** The next batch for this run (one request at a time). Resolves when it is queued. */
+  function requestSpeedBatch(run) {
+    if (speedRequest && speedRequest.run === run) return speedRequest.promise;
+    const request = { run: run, promise: null };
+    request.promise = fetchStreakBatch(streakTakenIds(run), false).then((questions) => {
+      if (speed && speed.run === run) {
+        addToQueue(run, questions);
+        saveSpeed();
+      }
+    }).finally(() => {
+      if (speedRequest === request) speedRequest = null;
+    });
+    speedRequest = request;
+    return request.promise;
+  }
+
+  function refillSpeed(run) {
+    if (run.queue.length < STREAK_REFILL_AT) requestSpeedBatch(run).catch(() => {});
+  }
+
+  /** Fetch the next queued pictures again (the browser cache keeps them), e.g. after a reload. */
+  function prefetchSpeedImages(run) {
+    run.queue.slice(0, 3).forEach((q) => { if (q.image) new Image().src = q.image; });
+  }
+
+  /** The question's language: the one the player last chose, Arabic first (as the Streak). */
+  function speedLang(run, q) {
+    return run.lang !== 'en' && isFilled(q.question_ar) ? 'ar' : 'en';
+  }
+
+  /** Open the next question; the clock stays frozen while a batch loads. */
+  async function nextSpeedQuestion() {
+    const run = speed && speed.run;
+    if (!run) return;
+    if (!run.queue.length) {
+      speedPhase = 'loading';
+      dom.streakNext.hidden = true;
+      if (speedOnScreen()) showStreakFeedback(t('common.loading'), '');
+      let failure = null;
+      try {
+        await requestSpeedBatch(run);
+      } catch (err) {
+        failure = err;
+      }
+      if (!speed || speed.run !== run) return;
+      if (!run.queue.length) {
+        if (failure && speedOnScreen()) { // "Try again" (the clock stays frozen)
+          showStreakFeedback(t('speed.nextFailed', { reason: sentence(errorText(failure)) }), 'is-bad');
+          dom.streakNext.textContent = t('common.tryAgain');
+          dom.streakNext.hidden = false;
+          dom.streakNext.disabled = false;
+          dom.streakNext.focus();
+          return;
+        }
+        finishSpeed(); // every question was played (or nothing to retry on): the run ends with its score
+        return;
+      }
+    }
+    const q = run.queue.shift();
+    run.usedIds.push(q.id);
+    run.current = { q: q, lang: speedLang(run, q), picked: null, elapsedMs: 0 };
+    saveSpeed();
+    openSpeedQuestion();
+    refillSpeed(run);
+  }
+
+  function onSpeedRetry() {
+    if (speedPhase === 'loading' && !dom.streakNext.hidden && !dom.streakNext.disabled) {
+      dom.streakNext.disabled = true;
+      nextSpeedQuestion();
+    }
+  }
+
+  /** Put the run's question on the screen with the clock stopped; it starts once the question is visible. */
+  function openSpeedQuestion() {
+    const run = speed.run;
+    const cur = run.current;
+    setStreakLayout(true);
+    dom.screens.question.classList.add('speed');
+    dom.qHeading.textContent = runHeading(cur.q);
+    renderQuestionImage(cur.q);
+    renderRunLang(cur.q, cur, speedAnswer);
+    renderSpeedPanel();
+    dom.streakNext.hidden = true; // "Try again" belongs to a failed load only
+    showStreakFeedback('', '');
+    showScreen('question');
+    updateReportButton(); // none in the Speed Round
+    showTimerAt(SPEED_CAP_S, run.leftMs, SPEED_LOW_S * 1000);
+    setTimeUp(false);
+    prefetchSpeedImages(run);
+    armSpeedQuestion();
+  }
+
+  /** Start the open question when it can be seen: not while the tab is hidden, after its picture loaded. */
+  function armSpeedQuestion() {
+    const cur = speed.run.current;
+    if (speedPauseWanted || document.hidden) {
+      enterSpeedPause();
+      return;
+    }
+    if (cur.picked !== null) { // answered before a reload or a pause: on to the next one
+      nextSpeedQuestion();
+      return;
+    }
+    speedPhase = 'wait';
+    dom.screens.question.classList.add('is-waiting'); // the question shows all at once, picture included
+    const token = ++speedToken;
+    whenImageReady(cur.q, () => {
+      if (token === speedToken && speedPhase === 'wait') goSpeedLive();
+    });
+  }
+
+  /** `done` once the question's picture has loaded (or failed, or after SPEED_IMAGE_WAIT_MS); at once without one. */
+  function whenImageReady(q, done) {
+    const image = dom.qImage;
+    if (!q.image || image.complete) { // with src set, complete = loaded or broken: start either way
+      done();
+      return;
+    }
+    let called = false;
+    const once = () => {
+      if (called) return;
+      called = true;
+      image.removeEventListener('load', once);
+      image.removeEventListener('error', once);
+      window.clearTimeout(wait);
+      done();
+    };
+    const wait = window.setTimeout(once, SPEED_IMAGE_WAIT_MS);
+    image.addEventListener('load', once);
+    image.addEventListener('error', once);
+  }
+
+  /** The question is visible: its stopwatch and the run's clock start. */
+  function goSpeedLive() {
+    const run = speed.run;
+    speedPhase = 'live';
+    dom.screens.question.classList.remove('is-waiting');
+    speedShownAt = now();
+    run.deadline = Date.now() + run.leftMs;
+    saveSpeed();
+    startTimer(SPEED_CAP_S, run.leftMs, onSpeedTimeUp, SPEED_LOW_S * 1000);
+    stopSpeedSaver();
+    speedSaver = window.setInterval(saveSpeedProgress, SPEED_SAVE_MS);
+    dom.qHeading.focus();
+    onQuestionShown(false); // US-48: read aloud when that is on
+  }
+
+  /** BUG-59-03: while the clock runs, save the time left and the time the question has been seen. */
+  function saveSpeedProgress() {
+    const run = speed && speed.run;
+    if (!run || speedPhase !== 'live' || !timer.running) {
+      stopSpeedSaver();
+      return;
+    }
+    const at = now();
+    run.leftMs = Math.max(0, Math.min(timer.endAt - at, SPEED_CAP_S * 1000));
+    run.current.elapsedMs += Math.max(0, at - speedShownAt);
+    speedShownAt = at; // the stopwatch goes on from here, so nothing is counted twice
+    saveSpeed();
+  }
+
+  function stopSpeedSaver() {
+    if (speedSaver !== null) window.clearInterval(speedSaver);
+    speedSaver = null;
+  }
+
+  /** Stop the running clock and the stopwatch, keeping the time left and the time seen. */
+  function freezeSpeedClock() {
+    const run = speed.run;
+    stopSpeedSaver();
+    pauseTimer();
+    run.current.elapsedMs += Math.max(0, now() - speedShownAt);
+    run.leftMs = timer.remainingMs;
+    run.deadline = null;
+  }
+
+  /** A tapped choice: right +1 and time by speed, wrong −SPEED_WRONG_S; the clock is frozen for the feedback. */
+  function speedAnswer(index) {
+    const run = speed && speed.run;
+    const cur = run && run.current;
+    if (!cur || cur.picked !== null || speedPhase !== 'live' || !speedOnScreen()) return;
+    freezeSpeedClock();
+    cur.picked = index;
+    run.answered += 1;
+    const right = index === cur.q.correct;
+    let seconds;
+    let label = '';
+    if (right) {
+      const ms = Math.round(cur.elapsedMs);
+      const tier = speedTier(ms);
+      run.score += 1;
+      run.times.push(ms);
+      seconds = tier.addS;
+      label = tier.label;
+    } else {
+      seconds = -SPEED_WRONG_S;
+    }
+    // US-47: right and wrong answers count for the difficulty stats (the clock running out never does)
+    sendQuestionStat(run, cur.q.id, right ? STAT.correct : STAT.wrong);
+    // No markSeen (D-73 ac): Speed Round neither uses nor fills the played-questions list; a question
+    // never repeats within one run (usedIds, sent as exclude).
+    extendDeadline(seconds * 1000);
+    run.leftMs = timer.remainingMs;
+    speedPhase = 'feedback';
+    saveSpeed();
+    stopReading();
+    renderRunChoices(cur.q, cur, speedAnswer);
+    renderSpeedPanel();
+    showSpeedFeedback(right, label, seconds);
+    speedTicker = window.setTimeout(afterSpeedFeedback, SPEED_FEEDBACK_MS);
+  }
+
+  function afterSpeedFeedback() {
+    speedTicker = null;
+    const run = speed && speed.run;
+    if (!run || speedPhase !== 'feedback') return;
+    if (run.leftMs <= 0) finishSpeed();
+    else nextSpeedQuestion();
+  }
+
+  /**
+   * "Lightning! +5 s" or "Wrong! −3 s. The right answer was B, Ottawa." in the polite live line, and
+   * the "+5 s" / "−3 s" that floats by the clock (still under reduced motion, CSS).
+   */
+  function showSpeedFeedback(right, label, seconds) {
+    const delta = speedDeltaText(seconds);
+    const cur = speed.run.current;
+    if (right) {
+      showStreakFeedback(t('speed.rightLine', { label: t(label), delta: delta }), 'is-good');
+    } else {
+      const answer = cur.q.choices[cur.q.correct];
+      const arabic = cur.lang === 'ar';
+      showStreakFeedback(t('speed.wrongLine', { delta: delta }) + t('run.rightWas', { letter: CHOICE_LETTERS[cur.q.correct] }),
+        'is-bad', { text: arabic ? answer.text_ar : answer.text, arabic: arabic });
+    }
+    const float = dom.speedDelta;
+    float.textContent = delta;
+    float.className = 'speed-delta ' + (seconds >= 0 ? 'is-gain' : 'is-loss');
+    float.hidden = false;
+  }
+
+  /** The clock reached 0 on an open question: it shows as time's up (no stat is sent), then the result. */
+  function onSpeedTimeUp() {
+    const run = speed && speed.run;
+    if (!run || speedPhase !== 'live') return;
+    stopSpeedSaver();
+    speedPhase = 'over';
+    run.leftMs = 0;
+    run.deadline = null;
+    run.current.picked = STREAK_TIME_UP;
+    saveSpeed();
+    renderRunChoices(run.current.q, run.current, speedAnswer);
+    showStreakFeedback(t('timer.up'), 'is-bad');
+    speedTicker = window.setTimeout(finishSpeed, SPEED_FEEDBACK_MS);
+  }
+
+  /** The panel: "Best: 12", the score, the hint, End run (Next only for "Try again"). */
+  function renderSpeedPanel() {
+    const run = speed.run;
+    setRunPanelTexts(t('speed.name'), t('speed.score'), t('speed.hint', { wrong: SPEED_WRONG_S, cap: SPEED_CAP_S }));
+    dom.streakName.textContent = t('speed.bestLabel', { n: speed.best });
+    dom.streakName.style.borderInlineStartColor = 'var(--gold)'; // the right edge in Arabic
+    dom.streakCount.textContent = String(run.score);
+    dom.streakChances.hidden = true; // no second chances here
+    if (speedPhase !== 'loading') dom.streakNext.hidden = true;
+    dom.streakEnd.hidden = false;
+    dom.streakEnd.disabled = false;
+  }
+
+  function toggleSpeedLang() {
+    const run = speed.run;
+    const cur = run.current;
+    if (!isFilled(cur.q.question_ar)) return;
+    cur.lang = cur.lang === 'ar' ? 'en' : 'ar';
+    run.lang = cur.lang; // the next questions keep the chosen language
+    renderRunLang(cur.q, cur, speedAnswer);
+    saveSpeed();
+  }
+
+  // --- Pause (hidden tab, reload) and End run ---
+
+  /** The tab was hidden (or the page is being left): the run waits for a tap. */
+  function pauseSpeed() {
+    if (!speed || !speed.run) return;
+    if (speedPhase === 'live') {
+      freezeSpeedClock();
+      enterSpeedPause();
+    } else if (speedPhase === 'wait' || speedPhase === 'countdown') {
+      stopSpeedTimers();
+      enterSpeedPause();
+    } else if (speedPhase === 'feedback' || speedPhase === 'loading' || speedPhase === 'hold') {
+      speedPauseWanted = true; // pauses when the next question opens (or the confirm closes)
+      saveSpeed();
+    }
+  }
+
+  function enterSpeedPause() {
+    speedPhase = 'paused';
+    speedPauseWanted = false;
+    stopReading();
+    saveSpeed();
+    showSpeedOverlay('paused');
+    dom.speedResume.focus();
+  }
+
+  function onSpeedResume() {
+    if (speedPhase !== 'paused' || !speed || !speed.run) return;
+    showSpeedOverlay(null);
+    if (!speed.run.started) startSpeedCountdown();
+    else armSpeedQuestion();
+  }
+
+  function onSpeedVisibility() {
+    if (document.hidden) pauseSpeed();
+  }
+
+  /** End run (or Android Back): the clock is frozen while the confirm is open. */
+  function onSpeedEnd() {
+    if (!speedOnScreen() || speedPhase === 'over' || speedPhase === 'paused') return;
+    const wasLive = speedPhase === 'live';
+    const before = speedPhase;
+    if (wasLive) {
+      freezeSpeedClock();
+      speedPhase = 'hold';
+      saveSpeed();
+    } else if (speedPhase === 'wait') {
+      stopSpeedTimers();
+    }
+    if (window.confirm(t('speed.endConfirm', { n: speed.run.score }))) {
+      finishSpeed();
+      return;
+    }
+    if (!speed.run || speedPhase === 'over') return;
+    if (wasLive || before === 'wait') {
+      if (speedPauseWanted || document.hidden) enterSpeedPause();
+      else if (wasLive) goSpeedLive();
+      else armSpeedQuestion();
+    }
+  }
+
+  // --- Result ---
+
+  /** The run is over: the result (with the personal best) is saved and shown. */
+  function finishSpeed() {
+    const data = speed;
+    const run = data && data.run;
+    if (!run) return;
+    stopTimer();
+    stopSpeedTimers();
+    speedPhase = 'over';
+    speedPauseWanted = false;
+    stopReading();
+    const result = {
+      score: run.score,
+      prevBest: data.best,
+      newBest: run.score > data.best,
+    };
+    if (result.newBest) {
+      data.best = run.score;
+      data.bestAt = Date.now();
+    }
+    data.last = result;
+    data.run = null;
+    data.onResult = true;
+    saveSpeed();
+    showSpeedOverlay(null);
+    showSpeedResult();
+  }
+
+  function showSpeedResult() {
+    speedPhase = 'idle';
+    renderSpeedResult();
+    dom.speedShareStatus.textContent = '';
+    clearMessage(dom.speedMsg);
+    showScreen('speed');
+    dom.speedTitle.focus();
+  }
+
+  function renderSpeedResult() {
+    const r = speed.last;
+    dom.speedScore.textContent = String(r.score);
+    dom.speedScoreLabel.textContent = tn('speed.scoreLabel', r.score);
+    let best;
+    if (r.newBest) best = t('speed.newBest');
+    else if (r.score > 0 && r.score === r.prevBest) best = t('speed.tiedBest', { best: r.prevBest });
+    else if (r.score < r.prevBest) best = tn('speed.away', r.prevBest - r.score, { best: r.prevBest });
+    else best = t('speed.noScore');
+    dom.speedBest.textContent = best;
+    dom.speedBest.classList.toggle('is-new', r.newBest);
+  }
+
+  /** "Mokh Rush Speed Round: 18 correct" (js/share.js adds the site link). */
+  function speedShareText(r) {
+    return t('speed.share', { count: tn('speed.correctCount', r.score) });
+  }
+
+  function onSpeedShare() {
+    if (speed && speed.last && state.screen === 'speed') shareText(speedShareText(speed.last), dom.speedShareStatus);
+  }
+
+  /** Play again: a new run with the countdown only (the rules card was seen on the first run). */
+  async function onSpeedAgain() {
+    if (dom.speedAgain.disabled || state.screen !== 'speed') return;
+    clearMessage(dom.speedMsg);
+    dom.speedAgain.disabled = true;
+    dom.speedAgain.textContent = t('setup.starting');
+    try {
+      await startSpeedRun();
+    } catch (err) {
+      showMessage(dom.speedMsg, () => t('speed.failed', { reason: errorText(err) }), 'error');
+    } finally {
+      dom.speedAgain.disabled = false;
+      dom.speedAgain.textContent = t('lb.again');
+    }
+  }
+
+  /** New Game on the result: back to setup. Never newGame(): that would clear a saved Streak run. */
+  function onSpeedNewGame() {
+    if (speed) {
+      speed.onResult = false;
+      saveSpeed();
+    }
+    if (state.setup) {
+      showScreen('setup');
+      updateStartButton();
+      dom.speedOpenBtn.focus();
+    } else {
+      startSetup();
+    }
+  }
+
+  /** A reload: the result screen, or the run paused with the time it had left. Returns true when shown. */
+  function restoreSavedSpeed() {
+    const data = loadSpeed();
+    if (!data || (!data.run && !data.onResult)) return false;
+    speed = data;
+    try {
+      if (data.run) restoreSpeedRun();
+      else showSpeedResult();
+      return true;
+    } catch (err) {
+      stopTimer();
+      stopSpeedTimers();
+      speedPhase = 'idle';
+      showSpeedOverlay(null);
+      speed.run = null;
+      speed.onResult = false;
+      saveSpeed();
+      return false;
+    }
+  }
+
+  function restoreSpeedRun() {
+    const run = speed.run;
+    // Closed without a pause (BUG-59-03): the time left saved while the clock ran (at most SPEED_SAVE_MS
+    // old), never more than that and never above the cap; the run comes back paused like a reload.
+    run.leftMs = Math.max(0, Math.min(run.leftMs, SPEED_CAP_S * 1000));
+    run.deadline = null;
+    if (run.started && run.leftMs <= 0) { // the clock ran out while the page was closed: no stat is sent
+      finishSpeed();
+      return;
+    }
+    if (!run.started || !run.current) {
+      if (loadSpeedSeen()) startSpeedCountdown();
+      else showSpeedIntro();
+      return;
+    }
+    speedPauseWanted = true; // the question opens under "Paused, tap to resume"
+    openSpeedQuestion();
+  }
+
+  function bindSpeedEvents() {
+    dom.speedOpenBtn.addEventListener('click', onSpeedOpen);
+    dom.speedGo.addEventListener('click', onSpeedGo);
+    dom.speedResume.addEventListener('click', onSpeedResume);
+    dom.speedAgain.addEventListener('click', onSpeedAgain);
+    dom.speedShare.addEventListener('click', onSpeedShare);
+    dom.speedNewGame.addEventListener('click', onSpeedNewGame);
+    setText(dom.speedRule2, () => t('speed.rule2', { time: t('speed.seconds', { n: SPEED_WRONG_S }) }));
+    document.addEventListener('visibilitychange', onSpeedVisibility);
+    window.addEventListener('pagehide', pauseSpeed); // a reload keeps the time left exactly
   }
 
   // ---------- Daily Crossword (US-58, D-72) ----------
@@ -5741,6 +6657,10 @@
   /** What the speaker reads now, as [{ text, lang }] (the question first), or null when no question is open. */
   function speechParts() {
     if (state.screen !== 'question') return null;
+    if (speedOnScreen()) { // US-59: only while the question is open and visible
+      const cur = speed.run.current;
+      return speedPhase === 'live' ? runSpeechParts(cur.q, cur) : null;
+    }
     if (streakOnScreen()) return runSpeechParts(streak.current.q, streak.current);
     if (dailyOnScreen()) return runSpeechParts(dailyQuestion(), daily.current);
     const g = state.game;
@@ -6030,13 +6950,20 @@
       else if (!dom.dailyPlay.hidden) dom.dailyNext.textContent = t('daily.ready');
     } else if (state.screen === 'crossword' && crossword) {
       renderCrossword(); // progress, the toggled clues and the timer stay (US-58)
+    } else if (state.screen === 'speed' && speed && speed.last) {
+      renderSpeedResult(); // US-59
     }
   }
 
   /** The open question (board, Golden Goal, Streak or Daily Challenge), without touching its timer. */
   function refreshQuestion() {
     const g = state.game;
-    if (streakOnScreen()) {
+    if (speedOnScreen()) { // US-59: the clock and its frozen or running state stay as they are
+      const cur = speed.run.current;
+      dom.qHeading.textContent = runHeading(cur.q);
+      renderRunLang(cur.q, cur, speedAnswer);
+      renderSpeedPanel();
+    } else if (streakOnScreen()) {
       renderRunHeading(streak.current.q);
       renderStreakLang();
       renderStreakPanel();
@@ -6103,7 +7030,7 @@
     dom.streakBoardBtn.addEventListener('click', onLeaderboardOpen);
     dom.streakNameInput.addEventListener('input', () => setFieldError(dom.streakNameInput, dom.streakNameError, ''));
     dom.streakNext.addEventListener('click', onRunNext);
-    dom.streakEnd.addEventListener('click', onStreakEnd);
+    dom.streakEnd.addEventListener('click', onRunEnd);
     if (dom.chanceUse) { // US-54: not on the Integration Quiz page
       dom.chanceUse.addEventListener('click', onStreakSecondChance);
       dom.chanceEnd.addEventListener('click', onChanceEnd);
@@ -6141,6 +7068,7 @@
     bindStreakEvents();
     bindDailyEvents();
     bindCrosswordEvents();
+    bindSpeedEvents();
     bindReportEvents();
     bindFinalEvents();
     dom.uiLangBtns.forEach((btn) => btn.addEventListener('click', onUiLangClick)); // US-49
@@ -6190,6 +7118,9 @@
         clearSavedState();
       }
     }
+    // US-59: one saved solo run at a time; a Speed Round started after the others comes back first.
+    if (!INTEGRATION && lastSoloMode() === 'speed' && restoreSavedSpeed()) return;
+    if (!INTEGRATION && lastSoloMode() === 'daily' && restoreSavedDaily()) return;
     const savedStreak = loadStreak();
     if (savedStreak) {
       try {
@@ -6203,6 +7134,7 @@
     }
     if (!INTEGRATION && restoreSavedCrossword()) return;
     if (!INTEGRATION && restoreSavedDaily()) return;
+    if (!INTEGRATION && restoreSavedSpeed()) return;
     startSetup();
   }
 
