@@ -3507,7 +3507,7 @@
       deadline: Date.now() + run.timerSeconds * 1000,
       picked: null,
     };
-    if (!INTEGRATION) markSeen(q.id); // later boards and runs avoid it too
+    // D-75: a Streak question is not added to the played list (it still skips the ones played on the board)
     saveStreak();
     showStreakQuestion();
     refillStreak(run);
