@@ -1427,6 +1427,17 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 .speed-score-label { font-size: 1.2rem; font-weight: 700; }
 .speed-best { margin: 0 0 0.4rem; font-size: 1.2rem; font-weight: 700; }
 .speed-best.is-new { color: var(--success); }
+/* US-60: the leaderboard rank line under the best, and the save failure with Try again */
+.speed-rank { margin: 0 0 0.4rem; }
+.speed-rank[hidden] { display: none; }
+/* US-60: the Speed Round button and its trophy (the Speed leaderboard) stay together when the setup row wraps */
+.speed-pair { display: inline-flex; align-items: center; gap: 0.5rem; }
+.speed-pair[hidden] { display: none; }
+/* US-60: the name step in the Speed card: a left-aligned field (start in Arabic), Back and Start centred */
+.speed-intro { margin: 0; }
+.speed-name-field { margin: 0 0 0.4rem; text-align: start; }
+.double-card .speed-name-field p { margin: 0.25rem 0 0; }
+.speed-intro-actions { justify-content: center; margin-top: 0.6rem; }
 @media (prefers-reduced-motion: reduce) {
   .speed-count.is-pop, .speed-delta, .question.speed .timer.is-low .timer-value { animation: none; }
 }

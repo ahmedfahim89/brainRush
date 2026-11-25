@@ -801,3 +801,15 @@ US-56 Challenge a friend (Should, M: new `challenges` table and API) is in `docs
 4. ~~Live deploy (FU-95)~~ Done 2026-11-25: uploaded, Speed Round ticked in live Admin, desktop live check passed. The phone run moves to FU-93.
 
 ---
+
+## Change request "Speed leaderboard" (US-60, Epic E20) — outside the sprint cycle, 2026-11-25
+
+**Goal:** a shared Speed Round leaderboard "with the same logic as the Streak Challenge" (D-76): score = correct answers, best run per name, This week / All time, the rank line after a run; the name is asked in the Speed popup before the countdown on every run. Reuses `api/streaks.php` on a new table `speed_scores` (migration `sql/migrate-add-speed-scores.sql` before the code).
+
+- **Story:** US-60 (Should, M).
+- **Pipeline:** game-developer (done 2026-11-25, `docs/sprints/us-60-dev.md`), then game-tester, PO acceptance, scrum-master; then the owner's local Chrome test on :8000 before the commit (FU-100).
+- **Status:** Built, uncommitted on branch `speed-leaderboard`; local migration run.
+
+**Follow-ups (`docs/product-backlog.md`):** FU-100 local check and commit (Must, Owner), FU-101 PR, hosted migration first, deploy (Must, Owner), FU-102 Arabic review of the new strings (Should, Owner), FU-103 Arabic setup row wrap at 1366 px (Could, Owner).
+
+**Outcome (2026-11-26):** Tested: 52 PASS, 2 FAIL, 7 PENDING. BUG-60-01 (Major) and BUG-60-03 (Minor) were fixed in fix loop 1. **PO accepted US-60 with follow-ups** (D-76 k to p). The pending rows are covered by the developer's run, by code or by FU-101. New follow-ups: FU-104 (Must, Tester) re-tests the fix loop and blocks the commit. FU-105 (Could, Owner) decides BUG-60-04; the PO recommends "Your leaderboard best is still N." for Speed only. FU-106 (Could, Owner) is the missing question image (BUG-60-02, existed before US-60). Next: FU-104, then FU-100, then FU-101.

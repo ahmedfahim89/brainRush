@@ -345,7 +345,7 @@
       // Speed Round (US-59, D-73)
       'speed.name': 'Speed Round',
       'speed.rule1': 'Answer fast to earn time',
-      'speed.rule2': 'Wrong costs {time}',
+      'speed.rule2': 'Wrong costs {n} seconds',
       'speed.rule3': 'Every correct answer is a point',
       'speed.go': 'Start',
       'speed.paused': 'Paused',
@@ -370,6 +370,19 @@
       'speed.noScore': 'No correct answers this time. Try again!',
       'speed.correctCount': { one: '1 correct', other: '{n} correct' },
       'speed.share': 'Mokh Rush Speed Round: {count}',
+      // Speed leaderboard (US-60, D-76): the name step, the result's rank line and the leaderboard screen
+      'speed.nameHint': 'Your score goes on the shared Speed leaderboard with this name.',
+      'speed.leaderboard': 'Speed leaderboard',
+      'speed.boardBtn': 'Leaderboard',
+      'speed.lbHeadline': '{name}: {count}!', // "Ahmed Fahim: 18 correct!"
+      'speed.lbSaving': 'Saving your score...',
+      'speed.lbSaveFailed': 'Your score could not be saved: {reason} ',
+      'speed.lbOnlyOne': 'Only runs with 1 or more correct answers go on the leaderboard.',
+      'speed.lbEmpty': 'No scores yet. Be the first!',
+      'speed.lbEmptyWeek': 'No scores this week yet. Be the first!',
+      'speed.lbTopAll': 'Top 10 Speed Round scores of all time',
+      'speed.lbTopWeek': 'Top 10 Speed Round scores this week',
+      'speed.unsaved': 'Your score of {n} was not saved. Leave it unsaved?',
 
       // Golden Goal, the final round (US-44, D-48, D-50, D-51)
       'final.name': 'Golden Goal',
@@ -752,7 +765,7 @@
       // Speed Round (US-59): AI-drafted, to the native review (FU-91)
       'speed.name': 'جولة السرعة',
       'speed.rule1': 'أجب بسرعة لتكسب وقتًا',
-      'speed.rule2': 'الإجابة الخاطئة تكلّفك {time}',
+      'speed.rule2': 'الإجابة الخاطئة تكلّفك {n} ثوانٍ',
       'speed.rule3': 'كل إجابة صحيحة بنقطة',
       'speed.go': 'ابدأ',
       'speed.paused': 'متوقفة مؤقتًا',
@@ -783,6 +796,18 @@
       'speed.noScore': 'لا إجابات صحيحة هذه المرة. حاول مجددًا!',
       'speed.correctCount': { zero: 'لا إجابات صحيحة', one: 'إجابة صحيحة واحدة', two: 'إجابتان صحيحتان', few: '{n} إجابات صحيحة', many: '{n} إجابة صحيحة', other: '{n} إجابة صحيحة' },
       'speed.share': 'جولة السرعة في مخ رش: {count}',
+      'speed.nameHint': 'ستظهر نتيجتك بهذا الاسم في لوحة صدارة جولة السرعة.',
+      'speed.leaderboard': 'لوحة صدارة جولة السرعة',
+      'speed.boardBtn': 'لوحة الصدارة',
+      'speed.lbHeadline': '{name}: {count}!',
+      'speed.lbSaving': 'جارٍ حفظ نتيجتك...',
+      'speed.lbSaveFailed': 'تعذّر حفظ نتيجتك: {reason} ',
+      'speed.lbOnlyOne': 'لا تدخل لوحة الصدارة إلا الجولات التي فيها إجابة صحيحة واحدة على الأقل.',
+      'speed.lbEmpty': 'لا توجد نتائج بعد. كن أول من يسجّل!',
+      'speed.lbEmptyWeek': 'لا توجد نتائج هذا الأسبوع بعد. كن أول من يسجّل!',
+      'speed.lbTopAll': 'أفضل 10 نتائج في جولة السرعة على الإطلاق',
+      'speed.lbTopWeek': 'أفضل 10 نتائج في جولة السرعة هذا الأسبوع',
+      'speed.unsaved': 'لم تُحفظ نتيجتك ({n}). هل تغادر دون حفظها؟',
 
       'final.name': 'الهدف الذهبي',
       'final.round': ' – الجولة {n}',

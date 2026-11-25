@@ -13,16 +13,18 @@
 // them (read_json_body() forces a CORS preflight); the full list and DELETE are admin only
 // (require_admin), so the admin can remove junk or offensive names. Accepted limitation (D-37): the
 // answers are in the question payload and the POST is public, so a determined user can fake a score.
-// The Integration Quiz (api/integration-quiz.php) includes this file for its own leaderboard: every
-// function takes the table (one of STREAK_TABLES), and streak_board_request() is the shared routing.
+// The Integration Quiz (api/integration-quiz.php) and the Speed Round (api/speed-scores.php, US-60)
+// include this file for their own leaderboards: every function takes the table (one of
+// STREAK_TABLES), and streak_board_request() is the shared routing.
 require_once __DIR__ . '/db.php';
 
 const STREAK_NAME_MAX = 30;  // NAME_MAX in js/game.js (D-22)
 const STREAK_MAX = 100000;
 const STREAK_TOP = 10;
 const STREAK_PERIODS = ['all', 'week']; // GET ?period= (US-45); no period means 'all'
-// The leaderboard tables, with the same columns: the public Streak Challenge and the Integration Quiz.
-const STREAK_TABLES = ['streaks', 'integration_scores'];
+// The leaderboard tables, with the same columns: the public Streak Challenge, the Integration Quiz and
+// the Speed Round (US-60: `streak` holds the run's correct answers).
+const STREAK_TABLES = ['streaks', 'integration_scores', 'speed_scores'];
 
 /** $table as it goes into the SQL; a table name cannot be a bound parameter, so only STREAK_TABLES pass. */
 function streak_table(string $table): string
@@ -171,7 +173,7 @@ function delete_streak(PDO $pdo, string $table, int $id): void
     $stmt = $pdo->prepare('DELETE FROM ' . streak_table($table) . ' WHERE id = :id');
     $stmt->execute([':id' => $id]);
     if ($stmt->rowCount() === 0) {
-        not_found('Streak run not found');
+        not_found('Run not found'); // shared by the Streak, Integration Quiz and Speed tables (BUG-60-03)
     }
     json_response(['deleted' => $id]);
 }
@@ -205,7 +207,7 @@ function streak_board_request(string $table): void
     }
 }
 
-// Included for its functions only (api/integration-quiz.php): handle no request.
+// Included for its functions only (api/integration-quiz.php, api/speed-scores.php): handle no request.
 if (defined('STREAKS_INCLUDE_ONLY')) {
     return;
 }
