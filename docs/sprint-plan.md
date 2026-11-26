@@ -1,6 +1,6 @@
 # BrainRush — Sprint Plan
 
-Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..US-30 in Sprints 1-6, decisions D-01..D-32, follow-ups FU-01..FU-15; Epic E17 US-42..US-53 in Sprints 7-15, open owner questions FU-20..FU-24).
+Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..US-30 in Sprints 1-6, decisions D-01..D-32, follow-ups FU-01..FU-15; Epic E17 US-42..US-53 in Sprints 7-15, open owner questions FU-20..FU-24; FU-24 cancelled 2026-11-27). Phone buzzer (US-52, US-64, US-65, D-80): phone Sprints 0-3 on branch `phone-buzzer`, see the section after Sprint 13; open owner question FU-117.
 
 **Overall status (2026-10-19):** Sprints 1-6 Done and shipped. Sprint 6 (Question bank) and D-32 (pick 1..N categories) were merged via PR #11 on 2026-10-11, and the hosted DB is migrated (FU-11). Follow-ups FU-10..FU-15 are all Done; no open items. Later owner requests were shipped outside the sprint cycle: Egypt questions (PR #13, #16), Arabic localization (PR #17, #19), the Gen Z set (PR #18), the AI set (PR #20), the Egyptians set (`sql/add-egyptians-questions.sql`, PR #22, 2026-10-15), the game start log (`api/game-log.php` writes one line per started game with time, player names and categories to a daily `logs/game-YYYY-MM-DD.log`, blocked from the web; PR #24, deployed 2026-10-18) and the "new questions" banner (gold strip at the top of the setup screen; Admin > Game settings turns it on or off and sets its text, stored as `banner_enabled` / `banner_text` settings, no DB migration; branch `new-questions-banner`, 2026-10-19).
 
@@ -25,7 +25,11 @@ Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..U
 | 11 | Question difficulty stats (US-47) | Done: accepted by the PO 2026-11-03 (D-56); merged to `main` (PR #92, `e5e4776`); reset-stats CR merged (PR #93) |
 | 12 | Custom category for one game (US-50) | Cancelled by the owner 2026-11-11 |
 | 13 | Arabic interface (US-49) | Accepted by the PO 2026-11-09 (ran before Sprint 12); merged to `main` (PR #94, `1629605`); FU-47, FU-48 and FU-49 are Done in the backlog. CR "Arabic category names" accepted 2026-11-09 (D-61); hosted migration before the code (FU-53) |
-| 14 | Phone buzzers (US-52), spike first | Planned (later; not committed until the FU-24 spike) |
+| 14 | Phone buzzers (US-52), spike first | Replaced 2026-11-27 by the Phone buzzer plan below (D-80; FU-24 cancelled) |
+| Phone 0 | Phone buzzer docs (stories US-52, US-64, US-65; D-80) | Done (2026-11-27) |
+| Phone 1 | Rooms, joining, live board (US-52) | Planned |
+| Phone 2 | Questions and answers on phones (US-64) | Planned |
+| Phone 3 | Golden Goal bets on phones, release (US-65) | Planned (blocked until FU-117 is answered) |
 | 15 | Rewarded second chance in Streak (US-51) | Planned (later; blocked by FU-23) |
 
 Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops) -> product-owner accepts -> scrum-master updates status -> commit on branch `sprint-N` + PR to `main`.
@@ -598,31 +602,101 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 
 ---
 
-## Sprint 14 — Phone buzzers (US-52) — later, spike first
+## Phone buzzer (US-52, US-64, US-65) — phone Sprints 0 to 3, branch `phone-buzzer`
 
-**Goal:** Decide with evidence whether phone buzzers can work on Hostinger shared hosting (no WebSockets), and build them only if the owner commits the story after the spike. (Owner: later, its own sprint.)
-**Stories:** US-52 (**not committed** until the FU-24 spike result is accepted by the owner and the PO)
-**Dependencies:** **FU-24** (technical spike on short polling: latency, server load, cleanup). If committed: Sprint 13 is already done, so the buzzer pages (`buzzer.html`, `js/buzzer.js`) and the new host-screen room code / QR strings must ship in English and Arabic through `js/i18n.js` (D-60), with RTL and Arabic tests; Setup/Question screens; Privacy page.
-**Owner questions needed before development:** **FU-24** (spike) and, after it, the owner's go / no-go. Nothing in Phase 2 starts before that.
+*Replaces the old "Sprint 14 — Phone buzzers, spike first" plan. Owner approved the design on 2026-11-27 (D-80; plan `C:\Users\NB28970\.claude\plans\the-game-is-based-zesty-rabin.md`). FU-24 (spike) is cancelled; its latency check is part of phone Sprint 1. The phone sprints are numbered 0 to 3 so they do not clash with Sprints 1 to 15 above.*
 
-**Phase 1 — Spike (time-boxed, no application code merged)**
-1. `docs/sprints/sprint-14-spike.md` — prototype of a room with short polling (a throwaway script, not merged): measure buzz-to-host latency, requests per second per room, and load on the shared host for 1, 5 and 10 phones.
-2. Same note — fairness check (how often the order is wrong at about 0.5-1 s polling), cleanup options without cron (for example deleting idle rooms on request), and the tables needed.
-3. Same note — go / no-go recommendation; the PO and owner decide, and the Scrum Master then either commits Phase 2 (and updates this sprint) or moves US-52 back to the backlog.
+**What it is:** a "Game control" choice on Setup (Players and Teams only): **Host control** (today's game, unchanged) or **Phone buzzer** (players join by QR / room code, pick their name, see a live read-only board, type answers on their phones; the host still picks cells and marks Correct / Wrong; Golden Goal bets are private on the phones). Hostinger has no WebSockets, so phones poll about once a second. Tournament and Mokh Bot are unchanged.
 
-**Phase 2 — Outline only, to be refined after the spike (not committed)**
-4. `sql/migrate-add-buzzer-rooms.sql` (new) + both schema files — room and buzz tables with a last-activity time; rooms idle for 6 h are deleted.
-5. `api/rooms.php` (new) — create room (code), join (pick contestant), buzz, read buzz order; validation and rate limits; no personal data.
-6. `buzzer.html` + `js/buzzer.js` (new) — phone page; `index.html` + `js/game.js` — room code and QR on the host screen, buzz order shown within about 1 s, host still scores; a QR approach that adds no external service.
-7. `privacy.html`, `README.md`, `docs/deploy-hostinger.md`, `docs/sprints/sprint-14-dev.md`.
+**Common rules (all phone sprints)**
+- One worktree branch `phone-buzzer`; **one PR per sprint**, merged by the owner. Pipeline as usual: PO stories -> Scrum Master plan -> game-developer -> game-tester -> PO acceptance -> owner local check -> commit / PR.
+- Every new host call is guarded by `if (mode === 'phone')`; Host control keeps its code path and makes **no** rooms API call.
+- All new text goes through `js/i18n.js` in EN and AR (D-58, D-60), RTL on the join page, names and numbers isolated; AR strings are AI-drafted pending native review.
+- `sw.js` caches the new page and assets and **never** caches `api/rooms.php`; assets use the existing content-hashed names (run the build step; the join page references the hashed files).
+- The right answer is never sent to phones; Kilo Meshakkal boxes and the double cell are hidden in the phone payload as on the host board (US-52).
+- Migration rule: `sql/migrate-add-rooms.sql` (re-runnable) and both schema files (`sql/schema.sql`, `sql/schema-hosted.sql`, identical bodies) carry each sprint's tables; on Hostinger the migrate SQL is imported through phpMyAdmin **before** the code.
 
-**Tester focus:** Phase 1: the spike note's numbers can be repeated and the recommendation follows from them. Phase 2 (if committed): room code and QR, join, first buzz order within about 1 s with several phones, host scoring unchanged, 6 h cleanup, bad codes and rate limits, load on the host, phone browsers (iOS Safari, Chrome Android), no console errors.
+**Definition of Done (every phone sprint, on top of the global DoD)**
+- Host control regression: a full game (Golden Goal, Swap, Skip, 3 choices, double cell, Kilo Meshakkal) plays exactly as before; no rooms call in the network log.
+- EN and AR (RTL) checked on every new or changed screen; join page fits 375x812 and 320 px wide.
+- Local Chrome test by the tester: host window plus 3 to 4 join tabs (one in a mobile viewport), as listed in the sprint's test focus; no console errors.
+- Owner's local check **before commit**; one PR; migrate SQL imported on Hostinger via phpMyAdmin before the code; after the merge, CDN purge and a live check (stale Hostinger edge copy, see the live-site notes).
 
-**Definition of Done (Sprint 14)**
-- Phase 1: spike note delivered and the go / no-go decision recorded in the backlog. A "no-go" closes the sprint as Done with no code.
-- Phase 2 (only if committed): global DoD, plus the migration rule above (migration before the code on every DB; both schema files updated).
+### Phone Sprint 0 — Docs (done)
 
-**Status:** Planned (later; Phase 2 not committed)
+**Goal:** Stories and decision recorded; old plan replaced. Docs only, nothing deployed.
+**Stories:** none built. PO wrote US-52 (reworked), US-64, US-65, D-80; FU-24 cancelled; FU-117 opened. Scrum Master replaced the old Sprint 14 plan (this section).
+**Status:** Done (2026-11-27)
+
+### Phone Sprint 1 — Rooms, joining and the live board (US-52)
+
+**Goal:** Players join from their phones and follow the live board; the host plays a normal game in Phone buzzer mode.
+**Stories:** US-52
+**Dependencies:** Phone Sprint 0; `api/db.php` PDO and JSON helpers; saved-game version (D-28); i18n (Sprint 13).
+**Owner questions needed before development:** none.
+
+**Developer tasks**
+1. `sql/migrate-add-rooms.sql` (new, re-runnable) + `sql/schema.sql` + `sql/schema-hosted.sql` — `game_rooms` (code, host_token, state JSON, version, updated_at) and `room_players` (room, contestant index unique per room, device token, joined_at). Run locally twice.
+2. `api/rooms.php` (new) — host calls `create`, `push`, `release` (host token); player calls `join`, `state?since=version` (device token; small "no change" reply); room code unguessable; 401/403/404/400 as in US-52; prepared statements; delete rooms idle over 6 h on any request; state payload hides open Kilo Meshakkal values and the double cell until opened.
+3. `index.html` + `js/game.*.js` — Setup "Game control" radio under the categories (Players and Teams only, saved in the game state, bump the saved-game version with an old-save test); create the room on Start; hook `saveState` to `push` the board and scores; share / lobby panel (QR, code, link, joined / waiting per name, Release with confirm, show / hide); QR drawn locally by a small vendored library (no external service).
+4. `join.html` + `js/join.js` + CSS (existing theme tokens) — name buttons (claimed ones greyed), rejoin by the device token in localStorage, read-only board with owner colours and scores, "game ended or wrong code" screen; polls about once a second; text via `textContent`.
+5. `js/i18n.js` — EN and AR strings for Setup, lobby and join screens.
+6. `sw.js` — cache the join page and assets, never `api/rooms.php`; content-hashed asset names and build step.
+7. `README.md`, `docs/deploy-hostinger.md` (migrate before code), `privacy.html` note (room data, device token), `docs/sprints/phone-sprint-1-dev.md` incl. the **latency check on the live host**: measured delay (host change to phone update) and requests per minute with 1, 5 and 10 join tabs.
+
+**Tester focus:** Game control shown only in Players / Teams, default Host control, restored on reload; join by link and by QR; claimed name greyed and the server refuses a second claim; refresh rejoins as the same name; Release frees a name; bad / expired code; cells and scores update on phones within about 1 s; phone board read-only; payload checks (no Kilo value, no double cell); unchanged-version poll is small; 6 h cleanup (age a row by hand); 4 tabs (host + 3 to 4 join); Teams one device per team; nobody joined still plays; AR / RTL; Host control regression; XSS names; no console errors.
+
+**Definition of Done (phone Sprint 1)**
+- The phone-sprint DoD above, plus: the host plays a normal game in Phone buzzer mode and phones follow the board live.
+- Latency check recorded in the dev note; if the delay is well over 1 s or the host shows errors, the PO and owner decide before phone Sprint 2.
+
+**Status:** Accepted by the PO 2026-11-27, waiting for the owner's check. Dev note `docs/sprints/phone-sprint-1-dev.md` (fix rounds 1 and 2), test report `docs/sprints/phone-sprint-1-test.md` (first run and Re-test 1); BUG-52-01 to 04 fixed; PO decisions D-80 q to y. Branch `phone-buzzer`, uncommitted. Next: owner's local check (FU-118), commit, PR, hosted migration and deploy (FU-119), live latency and real-phone check (FU-120); native Arabic review FU-121.
+
+### Phone Sprint 2 — Questions and answers on phones (US-64)
+
+**Goal:** The core Phone buzzer loop: question on every phone, typed answers in arrival order on the host.
+**Stories:** US-64
+**Dependencies:** phone Sprint 1 merged (or on the branch and accepted); helpers (US-32), timer and pause.
+**Owner questions needed before development:** none.
+
+**Developer tasks**
+1. `sql/migrate-add-rooms.sql` + both schema files — `room_answers` (room, question seq, contestant, text up to 200, received_at in ms server time; one per contestant per seq).
+2. `api/rooms.php` — host `open_question` (category, value, text, optional 3 choices; never the answer), `close_question`, `answers?seq=`; player `answer` (only the open seq, 409 on a second, "too late" after close, 400 over 200 chars); `state` carries the open question, pause state and seq; server time decides order and lateness.
+3. `js/game.*.js` + `index.html` + CSS — in `openQuestion` call `open_question` and poll answers; **Answers panel** next to the Correct / Wrong buttons from `markContestant` (name in colour, text via `textContent`, "+3.2 s"); call `close_question` on timer 0, answer shown, Skip, Swap (new seq, old answers dropped) and Back to board / End Game; pause syncs to phones; 3 choices sent as options; refresh of the host mid-question restores the panel.
+4. `join.html` + `js/join.js` + CSS — question screen (category, value, text, countdown, answer box and Send), locked "Answer sent" state, "Too late", 3-choice buttons filling the box, back to the board on close, rejoin on the open question with a sent answer still locked; AR question first.
+5. `js/i18n.js` — EN and AR strings; `sw.js` and hashed assets rebuilt.
+6. `README.md`, `docs/deploy-hostinger.md`, `docs/sprints/phone-sprint-2-dev.md`.
+
+**Tester focus:** question appears on every phone within about 1 s; payload never holds the answer (before and after close); answers listed in arrival order with times; second answer 409 and not listed; late answer rejected after timer 0 / answer shown / Skip; pause pauses phones and still accepts answers; 3 choices on phones; Swap clears old answers; phone refresh keeps the locked answer; contestant with no device marked by hand; scoring, one-correct, negative scores and cell colouring unchanged; answer HTML / over 200 chars; AR / RTL; Host control regression (no panel, no calls); 4 tabs; no console errors.
+
+**Definition of Done (phone Sprint 2)**
+- The phone-sprint DoD above, plus: a full game (no Golden Goal) is played with every answer typed on phones; the answer text never reaches phones.
+- `room_answers` is in the migrate SQL and both schema files; migrate imported on Hostinger before the code.
+
+**Status:** Deferred by the owner (2026-11-27) until they ask
+
+### Phone Sprint 3 — Golden Goal bets on phones and release (US-65)
+
+**Goal:** Private bets on phones, then release the Phone buzzer.
+**Stories:** US-65
+**Dependencies:** phone Sprint 2; Golden Goal (US-44, D-48, D-51). **FU-117** (Golden Goal bet range on phones; owner to confirm D-80 j) must be answered **before this sprint starts**.
+**Owner questions needed before development:** **FU-117**.
+
+**Developer tasks**
+1. `sql/migrate-add-rooms.sql` + both schema files — `room_bets` (room, round, contestant, amount; one per contestant per round).
+2. `api/rooms.php` — host `start_bets`, `bets_status` (who has bet, never amounts), `reveal_bets` (host token only), continue without missing bets (missing = 0); player `bet` (whole number 0 to the bet limit, 400 outside, 409 on a second); a repeat round asks for new bets; then the question uses the Sprint 2 calls.
+3. `js/game.*.js` + `index.html` + CSS — in phone mode replace the masked bet entry with "Waiting for players to bet (n/N)" (each name bet / waiting, no amounts) and **Continue without missing bets**; open the question when all bets are in; reveal bets and results on the host after marking; host refresh keeps sent bets; Host control and Tournament Golden Goal untouched.
+4. `join.html` + `js/join.js` + CSS — private bet screen (category, score, allowed range), locked after sending, resumes after a refresh; result screen; closed-game and expired-room screens; game-over screen.
+5. `js/i18n.js` — EN and AR strings and an AR text review pass for all phone screens; `sw.js` and hashed assets rebuilt.
+6. `README.md`, `how-to-play.html` (Phone buzzer section), `privacy.html`, `docs/deploy-hostinger.md`, `docs/sprints/phone-sprint-3-dev.md`.
+
+**Tester focus:** bet screen on every phone; amounts never shown on the host or in other phones' payloads; bet over the limit rejected, second bet 409; waiting counter; continue without missing bets (missing = 0); release and rejoin during the wait; host and phone refresh during the wait; repeat round (still tied); results scored as US-44; closed game and expired room on phones; full game with Golden Goal in Phone buzzer and in Host control; Tournament and Mokh Bot unchanged; AR / RTL; 4 tabs; no console errors.
+
+**Definition of Done (phone Sprint 3)**
+- The phone-sprint DoD above, plus: a full game including Golden Goal is played in both Host control and Phone buzzer.
+- Live smoke test on Hostinger with 3 or more real phones after the deploy (observed delay and server errors noted); owner accepts the release.
+
+**Status:** Deferred by the owner (2026-11-27) until they ask; when resumed, still blocked until FU-117 is answered
 
 ---
 
@@ -670,10 +744,13 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 | 11 | US-47 (done, accepted 2026-11-03, merged, PR #92) |
 | 12 | US-50 (cancelled 2026-11-11) |
 | 13 | US-49 (done, accepted 2026-11-09, merged, PR #94) |
-| 14 | US-52 (planned, later; spike first, not committed) |
+| 14 | none (replaced 2026-11-27 by the Phone buzzer sprints below; US-52 moved to Phone 1) |
+| Phone 1 | US-52 (accepted by the PO 2026-11-27, waiting for the owner's check FU-118; branch `phone-buzzer`) |
+| Phone 2 | US-64 (deferred by the owner 2026-11-27 until they ask) |
+| Phone 3 | US-65 (deferred by the owner 2026-11-27 until they ask; FU-117 first) |
 | 15 | US-51 (planned, later; blocked by FU-23) |
 
-Epic E17 (US-42..US-53): all 12 stories appear in exactly one of Sprints 7-15 (US-42..US-52 were approved on 2026-11-02; US-53 was added on 2026-11-03). Stories US-31..US-41 were delivered outside the sprint cycle (see the status paragraphs at the top) and have no sprint here.
+Epic E17 (US-42..US-53): all 12 stories appear in exactly one sprint: Sprints 7-15, except US-52, which moved to Phone Sprint 1 on 2026-11-27 (US-42..US-52 were approved on 2026-11-02; US-53 was added on 2026-11-03). US-64 (Phone Sprint 2) and US-65 (Phone Sprint 3) were added on 2026-11-27 (D-80), each in exactly one phone sprint. Stories US-31..US-41 were delivered outside the sprint cycle (see the status paragraphs at the top) and have no sprint here.
 
 All 30 stories appear exactly once; 29 are delivered (accepted) and US-22 is retired (D-31). The amended stories stay in the sprint that first delivered them; Sprint 6 changed their behaviour. Sprint 5 (polish) carries no stories, only follow-ups FU-03, FU-04, FU-05 and FU-08. US-29 (hosted deployment with protected admin) was built on the `hosting` branch after the Sprint 2 stories and is recorded as part of Sprint 2 (owner decision 2026-10-05). Its follow-ups were handled in Sprint 4: the `docs/deploy-hostinger.md` note is done; the hosted `/password.txt` smoke check was done by the owner on 2026-10-05 (FU-01). Notes: US-17 (persistence) is placed in Sprint 4 because its criteria cover the question and results screens; Sprint 3 builds the save/load layer as an enabler. US-27 (XSS) is accepted in Sprint 4 once all UI exists, but DoD item 4 enforces `textContent` from Sprint 2 onward. US-26 is accepted in Sprint 1 where all SQL lives; DoD item 3 keeps it enforced later.
 

@@ -201,6 +201,35 @@ CREATE TABLE IF NOT EXISTS speed_scores (
   KEY idx_speed_scores_streak (streak)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
+-- Phone buzzer rooms (US-52, D-80): a room per hosted game in Phone buzzer mode and one row per
+-- name claimed by a phone. Tokens are stored as SHA-256 hashes only; `state` is the board as the
+-- phones may see it (no questions, answers or hidden values). api/rooms.php deletes rooms with no
+-- request for 6 hours. Same tables as sql/migrate-add-rooms.sql.
+CREATE TABLE IF NOT EXISTS game_rooms (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  code       CHAR(6)      NOT NULL,
+  host_hash  CHAR(64)     NOT NULL,
+  host_session CHAR(32)   NULL,
+  names      TINYINT UNSIGNED NOT NULL,
+  state      MEDIUMTEXT   NOT NULL,
+  version    INT UNSIGNED NOT NULL DEFAULT 1,
+  created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  seen_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_game_rooms_code (code),
+  KEY idx_game_rooms_seen (seen_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
+CREATE TABLE IF NOT EXISTS room_players (
+  room_id     INT UNSIGNED     NOT NULL,
+  contestant  TINYINT UNSIGNED NOT NULL,
+  device_hash CHAR(64)         NOT NULL,
+  joined_at   DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (room_id, contestant),
+  UNIQUE KEY uq_room_players_device (room_id, device_hash),
+  CONSTRAINT fk_room_players_room FOREIGN KEY (room_id) REFERENCES game_rooms (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
 -- ---------------------------------------------------------------------------
 -- Seed data
 -- ---------------------------------------------------------------------------

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Join a game | Mokh Rush</title>
+  <!-- Phone buzzer (US-52, D-80): a player's own phone joins the host's game. Not a page for search engines. -->
+  <meta name="robots" content="noindex">
+  <!-- ds-allow-hardcode: the browser bar colour must be a literal; it is --bg of css/style.css -->
+  <meta name="theme-color" content="#0b1026">
+  <link rel="icon" href="img/mokh-favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="img/mokh-favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
+  <link rel="stylesheet" href="css/style.020b81cb.css">
+  <link rel="stylesheet" href="css/join.65369f06.css">
+  <!-- Interface language (US-49): loaded first, so an Arabic page is right to left from its first paint -->
+  <script src="js/i18n.c6802bfd.js"></script>
+</head>
+<body class="join">
+  <header class="page-header join-header">
+    <h1><img class="brand-logo" src="img/mokh-mark.svg" alt="" width="54" height="36"><span data-i18n="app.name">Mokh Rush</span></h1>
+    <div class="ui-lang" role="group" aria-label="Language" data-i18n-attr="aria-label:lang.group"><button type="button" class="ui-lang-btn" data-ui-lang="en" lang="en" aria-label="English" aria-pressed="true">EN</button><button type="button" class="ui-lang-btn" data-ui-lang="ar" lang="ar" aria-label="العربية" aria-pressed="false">عربي</button></div>
+  </header>
+
+  <main class="join-main">
+    <!-- Shown while the polls fail; the last board stays on screen -->
+    <p id="join-net" class="msg msg-warning join-net" role="status" hidden></p>
+
+    <!-- No code in the link, or the game has ended / the code is wrong -->
+    <section id="join-code-screen" class="join-screen" aria-labelledby="join-code-title" hidden>
+      <h2 id="join-code-title" data-i18n="join.title">Join a game</h2>
+      <p id="join-ended" class="msg msg-error" role="alert" hidden></p>
+      <form id="join-code-form" class="join-code-form" novalidate>
+        <label for="join-code" data-i18n="join.codeLabel">Room code</label>
+        <input id="join-code" class="join-code-input" type="text" maxlength="8" autocomplete="off" autocapitalize="characters" spellcheck="false" dir="ltr" aria-describedby="join-code-hint join-code-error">
+        <p id="join-code-hint" class="hint" data-i18n="join.codeHint">The 6-character code on the host screen.</p>
+        <p id="join-code-error" class="field-error" hidden></p>
+        <button type="submit" class="btn btn-primary btn-large" data-i18n="join.go">Join</button>
+      </form>
+    </section>
+
+    <!-- Pick a name: the host's names as buttons; a claimed one is greyed out -->
+    <section id="join-pick-screen" class="join-screen" aria-labelledby="join-pick-title" hidden>
+      <h2 id="join-pick-title"></h2>
+      <p class="hint" data-i18n="join.pickHint">Tap your name. A name already taken on another phone is greyed out.</p>
+      <p id="join-pick-msg" class="msg" role="alert" hidden></p>
+      <ul id="join-names" class="join-names"></ul>
+    </section>
+
+    <!-- Read-only live board: only the host picks cells -->
+    <section id="join-board-screen" class="join-screen" aria-labelledby="join-you" hidden>
+      <h2 id="join-you" class="join-you"></h2>
+      <p id="join-status" class="join-status" role="status"></p>
+      <h3 class="visually-hidden" data-i18n="join.board">Game board</h3>
+      <div id="join-board" class="join-board"></div>
+      <h3 class="join-scores-title" data-i18n="join.scores">Scores</h3>
+      <ul id="join-scores" class="join-scores"></ul>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <nav aria-label="Site" data-i18n-attr="aria-label:nav.site"><a href="how-to-play.html" target="_blank" rel="noopener" data-i18n="nav.howToPlay">How to play</a> &middot; <a href="privacy.html" target="_blank" rel="noopener" data-i18n="nav.privacy">Privacy</a> &middot; <a href="terms.html" target="_blank" rel="noopener" data-i18n="nav.terms">Terms</a></nav>
+  </footer>
+
+  <script src="js/join.d2eda833.js"></script>
+</body>
+</html>

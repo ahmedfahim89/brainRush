@@ -1,0 +1,145 @@
+/* Mokh Rush join page (US-52, D-80): a player's phone. Phone first (375x812 and 320 px wide with no
+   sideways scroll, D-30); the theme tokens come from css/style.css, which loads first. */
+
+.join {
+  /* ds-allow-hardcode: the same greys as a used, unanswered board cell on the host (.board-cell.is-unanswered) */
+  --cell-grey: #4b5163; /* ds-allow-hardcode */
+  --cell-grey-ink: #c3c7d4; /* ds-allow-hardcode */
+  --cell-top: #1f2a6b; /* ds-allow-hardcode: .board-cell gradient */
+  --cell-bottom: #161f57; /* ds-allow-hardcode */
+}
+
+.join-header { padding: 0.6rem 1rem; }
+.join-header h1 { font-size: 1.4rem; }
+.join-header .brand-logo { height: 1.8rem; }
+.join-main { max-width: 40rem; margin: 0 auto; padding: 1rem 0.75rem; }
+.join-screen[hidden] { display: none; }
+.join-net { margin: 0 0 0.8rem; }
+
+/* ---------- Room code ---------- */
+.join-code-form { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4rem; }
+.join-code-form .hint, .join-code-form .field-error { margin: 0; }
+.join-code-input {
+  width: 100%;
+  max-width: 14rem;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-align: center;
+}
+.join-code-form .btn { margin-top: 0.5rem; }
+#join-ended { margin: 0 0 1rem; }
+
+/* ---------- Name picker ---------- */
+.join-names { display: grid; gap: 0.6rem; margin: 0.8rem 0 0; padding: 0; list-style: none; }
+.join-name {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  min-height: 3.2rem;
+  padding: 0.6rem 0.9rem;
+  color: var(--text);
+  font-size: 1.2rem;
+  font-weight: 700;
+  text-align: start;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+@media (hover: hover) { .join-name:hover:not(:disabled) { border-color: var(--gold); } }
+.join-name:focus-visible { outline: none; box-shadow: var(--focus); }
+.join-name:disabled { cursor: not-allowed; }
+.join-name.is-taken { opacity: 0.45; }
+.join-name-dot { flex: none; width: 1.2rem; height: 1.2rem; border-radius: 50%; background: var(--muted); }
+.join-name-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.join-name-tag { flex: none; color: var(--muted); font-size: 0.85rem; font-weight: 600; }
+#join-pick-msg { margin: 0.6rem 0 0; }
+
+/* ---------- Live board (read only) ---------- */
+.join-you { margin-bottom: 0.2rem; overflow-wrap: anywhere; }
+.join-status { margin: 0 0 0.8rem; color: var(--muted); }
+.join-board {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 5), minmax(0, 1fr));
+  gap: 0.25rem;
+  /* the value size follows the column width and the longest value (--digits), as on the host board */
+  --pts: clamp(0.5rem, calc((min(100vw, 40rem) - 2rem) / var(--cols, 5) / (var(--digits, 3) * 0.62 + 0.6)), 1rem);
+}
+.jb-cat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 2.6rem;
+  padding: 0.25rem 0.15rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  background: var(--panel-2);
+  border-bottom: 2px solid var(--gold);
+  border-radius: var(--radius);
+}
+.jb-cat-name { min-width: 0; overflow-wrap: anywhere; }
+.jb-cat.is-mystery { color: var(--gold); font-size: 1.1rem; }
+.jb-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 2.9rem;
+  padding: 0.15rem;
+  overflow: hidden;
+  color: var(--gold);
+  background: linear-gradient(var(--cell-top), var(--cell-bottom));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.jb-points { font-size: var(--pts); font-weight: 800; line-height: 1.1; }
+.jb-cell.is-face .jb-points { font-size: 1.2rem; }
+.jb-cell.is-open { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold); }
+.jb-cell.is-used { background-image: none; border-color: rgba(0, 0, 0, 0.35); } /* ds-allow-hardcode: as .board-cell.is-used */
+.jb-cell.is-used .jb-points { font-size: calc(var(--pts) * 0.85); opacity: 0.85; }
+.jb-cell.is-unanswered { color: var(--cell-grey-ink); background: var(--cell-grey); }
+.jb-points.is-struck { text-decoration: line-through; opacity: 0.6; }
+.jb-owner, .jb-swap {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jb-double { position: absolute; top: 0.05rem; inset-inline-end: 0.2rem; font-size: 0.6rem; font-weight: 800; line-height: 1; }
+
+.join-scores-title { margin: 1.1rem 0 0.4rem; color: var(--gold); }
+.join-scores { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 0.4rem; margin: 0; padding: 0; list-style: none; }
+.jb-score {
+  min-width: 0; /* BUG-52-04: a long unbroken name wraps inside the card */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.4rem;
+  padding: 0.35rem 0.6rem;
+  color: var(--text);
+  background: var(--panel-2);
+  border-radius: var(--radius);
+}
+.jb-score.is-me { box-shadow: 0 0 0 3px var(--gold); }
+.jb-score-name { flex: 1 1 auto; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.jb-score-tag { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+.jb-score-value { flex: 1 0 100%; font-size: 1.3rem; font-weight: 800; }
+
+@media (max-width: 360px) {
+  .join-board { gap: 0.15rem; }
+  .jb-cat { font-size: 0.64rem; }
+}
+
+/* Arabic (D-60): bigger letters for the category names */
+html[lang="ar"] .jb-cat { font-size: 0.78rem; }
