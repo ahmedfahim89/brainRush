@@ -3,6 +3,7 @@
 > Mokh Rush is a free trivia game for a group around one shared screen, played in the browser. One person hosts: they read each question out, listen to the spoken answers and mark them right or wrong. Players or teams pick questions from a board of categories and point values, and harder questions are worth more points.
 
 - Up to 6 players or 4 teams, each with their own color.
+- Tournament mode is a knockout for 3 to 8 players or teams: a random draw into a bracket (semi-finals and a final, or quarter-finals first for 5 to 8; empty spots are byes), each match a short board with the point values the admin picked for tournaments (the 3 lowest by default) between two contestants, a level match decided by Golden Goal (or a coin toss when no question is left), and final standings (1st, 2nd, joint 3rd, joint 5th) that can be shared.
 - A correct answer adds the question's points, a wrong one takes them away.
 - One random question on each board is secretly worth double points for a correct answer; a popup reveals it when it is opened.
 - Every question has a countdown timer, and a speaker button can read it aloud with the device's own voices.
@@ -23,7 +24,7 @@ This file lists no questions or answers, on purpose.
 ## Play
 
 - [Play Mokh Rush](https://brainrush.integration.ninja/): set up players or teams, pick categories and start a game
-- [How to play](https://brainrush.integration.ninja/how-to-play.html): player guide covering setup, the board, answering, scoring, helpers, ending the game, the Golden Goal tiebreaker, the Streak Challenge, the Daily Challenge, the Daily Crossword and the Speed Round
+- [How to play](https://brainrush.integration.ninja/how-to-play.html): player guide covering setup, the board, answering, scoring, helpers, ending the game, the Golden Goal tiebreaker, Tournament mode, the Streak Challenge, the Daily Challenge, the Daily Crossword and the Speed Round
 
 ## Optional
 

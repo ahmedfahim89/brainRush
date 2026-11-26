@@ -17,7 +17,7 @@
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0b1026">
-  <link rel="stylesheet" href="css/style.ba1c892a.css">
+  <link rel="stylesheet" href="css/style.fb1be6f7.css">
   <link rel="stylesheet" href="css/guide.70c9a392.css">
 </head>
 <body class="guide">
@@ -43,6 +43,7 @@
         <li><a href="#double">&times;2 Double score</a></li>
         <li><a href="#ending">Ending the game</a></li>
         <li><a href="#golden-goal">Golden Goal <span aria-hidden="true">&#9917;</span></a></li>
+        <li><a href="#tournament">Tournament</a></li>
         <li><a href="#streak">💀 Sudden Death Streak (solo)</a></li>
         <li><a href="#daily">📅 Daily Challenge</a></li>
         <li><a href="#crossword"><span aria-hidden="true">&#9638;</span> Daily Crossword</a></li>
@@ -72,7 +73,7 @@
       <h2>Setting up a game</h2>
       <h3>Players or teams</h3>
       <ul>
-        <li>Choose <strong>Players</strong> (up to 6) or <strong>Teams</strong> (up to 4).</li>
+        <li>Choose <strong>Players</strong> (up to 6) or <strong>Teams</strong> (up to 4), or a <a href="#tournament"><strong>Tournament</strong></a> (3 to 8 contestants).</li>
         <li>Each player or team needs a name of their own, up to 30 characters.</li>
         <li>Everyone gets a color. Click a color circle to switch to the next free color.</li>
       </ul>
@@ -228,6 +229,38 @@
         </tbody>
       </table>
       <p>Sara wins with 800. Had Sara and Omar both been wrong with the same bet, they would still be level, and a second round would follow.</p>
+    </section>
+
+    <!-- US-61 / D-77: Tournament mode -->
+    <section id="tournament" class="guide-section">
+      <h2>Tournament</h2>
+      <p>A knockout for a bigger group: <strong>3 to 8</strong> players or teams, two at a time on a short board, until one champion is left.</p>
+      <h3>Setting it up</h3>
+      <ul>
+        <li>Choose <strong>Tournament</strong> next to Players and Teams and use <strong>Add contestant</strong> (up to 8). Names follow the usual rules. Tournament mode has <strong>8 colors</strong> (pink and lime join the usual six).</li>
+        <li>Pick the timer as for a normal game; it is used for <strong>every</strong> match. The categories are not picked on the setup screen: they are chosen <strong>before each match</strong>.</li>
+        <li>A tournament needs at least 3 contestants.</li>
+      </ul>
+      <h3>The draw and the bracket</h3>
+      <ul>
+        <li><strong>Start Game</strong> draws everyone at random into a bracket: <strong>Semi-finals</strong> and a <strong>Final</strong> for 3 or 4 contestants, <strong>Quarter-finals</strong>, Semi-finals and a Final for 5 to 8.</li>
+        <li>Empty spots are <strong>byes</strong>: a contestant with a bye ("Sara &ndash; bye") goes straight to the next round. Two byes never meet. With 5 contestants, for example, three of them have a bye and two play a quarter-final.</li>
+        <li>Not happy with the draw? <strong>Shuffle</strong> draws again, until the first match starts.</li>
+        <li>The bracket shows every round, the scores of the played matches, a &check; for each winner and the <strong>next match</strong>. <strong>Start match</strong> plays it; <strong>End tournament</strong> stops the tournament without saving it.</li>
+      </ul>
+      <h3>A match</h3>
+      <ul>
+        <li>Each match is a <strong>fresh, short board</strong> for the two contestants: when you press <strong>Start match</strong>, choose <strong>up to 3 categories</strong> for that match (<strong>Surprise me!</strong> works as on setup), then the board uses them with the <strong>point values the admin picked for tournaments</strong> (the 3 lowest when none are picked). Both start at 0 with all 3 helpers, and the board has its own &times;2 double score box. Everything else works as in a normal game.</li>
+        <li><strong>End Game</strong> (or a full board) ends the match: the higher score goes through, even when both are below zero.</li>
+        <li>A <strong>level match</strong> always goes to <a href="#golden-goal">Golden Goal</a>, with no skip: the two bet and answer until one leads. If no new question is left, a <strong>coin toss</strong> decides who goes through.</li>
+        <li>The match result shows who won and the score; <strong>Continue</strong> goes back to the bracket with the winner moved on.</li>
+      </ul>
+      <h3>Results</h3>
+      <ul>
+        <li>After the final you see the <strong>champion</strong>, the <strong>standings</strong> and every match with its score. The places are 1st (the champion), 2nd (the finalist), <strong>joint 3rd</strong> for the semi-final losers and <strong>joint 5th</strong> for the quarter-final losers; a bye is not a loss.</li>
+        <li><strong>Share</strong> sends something like "Sara won the Mokh Rush tournament! 2nd Omar, 3rd Ali and Mona".</li>
+        <li>Refreshing the page keeps the tournament where it was: the bracket, a match, its Golden Goal or the results.</li>
+      </ul>
     </section>
 
     <section id="streak" class="guide-section">

@@ -3,7 +3,40 @@
 // PUT  /api/settings.php  body { categories_per_game?, timer_seconds?, banner_enabled?, banner_text?, start_game_hidden?, helpers_enabled?, ads_enabled?, final_round_enabled?, daily_enabled?, crossword_enabled?, speed_enabled?, ads_client?, ads_slot? } -> updated settings
 // Writes need admin access (require_admin: 401/403 otherwise).
 // CHRISTMAS (US-55, D-66): also christmas_theme (0/1, missing row = 0) and christmas_banner_text (max 150, may be empty, missing row = "").
+// Tournament (US-61, D-77 aa): also tournament_points, the point values a tournament match board uses,
+// as an ascending comma list ("200,400,500"); "" (or a missing row) = the 3 lowest enabled values.
 require_once __DIR__ . '/db.php';
+
+const TOURNAMENT_POINTS_MAX = 20; // at most this many values in tournament_points
+
+/** "500, 200,200" -> "200,500" (ascending, no repeats); sends 400 on anything but whole numbers 1..1000000. */
+function normalize_tournament_points($value): string
+{
+    if ($value === null) {
+        return '';
+    }
+    if (!is_string($value)) {
+        bad_request('tournament_points must be text such as "200,400,500"');
+    }
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+    $list = [];
+    foreach (explode(',', $value) as $part) {
+        $n = parse_int(trim($part));
+        if ($n === null || $n < 1 || $n > 1000000) {
+            bad_request('tournament_points must list whole point values between 1 and 1000000, separated by commas');
+        }
+        $list[$n] = true;
+    }
+    if (count($list) > TOURNAMENT_POINTS_MAX) {
+        bad_request('tournament_points can hold at most ' . TOURNAMENT_POINTS_MAX . ' values');
+    }
+    $values = array_keys($list);
+    sort($values);
+    return implode(',', $values);
+}
 
 // Editable settings and their allowed integer range (values themselves live in the DB).
 const SETTING_RULES = [
@@ -53,6 +86,8 @@ function load_settings(PDO $pdo): array
     // CHRISTMAS (US-55): a missing row means off / no custom greeting
     $settings['christmas_theme'] = $settings['christmas_theme'] ?? 0;
     $settings['christmas_banner_text'] = $settings['christmas_banner_text'] ?? '';
+    // US-61 (D-77 aa): a missing row means "" (the 3 lowest enabled values)
+    $settings['tournament_points'] = isset($rows['tournament_points']) ? (string) $rows['tournament_points'] : '';
     return $settings;
 }
 
@@ -93,9 +128,12 @@ function validate_settings(array $body): array
         }
         $updates[$name] = $value;
     }
+    if (array_key_exists('tournament_points', $body)) {
+        $updates['tournament_points'] = normalize_tournament_points($body['tournament_points']); // US-61
+    }
     if (!$updates) {
         bad_request('Provide at least one of: ' . implode(', ', array_merge(
-            array_keys(SETTING_RULES), array_keys(TEXT_SETTING_RULES), array_keys(AD_SETTING_RULES))));
+            array_keys(SETTING_RULES), array_keys(TEXT_SETTING_RULES), array_keys(AD_SETTING_RULES), ['tournament_points'])));
     }
     return $updates;
 }

@@ -45,6 +45,7 @@
   const state = {
     settings: null,    // { categories_per_game, timer_seconds, banner_enabled, banner_text, ..., ads_enabled, ads_client, ads_slot }
     points: [],        // [{ id, points, enabled, question_count }] ascending
+    tournamentPoints: [], // US-61 (D-77 aa): the ticked tournament board values (numbers), saved with Save settings
     categories: [],    // [{ id, name, name_ar, question_count }] sorted by name; name_ar = Arabic name or null
     questions: [],     // [{ id, category_id, category_name, points, question, answer, question_ar, answer_ar, image, image_credit,
                        //    wrong_1, wrong_2, wrong_1_ar, wrong_2_ar, attempts, percent_correct,
@@ -85,6 +86,9 @@
     settingDaily: byId('setting-daily'), // D-74
     settingCrossword: byId('setting-crossword'), // US-58
     settingSpeed: byId('setting-speed'), // US-59
+    settingTournamentList: byId('setting-tournament-list'), // US-61: tournament board point values
+    tournamentPointsForm: byId('tournament-points-form'), // US-61: under Point values, saved on its own
+    tournamentPointsMsg: byId('tournament-points-msg'),
     settingAdsEnabled: byId('setting-ads-enabled'),
     settingAdsClient: byId('setting-ads-client'),
     settingAdsSlot: byId('setting-ads-slot'),
@@ -415,7 +419,60 @@
     dom.settingChristmasText.value = typeof settings.christmas_banner_text === 'string' ? settings.christmas_banner_text : '';
     dom.settingAdsClient.value = typeof settings.ads_client === 'string' ? settings.ads_client : '';
     dom.settingAdsSlot.value = typeof settings.ads_slot === 'string' ? settings.ads_slot : '';
+    state.tournamentPoints = parsePointList(settings.tournament_points); // US-61: "" or missing = none ticked
+    renderTournamentPoints();
     renderCategorySummary();
+  }
+
+  /** US-61: "200,400,500" -> [200, 400, 500]; anything else is skipped. */
+  function parsePointList(text) {
+    if (typeof text !== 'string') return [];
+    return text.split(',').map((part) => Number(part.trim())).filter((n) => Number.isInteger(n) && n > 0);
+  }
+
+  /**
+   * US-61 (D-77 aa): one checkbox per point value for the tournament board. A disabled value can be
+   * ticked (it is used again once enabled). The ticks are kept across a re-render of the point values.
+   */
+  function renderTournamentPoints() {
+    const list = dom.settingTournamentList;
+    clear(list);
+    if (!state.points.length) {
+      list.appendChild(h('p', { className: 'hint', text: 'No point values yet.' }));
+      return;
+    }
+    state.points.forEach((p) => {
+      const input = h('input', { type: 'checkbox', value: String(p.points) });
+      input.checked = state.tournamentPoints.indexOf(p.points) !== -1;
+      input.addEventListener('change', () => {
+        state.tournamentPoints = state.tournamentPoints.filter((n) => n !== p.points);
+        if (input.checked) state.tournamentPoints.push(p.points);
+      });
+      list.appendChild(h('label', { className: 'check-label' + (p.enabled ? '' : ' is-disabled') }, [
+        input,
+        h('span', { text: String(p.points) + (p.enabled ? '' : ' (disabled)') }),
+      ]));
+    });
+  }
+
+  /** The ticked values that still exist, ascending, as the API's comma list ("" = none). */
+  function tournamentPointsValue() {
+    return state.points.map((p) => p.points).filter((n) => state.tournamentPoints.indexOf(n) !== -1).join(',');
+  }
+
+  /** US-61 (D-77 aa): "Save tournament board" under Point values saves only tournament_points. */
+  function onTournamentPointsSubmit(event) {
+    event.preventDefault();
+    const submit = dom.tournamentPointsForm.querySelector('button[type="submit"]');
+    runAction(dom.tournamentPointsMsg, [submit], async () => {
+      const saved = await api('settings.php', 'PUT', { tournament_points: tournamentPointsValue() });
+      state.settings = saved;
+      state.tournamentPoints = parsePointList(saved.tournament_points);
+      renderTournamentPoints();
+      showSuccess(dom.tournamentPointsMsg, saved.tournament_points
+        ? 'Tournament board saved: ' + saved.tournament_points.split(',').join(', ') + '.'
+        : 'Tournament board saved: none ticked, so matches use the 3 lowest enabled values.');
+    });
   }
 
   async function loadSettings() {
@@ -479,6 +536,7 @@
   // ---------- Point values (US-19) ----------
 
   function renderPoints() {
+    renderTournamentPoints(); // US-61: the tournament board ticks follow the point values
     clear(dom.pointsList);
     if (!state.points.length) {
       dom.pointsList.appendChild(h('li', { className: 'hint', text: 'No point values yet. Add one to build the board.' }));
@@ -1590,6 +1648,7 @@
   function bindEvents() {
     dom.settingsForm.addEventListener('submit', onSettingsSubmit);
     dom.pointsForm.addEventListener('submit', onPointSubmit);
+    dom.tournamentPointsForm.addEventListener('submit', onTournamentPointsSubmit); // US-61
     dom.categoryForm.addEventListener('submit', onCategorySubmit);
     dom.qForm.addEventListener('submit', onQuestionSubmit);
     dom.qCancel.addEventListener('click', cancelEdit);

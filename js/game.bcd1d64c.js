@@ -181,6 +181,7 @@
   const MODES = {
     players: { limit: 6, key: 'players' },
     teams: { limit: 4, key: 'teams' },
+    tournament: { limit: 8, key: 'tournament' }, // US-61: entries of a knockout tournament (min TOURNAMENT_MIN)
   };
 
   // Six distinct contestant colors; `ink` is the readable text color on that background (dark navy on
@@ -195,9 +196,33 @@
     { value: '#9b5de5', name: 'color.purple', ink: '#0b1026' },
     { value: '#22b8cf', name: 'color.cyan', ink: '#0b1026' },
   ];
+  // US-61 (D-77 j): 2 more colours, offered in Tournament mode only (8 entries). Not grey or gold, clearly
+  // different from the six; the #0b1026 ink is 6.7:1 on pink and 10.5:1 on lime (WCAG AA).
+  const TOURNAMENT_COLORS = [
+    { value: '#f06bb5', name: 'color.pink', ink: '#0b1026' },
+    { value: '#a3d13c', name: 'color.lime', ink: '#0b1026' },
+  ];
+  const FULL_PALETTE = PALETTE.concat(TOURNAMENT_COLORS);
 
   const SCREENS = ['setup', 'board', 'question', 'results', 'final']; // a saved board game may be on these
-  const ALL_SCREENS = SCREENS.concat(['leaderboard', 'daily', 'crossword', 'speed']);
+  // US-61: the tournament's own screens (bracket, match result, tournament results)
+  const TOURNAMENT_VIEWS = ['bracket', 'match', 'tresults'];
+  const ALL_SCREENS = SCREENS.concat(['leaderboard', 'daily', 'crossword', 'speed'], TOURNAMENT_VIEWS);
+
+  // Tournament (US-61, D-77). The running tournament is saved under TOURNAMENT_KEY together with the
+  // screen and the match being played (its board game), in one write: so finishing a match moves the
+  // bracket on and drops the match board at once, and a reload can neither replay nor lose a match.
+  const TOURNAMENT_KEY = 'brainrush.tournament';
+  const TOURNAMENT_VERSION = 1;
+  const TOURNAMENT_MIN = 3;
+  const TOURNAMENT_ROWS = 3; // D-77 e/aa: with no Admin tournament values, a match board keeps the lowest 3 enabled
+  const TOURNAMENT_PICK_MAX = 3; // D-77 ab: each match board has 1 to 3 categories, chosen at Start match
+  // Saved screens of a running tournament: the bracket, the match on the board / question / Golden Goal
+  // screens, the match result and the tournament results.
+  const TOURNAMENT_SCREENS = ['bracket', 'board', 'question', 'final', 'match', 'tresults'];
+  // D-77 g: the first-round matches (0-based) that hold the byes, in this order, per bracket size.
+  const BYE_ORDER = { 4: [0], 8: [0, 3, 1] };
+  const MATCH_WAYS = ['score', 'goal', 'coin', 'bye']; // how a match was decided
 
   // Central state. `setup` is the form being filled in (memory only);
   // `game` is the running game and is saved to localStorage on every change:
@@ -325,6 +350,23 @@
   // Final round (US-44): the random question request in flight (memory only).
   let finalLoading = false;
 
+  // Tournament (US-61, D-77): the running tournament, null when none. Saved with the screen and the
+  // match board under TOURNAMENT_KEY on every change (saveState):
+  //   { startedAt (Date.now() ms), entries: [{id, name, color}] (setup
+  //     order), timerSeconds, helpersOff, rounds: [[match]] (first round first, each round half the one before),
+  //     started (the first match has started: no more Shuffle), playing: null | [round, index] (the
+  //     match on the board), last: null | [round, index] (the match result on show), finishedAt: null | ms }
+  //   match: { a, b: entry id or null (not known yet), bye: true in a first-round match whose second
+  //     slot is a bye (a goes through), winner: entry id or null, sa, sb: the scores of a played match
+  //     (else null), way: null or one of MATCH_WAYS }
+  let tourney = null;
+  let matchLoading = false; // the match board request in flight (memory only)
+  // D-77 ab: the categories popup of Start match, null when closed: { ref, selected: [id] (in the
+  // order ticked; SURPRISE and MIX as on setup), playable: null (loading) | [{id, name, nameAr}] }.
+  // lastPicks keeps the last match's ticks (memory only), so the next popup starts from them.
+  let picker = null;
+  let lastPicks = [];
+
   // Read aloud (US-48), memory only apart from the on-device choice: the browser's speech module
   // (null without speech synthesis), whether the open question is being read, and the choice.
   const speech = window.BrainRushSpeech && window.BrainRushSpeech.supported() ? window.BrainRushSpeech : null;
@@ -345,6 +387,9 @@
       crossword: byId('screen-crossword'),
       speed: byId('screen-speed'),
       final: byId('screen-final'),
+      bracket: byId('screen-bracket'),   // US-61: tournament screens (stand-ins in the Integration Quiz)
+      match: byId('screen-match'),
+      tresults: byId('screen-tresults'),
     },
     setupForm: byId('setup-form'),
     playersBlock: byId('players-block'),
@@ -393,11 +438,41 @@
     entryList: byId('entry-list'),
     entryLimitMsg: byId('entry-limit-msg'),
     entryAdd: byId('entry-add'),
+    entryMinError: byId('entry-min-error'), // US-61: "A tournament needs at least 3 contestants"
+    bracketInfo: byId('bracket-info'),
+    bracketRounds: byId('bracket-rounds'),
+    bracketMsg: byId('bracket-msg'),
+    bracketNext: byId('bracket-next'),
+    bracketStart: byId('bracket-start'),
+    bracketShuffle: byId('bracket-shuffle'),
+    bracketEnd: byId('bracket-end'),
+    bracketTitle: byId('bracket-title'),
+    matchRound: byId('match-round'),
+    matchTitle: byId('match-title'),
+    matchNote: byId('match-note'),
+    matchContinue: byId('match-continue'),
+    trTitle: byId('tr-title'),
+    trWinner: byId('tr-winner'),
+    trStandings: byId('tr-standings'),
+    trMatches: byId('tr-matches'),
+    trNew: byId('tr-new'),
+    trShare: byId('tr-share'),
+    trShareStatus: byId('tr-share-status'),
     catLegend: byId('cat-legend'),
     catCount: byId('cat-count'),
     catWarning: byId('cat-warning'),
     catList: byId('cat-list'),
     catError: byId('cat-error'),
+    catBlock: byId('cat-block'),
+    catTourneyNote: byId('cat-tourney-note'),
+    pickOverlay: byId('pick-overlay'),
+    pickAbout: byId('pick-about'),
+    pickForm: byId('pick-form'),
+    pickCount: byId('pick-count'),
+    pickList: byId('pick-list'),
+    pickError: byId('pick-error'),
+    pickStart: byId('pick-start'),
+    pickCancel: byId('pick-cancel'),
     timerInput: byId('timer-input'),
     timerError: byId('timer-error'),
     readAloudField: byId('read-aloud-field'),
@@ -710,7 +785,12 @@
   }
 
   function paletteEntry(color) {
-    return PALETTE.find((p) => p.value === color) || PALETTE[0];
+    return FULL_PALETTE.find((p) => p.value === color) || PALETTE[0];
+  }
+
+  /** The colours a mode offers: 8 in Tournament mode (US-61, D-77 j), the 6 of US-03 otherwise. */
+  function paletteFor(modeKey) {
+    return modeKey === 'tournament' ? FULL_PALETTE : PALETTE;
   }
 
   function currentMode() {
@@ -794,6 +874,10 @@
 
   function saveState() {
     if (INTEGRATION) return; // the quiz has no board game: a saved one (index.html's) stays as it is
+    if (tourney) { // US-61: the match board is saved inside the tournament, in the same write
+      saveTournament();
+      return;
+    }
     try {
       if (!state.game) {
         window.localStorage.removeItem(STORAGE_KEY);
@@ -820,7 +904,8 @@
     if (raw === null) return null;
     try {
       const saved = migrateSaved(JSON.parse(raw));
-      if (saved && SCREENS.indexOf(saved.screen) > 0 && isValidGame(saved.game) &&
+      // A tournament match (US-61) is only ever saved inside its tournament (TOURNAMENT_KEY).
+      if (saved && SCREENS.indexOf(saved.screen) > 0 && isValidGame(saved.game) && saved.game.mode !== 'tournament' &&
           isValidScreenFor(saved.screen, saved.game)) {
         return { screen: saved.screen, game: saved.game };
       }
@@ -928,7 +1013,7 @@
       const nameKey = 'n:' + name.toLowerCase();
       const ok = name !== '' && name.length <= NAME_MAX && !names[nameKey] &&
         Number.isInteger(c.id) && !ids[c.id] &&
-        PALETTE.some((p) => p.value === c.color) && !colors[c.color] &&
+        paletteFor(mode.key).some((p) => p.value === c.color) && !colors[c.color] &&
         Number.isInteger(c.score) && isValidHelpers(c.helpers);
       if (ok) {
         ids[c.id] = true;
@@ -1290,12 +1375,20 @@
       closeDoublePopup();
     } else if (isReportOpen()) {
       closeReport();                                 // US-42: the report form, as Cancel
+    } else if (isPickOpen()) {
+      closePicker();                                 // US-61: the match categories popup, as Cancel
     } else if (isSpeedOverlayOpen()) {
       onSpeedOverlayBack();                          // US-59: rules or countdown -> no run; Paused -> "End the run now?"
     } else if (speedOnScreen()) {
       onSpeedEnd();                                  // US-59: "End the run now?" confirm
     } else if (state.screen === 'speed') {
       onSpeedNewGame();                              // US-59: the result -> setup, as New Game
+    } else if (state.screen === 'bracket') {
+      onEndTournament();                             // US-61: "End the tournament?" confirm
+    } else if (state.screen === 'match') {
+      onMatchContinue();                             // US-61: the match result, as Continue
+    } else if (state.screen === 'tresults') {
+      onTourneyNewGame();                            // US-61: setup, as New game
     } else if (state.screen === 'final') {
       onFinalBack();                                 // final round (US-44): offer -> board, wagers -> ask
     } else if (state.screen === 'question') {
@@ -1409,8 +1502,30 @@
 
   function firstFreeColor() {
     const used = colorsInUse(null);
-    const free = PALETTE.find((p) => used.indexOf(p.value) === -1);
-    return free ? free.value : PALETTE[0].value;
+    const palette = paletteFor(state.setup.mode);
+    const free = palette.find((p) => used.indexOf(p.value) === -1);
+    return free ? free.value : palette[0].value;
+  }
+
+  /**
+   * US-61: every entry keeps a colour of the mode's palette, each once. Leaving Tournament mode gives
+   * an entry on one of its 2 extra colours (or a repeat) the first free colour of the 6; with more
+   * entries than colours the rest keep theirs (Start is blocked then, D-07, until some are removed).
+   */
+  function normalizeColors() {
+    const palette = paletteFor(state.setup.mode);
+    const taken = {};
+    const bad = [];
+    state.setup.entries.forEach((e) => {
+      if (palette.some((p) => p.value === e.color) && !taken[e.color]) taken[e.color] = true;
+      else bad.push(e);
+    });
+    bad.forEach((e) => {
+      const free = palette.find((p) => !taken[p.value]);
+      if (!free) return;
+      e.color = free.value;
+      taken[free.value] = true;
+    });
   }
 
   function renderMode() {
@@ -1427,9 +1542,25 @@
     }
   }
 
+  /** US-61 (D-23): message '' (none) or a function giving the "at least 3 contestants" error. */
+  function setEntryMinError(message) {
+    setText(dom.entryMinError, message);
+    dom.entryMinError.hidden = !message;
+  }
+
+  /** A tournament needs at least TOURNAMENT_MIN entries; checked at the click on Start (a field error). */
+  function validateTournamentSize() {
+    const s = state.setup;
+    const ok = s.mode !== 'tournament' || s.entries.length >= TOURNAMENT_MIN;
+    setEntryMinError(ok ? '' : () => t('tournament.needMin', { n: TOURNAMENT_MIN }));
+    return ok;
+  }
+
   function renderEntries() {
     const mode = currentMode();
     const entries = state.setup.entries;
+    normalizeColors(); // US-61: only Tournament mode offers the 2 extra colours
+    if (!dom.entryMinError.hidden && (state.setup.mode !== 'tournament' || entries.length >= TOURNAMENT_MIN)) setEntryMinError('');
     clear(dom.entryList);
     entries.forEach((entry, index) => {
       const label = t('entry.label.' + mode.key, { n: index + 1 });
@@ -1520,9 +1651,10 @@
   /** Move to the next palette color not used by another entry (no change if all are taken). */
   function cycleColor(entry) {
     const used = colorsInUse(entry);
-    const start = PALETTE.findIndex((p) => p.value === entry.color);
-    for (let step = 1; step < PALETTE.length; step += 1) {
-      const candidate = PALETTE[(start + step) % PALETTE.length];
+    const palette = paletteFor(state.setup.mode);
+    const start = palette.findIndex((p) => p.value === entry.color);
+    for (let step = 1; step < palette.length; step += 1) {
+      const candidate = palette[(start + step) % palette.length];
       if (used.indexOf(candidate.value) === -1) {
         entry.color = candidate.value;
         break;
@@ -1537,6 +1669,19 @@
     if (!hasOwn(MODES, event.target.value)) return;
     state.setup.mode = event.target.value;
     renderEntries();
+    renderCatBlockMode();
+  }
+
+  /**
+   * US-61 (D-77 ab): in Tournament mode the setup categories are switched off (the ticks are kept for
+   * Players and Teams) and a note says they are chosen before each match.
+   */
+  function renderCatBlockMode() {
+    const off = !!state.setup && state.setup.mode === 'tournament';
+    dom.catBlock.disabled = off;
+    dom.catBlock.classList.toggle('is-off', off);
+    dom.catTourneyNote.hidden = !off;
+    if (off) clearMessage(dom.catError);
   }
 
   // ---------- Setup: categories and timer (US-04, US-05) ----------
@@ -1568,6 +1713,7 @@
     }
     if (s.perGame !== null && !s.playable.length) renderNotEnough();
     renderCategorySelection();
+    renderCatBlockMode();
   }
 
   /**
@@ -1989,11 +2135,13 @@
     if (startBlockReason()) return;
     clearMessage(dom.startMsg);
     const namesOk = validateNames();
-    const categoriesOk = validateCategoryCount();
+    const sizeOk = validateTournamentSize(); // US-61: at least 3 contestants
+    const categoriesOk = state.setup.mode === 'tournament' || validateCategoryCount(); // D-77 ab: chosen per match
     const timer = validateTimer();
-    if (!namesOk || !categoriesOk || timer === null) {
+    if (!namesOk || !sizeOk || !categoriesOk || timer === null) {
       showMessage(dom.startMsg, () => t('start.fix'), 'error');
-      focusFirstProblem();
+      if (namesOk && !sizeOk) dom.entryAdd.focus();
+      else focusFirstProblem();
       return;
     }
 
@@ -2002,6 +2150,11 @@
     dom.startBtn.textContent = t('setup.starting');
     updateStartButton();
     try {
+      if (s.mode === 'tournament') { // US-61: the bracket first; each match has its own categories and board
+        await refreshStartSettings(s);
+        beginTournament(timer);
+        return;
+      }
       const selection = resolveSelection(s);
       const ids = selection.ids;
       // BUG-9-01: the game settings are read again with the board, so a change in Admin while Setup
@@ -2053,6 +2206,7 @@
   /** D-12: the board loaded now is used for the whole game (stored in the game state). */
   function beginGame(board, timerSeconds) {
     const s = state.setup;
+    clearTournament(); // never left over here; a new game must not come back as a tournament
     board.categories.forEach((c) => { if (c.id === MIX) dealMixColumn(c, board.points); });
     state.game = {
       mode: s.mode,
@@ -2150,13 +2304,14 @@
   function renderBoardInfo() {
     const g = state.game;
     const mode = MODES[g.mode];
-    dom.boardInfo.textContent = [
+    const match = isMatch(g) && tourney && tourney.playing ? [matchName(tourney, tourney.playing)] : []; // US-61
+    dom.boardInfo.textContent = match.concat([
       tn('board.contestants.' + mode.key, g.contestants.length),
       t('board.size', { cols: g.categories.length, rows: g.points.length }),
       t('board.played', { used: usedCount(g), total: totalCells(g) }),
       t('board.timer', { s: g.timerSeconds }),
       t('board.corrections', { step: String.fromCharCode(0x00b1) + scoreStep() }),
-    ].join('  ' + DOT + '  ');
+    ]).join('  ' + DOT + '  ');
   }
 
   function renderBoard() {
@@ -2199,7 +2354,8 @@
    */
   function localCategoryNames(text) {
     if (!i18n.isArabic()) return text;
-    return state.setup.playable.concat([{ id: MIX, name: MIX_NAME }]).reduce((out, c) => {
+    const playable = state.setup ? state.setup.playable : []; // none after a reload in a tournament (US-61)
+    return playable.concat([{ id: MIX, name: MIX_NAME }]).reduce((out, c) => {
       const local = columnName(c);
       return local === c.name ? out : out.split('"' + c.name + '"').join('"' + iso(local) + '"');
     }, text);
@@ -2289,7 +2445,11 @@
       if (!window.confirm(tn('board.endConfirm', left))) return;
     }
     if (g.finalRound === true && isTiedAtTop(g)) { // D-51: Golden Goal only breaks a tie for first
-      openFinalOffer(1, []);
+      openFinalOffer(1, []);  // US-61: always on in a tournament match (D-77 f)
+      return;
+    }
+    if (isMatch(g)) {
+      finishMatch('score');   // US-61: the higher score goes through
       return;
     }
     showResults();
@@ -3147,6 +3307,8 @@
     stopTimer();
     state.game = null;
     clearSavedState();
+    tourney = null; // US-61: End tournament / New game
+    clearTournament();
     streak = null;
     saveStreak();
     startSetup();
@@ -3952,6 +4114,10 @@
     }
     if (isReportOpen()) { // the report form handles its own keys; Escape closes it
       if (event.key === 'Escape') closeReport();
+      return;
+    }
+    if (isPickOpen()) { // US-61: the match categories popup; Escape is Cancel
+      if (event.key === 'Escape') closePicker();
       return;
     }
     const solo = streakOnScreen() || dailyOnScreen();
@@ -6479,6 +6645,7 @@
         dom.finalLead.textContent = t('final.lead2', { names: tied, score: score, n: f.round });
       }
       dom.finalRule.textContent = t('final.rule.' + MODES[g.mode].key, { max: largestPoints(g) });
+      dom.finalSkip.hidden = isMatch(g); // US-61 (D-77 f): a level match must be decided
       setFinalLoading(false);
       return;
     }
@@ -6609,10 +6776,16 @@
       }));
     } catch (err) {
       noneLeft = err.status === 409;
-      failure = () => t('final.loadFailed', { reason: sentence(errorText(err)) });
+      // US-61: a tournament match has no "skip to the results"
+      const key = isMatch(g) ? 'tournament.goalFailed' : 'final.loadFailed';
+      failure = () => t(key, { reason: sentence(errorText(err)) });
     }
     setFinalLoading(false);
     if (state.game !== g || g.final !== f || state.screen !== 'final') return; // skipped meanwhile
+    if (noneLeft && isMatch(g)) { // US-61 (D-77 f): no question left, so a coin toss decides the match
+      finishMatch('coin');
+      return;
+    }
     if (noneLeft) {
       g.final = null;
       showResults();
@@ -6640,7 +6813,7 @@
 
   function onFinalSkip() {
     const g = state.game;
-    if (!g || !g.final || g.final.stage !== 'offer' || state.screen !== 'final') return;
+    if (!g || !g.final || g.final.stage !== 'offer' || state.screen !== 'final' || isMatch(g)) return; // US-61: no Skip
     g.final = null;
     showResults();
   }
@@ -6681,7 +6854,7 @@
     setScoringPanelTexts({
       title: t('final.name') + roundSuffix(g.final.round),
       hint: t('final.hint.' + MODES[g.mode].key),
-      back: t('run.seeResults'),
+      back: finalDoneText(g),
     });
   }
 
@@ -6778,7 +6951,12 @@
     const allMarked = g.contestants.every((c) => hasOwn(f.marks, String(c.id)));
     dom.backBtn.disabled = !allMarked;
     // D-51: still level at the top -> the next round's offer (FU-34: "Next round"); otherwise the results.
-    dom.backBtn.textContent = allMarked && isTiedAtTop(g) ? t('final.nextRound') : t('run.seeResults');
+    dom.backBtn.textContent = allMarked && isTiedAtTop(g) ? t('final.nextRound') : finalDoneText(g);
+  }
+
+  /** The button that ends Golden Goal: "See results", or "See match result" in a tournament (US-61). */
+  function finalDoneText(g) {
+    return isMatch(g) ? t('tournament.seeMatch') : t('run.seeResults');
   }
 
   function markFinal(contestant, result) {
@@ -6796,6 +6974,12 @@
   /** The final round is over: Results (with the D-10 tie rule as always). */
   function finishFinal() {
     if (!finalOnScreen()) return;
+    if (isMatch(state.game)) { // US-61: the match is decided only once one contestant leads
+      if (isTiedAtTop(state.game)) return;
+      stopTimer();
+      finishMatch('goal');
+      return;
+    }
     stopTimer();
     state.game.final.stage = 'done';
     showResults();
@@ -6826,6 +7010,13 @@
   function onFinalLeave() {
     if (!finalOnScreen()) return;
     const g = state.game;
+    if (isMatch(g)) { // US-61 (D-77 f): close the question after a confirm; a level match plays on
+      if (!window.confirm(t('tournament.goalLeave'))) return;
+      if (!finalOnScreen() || state.game !== g) return;
+      if (isTiedAtTop(g)) nextFinalRound();
+      else finishFinal();
+      return;
+    }
     const unscored = g.contestants.some((c) => !hasOwn(g.final.marks, String(c.id)));
     if (unscored && !window.confirm(t('final.leave.' + MODES[g.mode].key))) return;
     if (!unscored && isTiedAtTop(g) && !window.confirm(t('final.leaveTied'))) return;
@@ -6839,7 +7030,7 @@
   function onFinalBack() {
     const g = state.game;
     const f = g && g.final;
-    if (!f) return;
+    if (!f || isMatch(g)) return; // US-61 (D-77 f): ignored on the offer and the bets of a match
     if (f.stage === 'offer') {
       g.final = null;
       if (f.round > 1) {
@@ -6863,6 +7054,803 @@
     dom.finalWagerShow.addEventListener('click', onWagerShowToggle);
     dom.finalWagerInput.addEventListener('input', () => setWagerError(''));
     dom.finalOpen.addEventListener('click', onFinalOpen);
+  }
+
+  // ---------- Tournament (US-61, D-77) ----------
+  // A knockout for 3 to 8 entries: a random draw into a bracket of 4 or 8 (empty spots are byes), each
+  // match a fresh short board for its two contestants on the board and question screens, a level
+  // match always decided by Golden Goal (a coin toss when no question is left). The finished
+  // tournament's results stay until New game. The tournament object is described at `tourney`.
+
+  /** A board game that is a tournament match. */
+  function isMatch(g) {
+    return !!g && g.mode === 'tournament';
+  }
+
+  function isPosInt(value) {
+    return Number.isInteger(value) && value > 0;
+  }
+
+  /** D-77 g: 3-4 entries play a bracket of 4, 5-8 a bracket of 8. */
+  function bracketSize(count) {
+    return count <= 4 ? 4 : 8;
+  }
+
+  function roundCount(size) {
+    return size === 4 ? 2 : 3;
+  }
+
+  function emptyMatch() {
+    return { a: null, b: null, bye: false, winner: null, sa: null, sb: null, way: null };
+  }
+
+  function matchAt(rec, ref) {
+    return rec.rounds[ref[0]][ref[1]];
+  }
+
+  function finalMatchOf(rec) {
+    return rec.rounds[rec.rounds.length - 1][0];
+  }
+
+  function entryOf(rec, id) {
+    return rec.entries.find((e) => e.id === id) || null;
+  }
+
+  /** "Quarter-finals" / "Semi-finals" / "Final": round r counted from the first. */
+  function roundTitle(rec, r) {
+    const fromEnd = rec.rounds.length - 1 - r;
+    return t(['tournament.round.final', 'tournament.round.semi', 'tournament.round.quarter'][fromEnd]);
+  }
+
+  /** "Quarter-final 2" / "Semi-final 1" / "Final". */
+  function matchName(rec, ref) {
+    const fromEnd = rec.rounds.length - 1 - ref[0];
+    if (fromEnd === 0) return t('tournament.match.final');
+    return t(fromEnd === 1 ? 'tournament.match.semi' : 'tournament.match.quarter', { n: ref[1] + 1 });
+  }
+
+  /**
+   * D-77 a, g: a random draw. The byes take the second slot of the first-round matches in BYE_ORDER,
+   * so two byes never meet; the shuffle only decides who sits where.
+   */
+  function drawBracket(entries) {
+    const size = bracketSize(entries.length);
+    const byes = BYE_ORDER[size].slice(0, size - entries.length);
+    const order = shuffled(entries.map((e) => e.id));
+    const rounds = [];
+    for (let count = size / 2; count >= 1; count /= 2) {
+      rounds.push(Array.from({ length: count }, emptyMatch));
+    }
+    rounds[0].forEach((m, i) => {
+      m.a = order.shift();
+      if (byes.indexOf(i) === -1) {
+        m.b = order.shift();
+      } else {
+        m.bye = true; // already through: no board is played
+        m.winner = m.a;
+        m.way = 'bye';
+      }
+    });
+    advanceBracket(rounds);
+    return rounds;
+  }
+
+  /** Fill each later round's slots from the winners of the two matches before it (null = not known yet). */
+  function advanceBracket(rounds) {
+    for (let r = 1; r < rounds.length; r += 1) {
+      rounds[r].forEach((m, i) => {
+        m.a = rounds[r - 1][2 * i].winner;
+        m.b = rounds[r - 1][2 * i + 1].winner;
+      });
+    }
+  }
+
+  /** The next match to play ([round, index]): the first round top to bottom, then the next round; or null. */
+  function nextMatch(rec) {
+    for (let r = 0; r < rec.rounds.length; r += 1) {
+      const i = rec.rounds[r].findIndex((m) => !m.bye && m.winner === null && m.a !== null && m.b !== null);
+      if (i !== -1) return [r, i];
+    }
+    return null;
+  }
+
+  // ----- Saved tournament -----
+
+  function saveTournament() {
+    try {
+      window.localStorage.setItem(TOURNAMENT_KEY, JSON.stringify({
+        version: TOURNAMENT_VERSION,
+        screen: state.screen,
+        tournament: tourney,
+        game: state.game, // the match on the board, else null
+      }));
+    } catch (err) {
+      // storage full or disabled: the tournament goes on, it just won't survive a refresh
+    }
+  }
+
+  function clearTournament() {
+    if (INTEGRATION) return;
+    try {
+      window.localStorage.removeItem(TOURNAMENT_KEY);
+    } catch (err) {
+      // nothing to clear
+    }
+  }
+
+  /** The saved { screen, tournament, game }, or null (a broken save is removed). */
+  function loadTournament() {
+    let raw = null;
+    try {
+      raw = window.localStorage.getItem(TOURNAMENT_KEY);
+    } catch (err) {
+      return null;
+    }
+    if (raw === null) return null;
+    try {
+      const saved = JSON.parse(raw);
+      if (isPlainObject(saved) && saved.version === TOURNAMENT_VERSION && isValidTournament(saved.tournament) &&
+          isValidTournamentScreen(saved.screen, saved.tournament, saved.game)) return saved;
+    } catch (err) {
+      // invalid JSON or an unexpected shape: discarded below
+    }
+    clearTournament();
+    return null;
+  }
+
+  /** 3 to 8 entries: unique ids, names (D-02, D-22) and colours of the 8-colour palette. */
+  function isValidEntries(list) {
+    return Array.isArray(list) && list.length >= TOURNAMENT_MIN && list.length <= MODES.tournament.limit &&
+      list.every((e) => isPlainObject(e) && typeof e.name === 'string' && e.name === e.name.trim()) &&
+      isValidContestants(list.map((e) => ({ id: e.id, name: e.name, color: e.color, score: 0, helpers: allHelpers() })),
+        MODES.tournament);
+  }
+
+  function isIdOrNull(value) {
+    return value === null || isPosInt(value);
+  }
+
+  function isIntOrNull(value) {
+    return value === null || Number.isInteger(value);
+  }
+
+  function isMatchShape(m) {
+    return isPlainObject(m) && isIdOrNull(m.a) && isIdOrNull(m.b) && typeof m.bye === 'boolean' &&
+      isIdOrNull(m.winner) && isIntOrNull(m.sa) && isIntOrNull(m.sb) &&
+      (m.way === null || MATCH_WAYS.indexOf(m.way) !== -1);
+  }
+
+  /** A played match: the winner is one of the two, on a higher score (a coin toss only breaks a tie). */
+  function isValidResult(m) {
+    if (m.winner === null) return m.sa === null && m.sb === null && m.way === null;
+    if (m.a === null || m.b === null || (m.winner !== m.a && m.winner !== m.b)) return false;
+    if (!Number.isInteger(m.sa) || !Number.isInteger(m.sb) || m.way === null || m.way === 'bye') return false;
+    const won = m.winner === m.a ? m.sa : m.sb;
+    const lost = m.winner === m.a ? m.sb : m.sa;
+    return m.way === 'coin' ? won === lost : won > lost;
+  }
+
+  /**
+   * The bracket of these entries: its size and rounds, the byes exactly as D-77 g, every entry once in
+   * the first round, each later slot holding the winner of the match before it, valid results.
+   */
+  function isValidRounds(rounds, entries) {
+    const size = bracketSize(entries.length);
+    if (!Array.isArray(rounds) || rounds.length !== roundCount(size)) return false;
+    if (!rounds.every((round, r) => Array.isArray(round) && round.length === size / Math.pow(2, r + 1) &&
+        round.every(isMatchShape))) return false;
+    const byes = BYE_ORDER[size].slice(0, size - entries.length);
+    const placed = [];
+    const firstOk = rounds[0].every((m, i) => {
+      if (m.bye !== (byes.indexOf(i) !== -1)) return false;
+      placed.push(m.a);
+      if (!m.bye) placed.push(m.b);
+      return !m.bye || (m.b === null && m.winner === m.a && m.way === 'bye' && m.sa === null && m.sb === null);
+    });
+    if (!firstOk || placed.length !== entries.length || !entries.every((e) => placed.indexOf(e.id) !== -1)) return false;
+    return rounds.every((round, r) => round.every((m, i) => {
+      if (r > 0 && (m.bye || m.a !== rounds[r - 1][2 * i].winner || m.b !== rounds[r - 1][2 * i + 1].winner)) return false;
+      return m.bye || isValidResult(m);
+    }));
+  }
+
+  function isValidRef(ref, rounds) {
+    return Array.isArray(ref) && ref.length === 2 && Number.isInteger(ref[0]) && ref[0] >= 0 &&
+      ref[0] < rounds.length && Number.isInteger(ref[1]) && ref[1] >= 0 && ref[1] < rounds[ref[0]].length;
+  }
+
+  function isValidTournament(tt) {
+    if (!isPlainObject(tt)) return false;
+    const range = timerRange();
+    if (!isPosInt(tt.startedAt) || !(tt.finishedAt === null || isPosInt(tt.finishedAt)) ||
+        typeof tt.started !== 'boolean' || typeof tt.helpersOff !== 'boolean' ||
+        !Number.isInteger(tt.timerSeconds) || tt.timerSeconds < range.min || tt.timerSeconds > range.max) return false;
+    if (!isValidEntries(tt.entries) || !isValidRounds(tt.rounds, tt.entries)) return false;
+    if ((tt.finishedAt !== null) !== (finalMatchOf(tt).winner !== null)) return false;
+    const played = tt.rounds.some((round) => round.some((m) => !m.bye && m.winner !== null));
+    if (tt.playing !== null) {
+      const next = nextMatch(tt);
+      if (!isValidRef(tt.playing, tt.rounds) || !next || next[0] !== tt.playing[0] || next[1] !== tt.playing[1]) return false;
+    }
+    if ((played || tt.playing !== null) && !tt.started) return false;
+    if (tt.last !== null) {
+      if (!isValidRef(tt.last, tt.rounds)) return false;
+      const m = matchAt(tt, tt.last);
+      if (m.bye || m.winner === null) return false;
+    }
+    return true;
+  }
+
+  /**
+   * The saved screen fits the tournament: a match on the board / question / Golden Goal screen with a
+   * valid match board of the two contestants of the match being played; the bracket, the match result
+   * or the final results without one.
+   */
+  function isValidTournamentScreen(screen, tt, g) {
+    if (TOURNAMENT_SCREENS.indexOf(screen) === -1) return false;
+    const onMatch = ['board', 'question', 'final'].indexOf(screen) !== -1;
+    if (onMatch !== (tt.playing !== null)) return false;
+    if (!onMatch) {
+      if (g !== null) return false;
+      if (screen === 'match') return tt.last !== null;
+      if (tt.last !== null) return false;
+      return screen === 'tresults' ? tt.finishedAt !== null : tt.finishedAt === null;
+    }
+    if (tt.last !== null) return false;
+    const m = matchAt(tt, tt.playing);
+    return isValidGame(g) && isMatch(g) && g.finalRound === true && g.timerSeconds === tt.timerSeconds &&
+      g.contestants.length === 2 && g.contestants[0].id === m.a && g.contestants[1].id === m.b &&
+      g.contestants.every((c) => {
+        const e = entryOf(tt, c.id);
+        return e.name === c.name && e.color === c.color;
+      }) && isValidScreenFor(screen, g);
+  }
+
+  /** Reopen the saved tournament screen; a match comes back as a saved game does (D-04, D-25). */
+  function restoreTournament(saved) {
+    tourney = saved.tournament;
+    if (saved.screen === 'bracket') {
+      showBracket();
+    } else if (saved.screen === 'match') {
+      showMatchResult();
+    } else if (saved.screen === 'tresults') {
+      showTourneyResults();
+    } else {
+      restoreGame({ screen: saved.screen, game: saved.game });
+    }
+  }
+
+  // ----- Start, bracket, Shuffle, End tournament -----
+
+  /**
+   * Start (valid setup): the draw, the bracket screen and one game log line (D-77 m). The timer and
+   * helpers_enabled serve every match; the categories are chosen before each match (D-77 ab).
+   */
+  function beginTournament(timerSeconds) {
+    const s = state.setup;
+    const entries = s.entries.map((e, i) => ({ id: i + 1, name: e.name.trim(), color: e.color }));
+    lastPicks = [];
+    tourney = {
+      startedAt: Date.now(),
+      entries: entries,
+      timerSeconds: timerSeconds,
+      helpersOff: !s.helpersOn,
+      rounds: drawBracket(entries),
+      started: false,
+      playing: null,
+      last: null,
+      finishedAt: null,
+    };
+    state.game = null;
+    clearSavedState();
+    postGameLog({ mode: 'tournament', players: entries.map((e) => e.name) }); // no categories yet (D-77 ab)
+    showBracket();
+  }
+
+  function showBracket() {
+    clearMessage(dom.bracketMsg);
+    renderBracket();
+    showScreen('bracket'); // also saves the tournament
+    dom.bracketTitle.focus();
+  }
+
+  function renderBracket() {
+    const tt = tourney;
+    const next = nextMatch(tt);
+    dom.bracketInfo.textContent = [
+      tn('tournament.count', tt.entries.length),
+      t('board.timer', { s: tt.timerSeconds }),
+    ].join('  ' + DOT + '  ');
+    clear(dom.bracketRounds);
+    dom.bracketRounds.style.setProperty('--rounds', String(tt.rounds.length));
+    tt.rounds.forEach((round, r) => {
+      const list = h('ol', { className: 'bracket-list' });
+      round.forEach((m, i) => list.appendChild(renderBracketMatch(tt, [r, i], next)));
+      dom.bracketRounds.appendChild(h('section', { className: 'bracket-round', 'aria-label': roundTitle(tt, r) }, [
+        h('h3', { className: 'bracket-round-title', text: roundTitle(tt, r), 'aria-hidden': 'true' }),
+        list,
+      ]));
+    });
+    const a = next ? entryOf(tt, matchAt(tt, next).a) : null;
+    const b = next ? entryOf(tt, matchAt(tt, next).b) : null;
+    dom.bracketNext.textContent = next
+      ? t('tournament.next', { match: matchName(tt, next), a: iso(a.name), b: iso(b.name) }) : '';
+    dom.bracketStart.hidden = !next;
+    dom.bracketShuffle.hidden = tt.started; // D-77 d: only before the first match
+    setMatchLoading(matchLoading);
+  }
+
+  /** One match card: two slots (or "Name – bye"), the scores once played, the winner marked by a ✓ and bold. */
+  function renderBracketMatch(tt, ref, next) {
+    const m = matchAt(tt, ref);
+    const isNext = !!next && next[0] === ref[0] && next[1] === ref[1];
+    const card = h('li', { className: 'bracket-match' + (isNext ? ' is-next' : '') + (m.bye ? ' is-bye' : '') }, [
+      h('span', { className: 'bracket-match-name' }, [
+        document.createTextNode(matchName(tt, ref)),
+        isNext ? h('span', { className: 'bracket-next-tag', text: t('tournament.nextTag') }) : null,
+      ]),
+    ]);
+    if (m.bye) {
+      card.appendChild(bracketSlot(tt, m, m.a, null, true));
+      return card;
+    }
+    card.appendChild(bracketSlot(tt, m, m.a, m.sa, false));
+    card.appendChild(bracketSlot(tt, m, m.b, m.sb, false));
+    if (m.way === 'goal' || m.way === 'coin') {
+      card.appendChild(h('span', { className: 'bracket-way', text: t('tournament.way.' + m.way) }));
+    }
+    return card;
+  }
+
+  function bracketSlot(tt, m, id, score, bye) {
+    const entry = id === null ? null : entryOf(tt, id);
+    const won = entry !== null && m.winner === id && !bye;
+    const out = entry !== null && m.winner !== null && m.winner !== id;
+    const swatch = h('span', { className: 'result-swatch', 'aria-hidden': 'true' });
+    if (entry) swatch.style.backgroundColor = paletteEntry(entry.color).value;
+    else swatch.classList.add('is-empty');
+    const name = entry ? ownDirection(h('span', { className: 'bracket-name', text: entry.name }))
+      : h('span', { className: 'bracket-name', text: t('tournament.tbd') });
+    return h('div', { className: 'bracket-slot' + (won ? ' is-winner' : '') + (out ? ' is-out' : '') + (entry ? '' : ' is-tbd') }, [
+      h('span', { className: 'bracket-mark', text: won ? CHECK : '', 'aria-hidden': 'true' }),
+      swatch,
+      name,
+      bye ? h('span', { className: 'bracket-bye', text: EN_DASH + ' ' + t('tournament.bye') }) : null,
+      won ? h('span', { className: 'visually-hidden', text: t('tournament.through') }) : null,
+      out ? h('span', { className: 'visually-hidden', text: t('tournament.out') }) : null,
+      score !== null ? h('span', { className: 'bracket-score', text: formatScore(score) }) : null,
+    ]);
+  }
+
+  function setMatchLoading(loading) {
+    matchLoading = loading;
+    dom.bracketStart.disabled = loading;
+    dom.bracketShuffle.disabled = loading;
+    dom.bracketStart.textContent = loading ? t('common.loading') : t('tournament.startMatch');
+  }
+
+  /** D-77 d: draw the whole bracket again, until the first match starts. */
+  function onShuffle() {
+    if (!tourney || tourney.started || state.screen !== 'bracket' || matchLoading) return;
+    tourney.rounds = drawBracket(tourney.entries);
+    renderBracket();
+    saveState();
+  }
+
+  /** D-77 k: End tournament asks first; OK goes to setup and the tournament is dropped. */
+  function onEndTournament() {
+    if (!tourney || state.screen !== 'bracket') return;
+    if (!window.confirm(t('tournament.endConfirm'))) return;
+    if (!tourney || state.screen !== 'bracket') return;
+    newGame();
+  }
+
+  // ----- A match -----
+
+  // ----- The categories popup of Start match (D-77 ab) -----
+
+  function isPickOpen() {
+    return !dom.pickOverlay.hidden;
+  }
+
+  /**
+   * Start match opens the popup: the playable categories are read now (a reload may have skipped the
+   * setup load, and Admin may have changed them), with the last match's ticks still ticked.
+   */
+  async function openPicker() {
+    const tt = tourney;
+    if (!tt || state.screen !== 'bracket' || matchLoading || isPickOpen()) return;
+    const ref = nextMatch(tt);
+    if (!ref) return;
+    clearMessage(dom.bracketMsg);
+    const open = { ref: ref, selected: lastPicks.slice(), playable: null };
+    picker = open;
+    clearMessage(dom.pickError);
+    dom.pickOverlay.hidden = false;
+    setPageInert(true);
+    renderPicker();
+    dom.pickCancel.focus();
+    let failure = null;
+    let playable = [];
+    try {
+      const list = await apiGet('categories.php?playable=1');
+      if (!Array.isArray(list)) throw textError('err.response');
+      playable = list.filter((c) => isPlainObject(c) && Number.isInteger(c.id) && typeof c.name === 'string')
+        .map((c) => ({ id: c.id, name: c.name, nameAr: isFilled(c.name_ar) ? c.name_ar : null }));
+    } catch (err) {
+      failure = err;
+    }
+    if (picker !== open) return; // closed meanwhile
+    if (failure || !playable.length) {
+      closePicker();
+      const reason = failure ? () => sentence(errorText(failure)) : () => t('cat.none');
+      showMessage(dom.bracketMsg, () => t('tournament.matchFailed', { reason: reason() }), 'error');
+      return;
+    }
+    open.playable = playable;
+    open.selected = open.selected.filter((id) => id === SURPRISE || id === MIX || playable.some((c) => c.id === id));
+    renderPicker();
+    const first = dom.pickList.querySelector('input:not(:disabled)');
+    if (first) first.focus();
+  }
+
+  /** Cancel, Escape or Android Back: back to the bracket, nothing started. */
+  function closePicker() {
+    if (!isPickOpen()) return;
+    dom.pickOverlay.hidden = true;
+    setPageInert(false);
+    picker = null;
+    if (!dom.bracketStart.hidden) dom.bracketStart.focus();
+  }
+
+  /** The popup's texts and tiles: "Surprise me!" first, then the setup tiles (with Kilo Meshakkal). */
+  function renderPicker() {
+    const p = picker;
+    if (!p) return;
+    const m = matchAt(tourney, p.ref);
+    dom.pickAbout.textContent = t('tournament.pickAbout', {
+      match: matchName(tourney, p.ref), a: iso(entryOf(tourney, m.a).name), b: iso(entryOf(tourney, m.b).name), n: TOURNAMENT_PICK_MAX,
+    });
+    clear(dom.pickList);
+    if (p.playable === null) {
+      dom.pickList.appendChild(h('li', { className: 'hint', text: t('cat.loading') }));
+      dom.pickCount.textContent = '';
+      dom.pickStart.disabled = true;
+      return;
+    }
+    const tiles = [{ id: SURPRISE, surprise: true }].concat(setupTiles({ playable: p.playable }));
+    tiles.forEach((c) => {
+      const inputId = 'pick-cat-' + (c.id === SURPRISE ? 'surprise' : c.id === MIX ? 'mix' : c.id);
+      const box = h('input', { type: 'checkbox', id: inputId, checked: p.selected.indexOf(c.id) !== -1 });
+      box.addEventListener('change', () => togglePick(c.id, box.checked));
+      const name = c.surprise
+        ? h('span', { className: 'cat-name-text' }, [
+          document.createTextNode(t('cat.surprise')),
+          h('span', { className: 'cat-surprise-hint', text: t('cat.surpriseHint', { n: SURPRISE_ALONE }) }),
+        ])
+        : h('span', { className: 'cat-name-text', text: iso(columnName(c)) });
+      dom.pickList.appendChild(h('li', { className: c.surprise ? 'cat-surprise-item' : '' }, [
+        h('label', { className: 'cat-label' + (c.surprise ? ' cat-surprise' : ''), htmlFor: inputId, 'data-cat': String(c.id) }, [
+          box,
+          name,
+          h('span', { className: 'cat-order', 'aria-hidden': 'true' }),
+        ]),
+      ]));
+    });
+    renderPickSelection();
+  }
+
+  /** "k of up to 3 selected", the order badges, and the unticked boxes locked once 3 are ticked. */
+  function renderPickSelection() {
+    const p = picker;
+    const count = p.selected.length;
+    const full = count >= TOURNAMENT_PICK_MAX;
+    dom.pickCount.textContent = t('cat.count', { k: count, n: TOURNAMENT_PICK_MAX });
+    Array.prototype.forEach.call(dom.pickList.querySelectorAll('.cat-label'), (label) => {
+      const order = p.selected.indexOf(Number(label.getAttribute('data-cat')));
+      label.classList.toggle('is-selected', order !== -1);
+      label.classList.toggle('is-locked', full && order === -1);
+      label.querySelector('input').disabled = full && order === -1;
+      label.querySelector('.cat-order').textContent = order === -1 ? '' : String(order + 1);
+    });
+    dom.pickStart.disabled = count < 1;
+  }
+
+  function togglePick(id, checked) {
+    const p = picker;
+    if (!p || p.playable === null) return;
+    const at = p.selected.indexOf(id);
+    if (checked && at === -1 && p.selected.length < TOURNAMENT_PICK_MAX) p.selected.push(id);
+    if (!checked && at !== -1) p.selected.splice(at, 1);
+    clearMessage(dom.pickError);
+    renderPickSelection();
+  }
+
+  /** Start match in the popup: 1 to 3 ticks, "Surprise me!" drawn as on setup, then the board. */
+  function onPickSubmit(event) {
+    event.preventDefault();
+    const p = picker;
+    if (!p || p.playable === null) return;
+    if (p.selected.length < 1) {
+      showMessage(dom.pickError, () => t('cat.atLeast'), 'error');
+      return;
+    }
+    let selection;
+    try {
+      selection = resolveSelection({ selected: p.selected, playable: p.playable, perGame: TOURNAMENT_PICK_MAX });
+    } catch (err) {
+      showMessage(dom.pickError, () => errorText(err), 'error');
+      return;
+    }
+    lastPicks = p.selected.slice();
+    closePicker();
+    onStartMatch(selection);
+  }
+
+  function bindPickerEvents() {
+    dom.pickForm.addEventListener('submit', onPickSubmit);
+    dom.pickCancel.addEventListener('click', closePicker);
+  }
+
+  /**
+   * Start match (after the popup): a fresh board of the chosen categories for the two contestants (the
+   * played list as `seen`, so unseen questions come first), cut to the Admin's tournament point values
+   * (D-77 aa), both read now (D-12 per match). selection = { ids, hidden } from resolveSelection.
+   */
+  async function onStartMatch(selection) {
+    const tt = tourney;
+    if (!tt || state.screen !== 'bracket' || matchLoading) return;
+    const ref = nextMatch(tt);
+    if (!ref) return;
+    clearMessage(dom.bracketMsg);
+    setMatchLoading(true);
+    let board = null;
+    let allowed = [];
+    let failure = null;
+    const ids = selection.ids;
+    // The Admin's tournament values; if the settings cannot be read, the default rows are used.
+    const settingsRead = apiGet('settings.php').then((s) => tournamentPointList(s && s.tournament_points), () => []);
+    try {
+      board = parseBoard(await apiPost('questions.php?board=1', { categories: ids.join(','), seen: loadSeen() }), ids);
+      allowed = await settingsRead;
+    } catch (err) {
+      failure = err;
+    }
+    setMatchLoading(false);
+    if (tourney !== tt || state.screen !== 'bracket') return; // ended meanwhile
+    if (failure) {
+      showMessage(dom.bracketMsg, () => t('tournament.matchFailed', { reason: sentence(localCategoryNames(errorText(failure))) }), 'error');
+      return;
+    }
+    beginMatch(ref, board, allowed, selection.hidden);
+  }
+
+  /** US-61 (D-77 aa): the settings' "200,400,500" -> [200, 400, 500]; anything else -> []. */
+  function tournamentPointList(text) {
+    if (typeof text !== 'string') return [];
+    return text.split(',').map((part) => Number(part.trim())).filter((n) => Number.isInteger(n) && n > 0);
+  }
+
+  /**
+   * D-77 aa: keep the board's (enabled) point values that the Admin ticked for tournaments. With none
+   * ticked, or none of the ticked ones enabled, keep the lowest TOURNAMENT_ROWS (D-77 e; all of them
+   * when fewer are enabled). Every enabled value is on the board for every column (the board API
+   * refuses a category missing one), so any subset is playable.
+   */
+  function cutRows(board, allowed) {
+    const picked = board.points.filter((p) => (allowed || []).indexOf(p) !== -1);
+    const keep = picked.length ? picked : board.points.slice(0, TOURNAMENT_ROWS);
+    board.categories.forEach((c) => {
+      Object.keys(c.questions).forEach((p) => {
+        if (keep.indexOf(Number(p)) === -1) delete c.questions[p];
+      });
+    });
+    board.points = keep;
+  }
+
+  /**
+   * D-77 i: the match board. Scores start at 0, 3 fresh helpers each, its own Kilo Meshakkal order
+   * and double cell, dealt after the cut; Golden Goal always on. Matches are not logged (D-77 m).
+   */
+  function beginMatch(ref, board, allowed, hidden) {
+    const tt = tourney;
+    const m = matchAt(tt, ref);
+    cutRows(board, allowed);
+    board.categories.forEach((c) => { c.hidden = hidden.indexOf(c.id) !== -1; });
+    preloadImages(board.categories);
+    board.categories.forEach((c) => { if (c.id === MIX) dealMixColumn(c, board.points); });
+    state.game = {
+      mode: 'tournament',
+      contestants: [m.a, m.b].map((id) => {
+        const e = entryOf(tt, id);
+        return { id: e.id, name: e.name, color: e.color, score: 0, helpers: allHelpers() };
+      }),
+      timerSeconds: tt.timerSeconds,
+      helpersOff: tt.helpersOff,
+      points: board.points,
+      categories: board.categories,
+      used: {},
+      double: pickDoubleCell(board.categories, board.points),
+      finalRound: true, // D-77 f: a level match goes to Golden Goal whatever final_round_enabled says
+      final: null,
+      statsSent: [],
+      current: null,
+    };
+    tt.started = true;
+    tt.playing = ref;
+    renderGame();
+    showScreen('board'); // one write: the bracket with the match being played and its board
+  }
+
+  /**
+   * The match is decided ('score', 'goal' or 'coin'): the winner moves on and the match board is
+   * dropped in the same write, so a reload neither replays nor loses the match.
+   */
+  function finishMatch(way) {
+    const tt = tourney;
+    const g = state.game;
+    if (!tt || !isMatch(g) || tt.playing === null) return;
+    stopTimer();
+    const ref = tt.playing;
+    const m = matchAt(tt, ref);
+    m.sa = findContestant(g, m.a).score;
+    m.sb = findContestant(g, m.b).score;
+    if (way === 'coin') m.winner = Math.random() < 0.5 ? m.a : m.b;
+    else m.winner = m.sa > m.sb ? m.a : m.b;
+    m.way = way;
+    advanceBracket(tt.rounds);
+    tt.playing = null;
+    tt.last = ref;
+    if (finalMatchOf(tt).winner !== null) {
+      tt.finishedAt = Date.now();
+    }
+    state.game = null;
+    showMatchResult();
+  }
+
+  function showMatchResult() {
+    renderMatchResult();
+    showScreen('match'); // also saves the tournament
+    dom.matchTitle.focus();
+  }
+
+  /** "Sara wins 300–200" (after Golden Goal / on a coin toss), with Continue only. */
+  function renderMatchResult() {
+    const tt = tourney;
+    const m = matchAt(tt, tt.last);
+    const aWon = m.winner === m.a;
+    const winner = entryOf(tt, m.winner);
+    const score = scorePair(aWon ? m.sa : m.sb, aWon ? m.sb : m.sa);
+    dom.matchRound.textContent = matchName(tt, tt.last);
+    dom.matchTitle.textContent = t('tournament.wins.' + m.way, { name: iso(winner.name), score: score });
+    dom.matchNote.hidden = m.way !== 'coin';
+    dom.matchNote.textContent = m.way === 'coin' ? t('tournament.coin', { name: iso(winner.name) }) : '';
+  }
+
+  /** "300 – 200" (spaced, so a negative score never sits against the dash). */
+  function scorePair(first, second) {
+    return formatScore(first) + ' ' + EN_DASH + ' ' + formatScore(second);
+  }
+
+  /** Continue: the bracket with the winner moved on, or the tournament results after the final. */
+  function onMatchContinue() {
+    const tt = tourney;
+    if (!tt || state.screen !== 'match') return;
+    tt.last = null;
+    if (tt.finishedAt !== null) showTourneyResults();
+    else showBracket();
+  }
+
+  // ----- Tournament results -----
+
+  function showTourneyResults() {
+    renderTourneyResults();
+    showScreen('tresults');
+    dom.trTitle.focus();
+  }
+
+  /**
+   * D-77 h: 1st, 2nd, joint 3rd (semi-final losers), joint 5th (quarter-final losers), competition
+   * ranking, in bracket order. A bye is not a loss. Returns [{ entry, rank }].
+   */
+  function standingsOf(rec) {
+    const rows = [{ id: finalMatchOf(rec).winner, tier: 0 }];
+    for (let r = rec.rounds.length - 1; r >= 0; r -= 1) {
+      rec.rounds[r].forEach((m) => {
+        if (m.bye || m.winner === null) return;
+        rows.push({ id: m.winner === m.a ? m.b : m.a, tier: rec.rounds.length - r });
+      });
+    }
+    return rows.map((row) => ({
+      entry: entryOf(rec, row.id),
+      rank: 1 + rows.filter((other) => other.tier < row.tier).length,
+    }));
+  }
+
+  /** "1st", "2nd", "3rd", "5th" (the only places a bracket of 8 gives). */
+  function placeText(rank) {
+    return [1, 2, 3, 5].indexOf(rank) !== -1 ? t('tournament.place.' + rank) : String(rank);
+  }
+
+  /** The finished tournament's results (Share and New game). */
+  function renderTourneyResults() {
+    const rec = tourney;
+    if (!rec) return;
+    const rows = standingsOf(rec);
+    dom.trWinner.textContent = t('tournament.champion', { name: iso(rows[0].entry.name) });
+    clear(dom.trStandings);
+    rows.forEach((row) => {
+      const swatch = h('span', { className: 'result-swatch', 'aria-hidden': 'true' });
+      swatch.style.backgroundColor = paletteEntry(row.entry.color).value;
+      const item = h('li', { className: 'result-row tr-row' + (row.rank === 1 ? ' is-winner' : '') }, [
+        h('span', { className: 'result-rank tr-rank', text: placeText(row.rank) }),
+        swatch,
+        h('span', { className: 'result-name', text: iso(row.entry.name) }),
+      ]);
+      item.style.borderInlineStartColor = paletteEntry(row.entry.color).value;
+      dom.trStandings.appendChild(item);
+    });
+    clear(dom.trMatches);
+    rec.rounds.forEach((round, r) => round.forEach((m, i) => {
+      if (m.bye || m.winner === null) return;
+      dom.trMatches.appendChild(renderPlayedMatch(rec, m, [r, i]));
+    }));
+    dom.trShareStatus.textContent = '';
+  }
+
+  /** "Semi-final 1  Sara 300–200 Omar  (after Golden Goal)": the winner in bold with a ✓. */
+  function renderPlayedMatch(rec, m, ref) {
+    const side = (id) => {
+      const e = entryOf(rec, id);
+      const won = m.winner === id;
+      return ownDirection(h(won ? 'strong' : 'span', { className: 'tr-side' + (won ? ' is-winner' : ''), text: (won ? CHECK + ' ' : '') + e.name }));
+    };
+    return h('li', { className: 'tr-match' }, [
+      h('span', { className: 'tr-match-name', text: matchName(rec, ref) }),
+      h('span', { className: 'tr-match-line' }, [
+        side(m.a),
+        h('span', { className: 'tr-score', text: scorePair(m.sa, m.sb) }),
+        side(m.b),
+      ]),
+      m.way === 'goal' || m.way === 'coin' ? h('span', { className: 'tr-way', text: t('tournament.way.' + m.way) }) : null,
+    ]);
+  }
+
+  /** US-46: "Sara won the Mokh Rush tournament! 2nd Omar, 3rd Ali and Mona" plus the site link. */
+  function tourneyShareText(rec) {
+    const rows = standingsOf(rec);
+    const groups = [];
+    rows.slice(1).forEach((row) => {
+      const last = groups[groups.length - 1];
+      if (last && last.rank === row.rank) last.names.push(row.entry.name);
+      else groups.push({ rank: row.rank, names: [row.entry.name] });
+    });
+    const head = t('tournament.shareWon', { name: iso(rows[0].entry.name) });
+    if (!groups.length) return head;
+    return head + ' ' + groups.map((group) =>
+      t('tournament.sharePlace', { place: placeText(group.rank), names: joinNames(group.names) })).join(t('list.sep'));
+  }
+
+  function onTourneyShare() {
+    const rec = tourney;
+    if (!rec || state.screen !== 'tresults') return;
+    shareText(tourneyShareText(rec), dom.trShareStatus);
+  }
+
+  /** Back or New Game on the results: setup, as New game (the tournament is dropped). */
+  function onTourneyNewGame() {
+    if (state.screen !== 'tresults') return;
+    newGame();
+  }
+
+  function bindTournamentEvents() {
+    dom.bracketStart.addEventListener('click', openPicker); // D-77 ab: the categories first
+    bindPickerEvents();
+    dom.bracketShuffle.addEventListener('click', onShuffle);
+    dom.bracketEnd.addEventListener('click', onEndTournament);
+    dom.matchContinue.addEventListener('click', onMatchContinue);
+    dom.trNew.addEventListener('click', onTourneyNewGame);
+    dom.trShare.addEventListener('click', onTourneyShare);
   }
 
   // ---------- Read aloud (US-48) ----------
@@ -7191,6 +8179,13 @@
       renderCrossword(); // progress, the toggled clues and the timer stay (US-58)
     } else if (state.screen === 'speed' && speed && speed.last) {
       renderSpeedResult(); // US-59
+    } else if (state.screen === 'bracket' && tourney) {
+      renderBracket();     // US-61
+      if (isPickOpen()) renderPicker(); // the ticks stay
+    } else if (state.screen === 'match' && tourney) {
+      renderMatchResult();
+    } else if (state.screen === 'tresults') {
+      renderTourneyResults();
     }
   }
 
@@ -7310,6 +8305,7 @@
     bindSpeedEvents();
     bindReportEvents();
     bindFinalEvents();
+    bindTournamentEvents();
     dom.uiLangBtns.forEach((btn) => btn.addEventListener('click', onUiLangClick)); // US-49
     i18n.onChange(onLanguageChanged);
   }
@@ -7355,6 +8351,19 @@
         stopTimer();
         state.game = null;
         clearSavedState();
+      }
+    }
+    // US-61: a running tournament comes back where it was (bracket, match, results); a broken save is dropped.
+    const savedTournament = INTEGRATION ? null : loadTournament();
+    if (savedTournament) {
+      try {
+        restoreTournament(savedTournament);
+        return;
+      } catch (err) {
+        stopTimer();
+        state.game = null;
+        tourney = null;
+        clearTournament();
       }
     }
     // US-59: one saved solo run at a time; a Speed Round started after the others comes back first.
