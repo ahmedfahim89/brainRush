@@ -4,7 +4,7 @@
 
 - Up to 6 players or 4 teams, each with their own color.
 - Tournament mode is a knockout for 3 to 8 players or teams: a random draw into a bracket (semi-finals and a final, or quarter-finals first for 5 to 8; empty spots are byes), each match a short board with the point values the admin picked for tournaments (the 3 lowest by default) between two contestants, a level match decided by Golden Goal (or a coin toss when no question is left), and final standings (1st, 2nd, joint 3rd, joint 5th) that can be shared.
-- In a tournament with byes (3, 5, 6 or 7 contestants), one computer contestant, Mokh Bot, takes one bye at random. A match against it is played in turns after a coin flip: on its turn the bot picks a question, gives an answer that is usually wrong and is scored by itself; it can win and go through.
+- In a tournament with byes (3, 5, 6 or 7 contestants), one computer contestant, Mokh Bot, takes one bye at random. A match against it is played in turns after a coin flip: on its turn the bot picks a question, answers and is scored by itself; it can win and go through. How often it is right (0% to 100%) is set by the site's admin, and it chooses its questions by that level and the score.
 - A correct answer adds the question's points, a wrong one takes them away.
 - One random question on each board is secretly worth double points for a correct answer; a popup reveals it when it is opened.
 - Every question has a countdown timer, and a speaker button can read it aloud with the device's own voices.
