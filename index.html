@@ -48,11 +48,11 @@
   <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="css/style.ba1c892a.css">
+  <link rel="stylesheet" href="css/style.fb1be6f7.css">
   <!-- CHRISTMAS (US-55, D-66): seasonal theme, only active under body.theme-christmas; remove after Christmas -->
   <link rel="stylesheet" href="css/christmas.717dbe43.css">
   <!-- Interface language (US-49): loaded first, so an Arabic page is right to left from its first paint -->
-  <script src="js/i18n.fa40ed1b.js"></script>
+  <script src="js/i18n.79f363c2.js"></script>
 </head>
 <body class="game">
   <!-- CHRISTMAS (US-55, D-66): first in <body> so the last known theme is applied before the first paint; remove after Christmas -->
@@ -162,6 +162,23 @@
     </div>
   </div>
 
+  <!-- Tournament match categories (US-61, D-77 ab): chosen at Start match, 1 to 3 per match -->
+  <div id="pick-overlay" class="report-overlay" role="dialog" aria-modal="true" aria-labelledby="pick-title" aria-describedby="pick-about" hidden>
+    <div class="report-card pick-card">
+      <h2 id="pick-title" class="report-title" data-i18n="tournament.pickTitle">Choose the categories</h2>
+      <p id="pick-about" class="hint report-about"></p>
+      <form id="pick-form" novalidate>
+        <p id="pick-count" class="hint pick-count" aria-live="polite"></p>
+        <ul id="pick-list" class="cat-list pick-list"></ul>
+        <p id="pick-error" class="msg msg-error" role="alert" hidden></p>
+        <div class="actions">
+          <button type="submit" id="pick-start" class="btn btn-primary" data-i18n="tournament.startMatch">Start match</button>
+          <button type="button" id="pick-cancel" class="btn" data-i18n="report.cancel">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <main class="game-main">
     <!-- Setup (US-01..US-06) -->
     <section id="screen-setup" class="screen setup" aria-labelledby="setup-title">
@@ -187,6 +204,11 @@
                 <input type="radio" name="mode" value="teams">
                 <span><span data-i18n="mode.teams">Teams</span> <small id="mode-limit-teams" class="mode-limit"></small></span>
               </label>
+              <!-- Tournament (US-61, D-77): a knockout for 3 to 8 contestants, one short board per match -->
+              <label class="mode-option">
+                <input type="radio" name="mode" value="tournament">
+                <span><span data-i18n="mode.tournament">Tournament</span> <small id="mode-limit-tournament" class="mode-limit"></small></span>
+              </label>
             </div>
             <!-- The solo and daily modes as one group (BUG-58-01): beside the toggle when they fit,
                  otherwise together on the line below it, so they never split over two lines on a laptop -->
@@ -207,6 +229,8 @@
           <p class="hint" data-i18n="setup.colorHint">Click a color circle to switch to the next free color.</p>
           <ol id="entry-list" class="entry-list"></ol>
           <p id="entry-limit-msg" class="msg msg-error" role="alert" hidden></p>
+          <!-- US-61: Start with fewer than 3 contestants in Tournament mode (a field error, D-23) -->
+          <p id="entry-min-error" class="field-error" role="alert" hidden></p>
           <button type="button" id="entry-add" class="btn">Add player</button>
         </fieldset>
 
@@ -228,6 +252,8 @@
 
         <fieldset id="cat-block" class="setup-block">
           <legend id="cat-legend">Select categories</legend>
+          <!-- US-61 (D-77 ab): in Tournament mode the categories are chosen before each match -->
+          <p id="cat-tourney-note" class="msg msg-warning cat-tourney-note" data-i18n="tournament.catNote" hidden>In a tournament, the categories are chosen before each match.</p>
           <p id="cat-count" class="hint"></p>
           <div id="cat-warning" class="msg msg-warning" role="alert" hidden></div>
           <ul id="cat-list" class="cat-list"></ul>
@@ -408,6 +434,52 @@
       </div>
     </section>
 
+    <!-- Tournament bracket (US-61, D-77): one column per round, the next match highlighted; game.js draws it -->
+    <section id="screen-bracket" class="screen tournament" aria-labelledby="bracket-title" hidden>
+      <h2 id="bracket-title" tabindex="-1" data-i18n="tournament.bracket">Tournament</h2>
+      <p id="bracket-info" class="hint bracket-info"></p>
+      <div id="bracket-rounds" class="bracket"></div>
+      <p id="bracket-next" class="bracket-next"></p>
+      <div id="bracket-msg" class="msg" role="alert" hidden></div>
+      <div class="actions start-row">
+        <button type="button" id="bracket-start" class="btn btn-primary btn-large" data-i18n="tournament.startMatch">Start match</button>
+        <button type="button" id="bracket-shuffle" class="btn btn-large" data-i18n="tournament.shuffle">Shuffle</button>
+        <button type="button" id="bracket-end" class="btn btn-end" data-i18n="tournament.end">End tournament</button>
+      </div>
+    </section>
+
+    <!-- Match result (US-61): who goes through, with Continue only (no Share, no New Game) -->
+    <section id="screen-match" class="screen results match-result" aria-labelledby="match-title" hidden>
+      <p id="match-round" class="match-round"></p>
+      <h2 id="match-title" class="results-winner" tabindex="-1"></h2>
+      <p id="match-note" class="match-note" hidden></p>
+      <div class="actions start-row">
+        <button type="button" id="match-continue" class="btn btn-primary btn-large" data-i18n="tournament.continue">Continue</button>
+      </div>
+    </section>
+
+    <!-- Tournament results (US-61): the champion, the standings and every played match -->
+    <section id="screen-tresults" class="screen tresults" aria-labelledby="tr-title" hidden>
+      <h2 id="tr-title" tabindex="-1" data-i18n="tournament.results">Tournament results</h2>
+      <p id="tr-winner" class="results-winner tr-winner"></p>
+      <div class="tr-columns">
+        <section class="tr-block" aria-labelledby="tr-standings-title">
+          <h3 id="tr-standings-title" data-i18n="tournament.standings">Standings</h3>
+          <ol id="tr-standings" class="results-list tr-standings"></ol>
+        </section>
+        <section class="tr-block" aria-labelledby="tr-matches-title">
+          <h3 id="tr-matches-title" data-i18n="tournament.matches">Matches</h3>
+          <ol id="tr-matches" class="tr-matches"></ol>
+        </section>
+      </div>
+      <div class="actions start-row">
+        <button type="button" id="tr-new" class="btn btn-primary btn-large" data-i18n="common.newGame">New Game</button>
+        <button type="button" id="tr-share" class="btn btn-large" data-i18n="common.share">Share</button>
+        <span id="tr-share-status" class="share-status" role="status"></span>
+      </div>
+    </section>
+
+
     <!-- Streak leaderboard (US-34): after a run, or from the setup screen; also the Speed leaderboard
          (US-60): game.js swaps the heading's text key, the API and the texts -->
     <section id="screen-leaderboard" class="screen leaderboard" aria-labelledby="leaderboard-title" hidden>
@@ -526,6 +598,6 @@
   <script src="js/share.4fcf5fb3.js"></script>
   <!-- Read aloud (US-48): loaded before game.js, which uses it -->
   <script src="js/speech.019a1850.js"></script>
-  <script src="js/game.480e525c.js"></script>
+  <script src="js/game.bcd1d64c.js"></script>
 </body>
 </html>

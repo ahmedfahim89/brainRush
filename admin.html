@@ -8,7 +8,7 @@
   <link rel="icon" href="img/mokh-favicon.svg" type="image/svg+xml">
   <link rel="icon" href="img/mokh-favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.ba1c892a.css">
+  <link rel="stylesheet" href="css/style.fb1be6f7.css">
 </head>
 <body class="admin">
   <header class="page-header">
@@ -24,76 +24,100 @@
   </div>
 
   <main class="admin-grid">
-    <!-- Settings (US-18) -->
-    <section class="panel" id="settings-panel" aria-labelledby="settings-title">
+    <!-- Settings (US-18): full width, one cell per setting, 3 per row on a wide screen -->
+    <section class="panel panel-wide" id="settings-panel" aria-labelledby="settings-title">
       <h2 id="settings-title">Game settings</h2>
       <form id="settings-form" class="stack" novalidate>
-        <label for="setting-categories">Max categories per game</label>
-        <input id="setting-categories" name="categories_per_game" type="number" min="1" max="10" step="1" required>
-        <label for="setting-timer">Default timer (seconds)</label>
-        <input id="setting-timer" name="timer_seconds" type="number" min="5" max="600" step="1" required>
-        <!-- "New questions" banner on the game setup screen -->
-        <label class="check-label" for="setting-banner-enabled">
-          <input id="setting-banner-enabled" name="banner_enabled" type="checkbox">
-          Show the "new questions" banner on the game screen
-        </label>
-        <label for="setting-banner-text">Banner text</label>
-        <input id="setting-banner-text" name="banner_text" class="wide-input" type="text" maxlength="150" required aria-describedby="setting-banner-hint">
-        <p id="setting-banner-hint" class="hint">For example: New questions added in Egyptians category &mdash; try it now!</p>
-        <!-- CHRISTMAS (US-55, D-66): seasonal theme on the game page; remove after Christmas -->
-        <label class="check-label" for="setting-christmas-theme">
-          <input id="setting-christmas-theme" name="christmas_theme" type="checkbox">
-          Christmas theme on the game page
-        </label>
-        <label for="setting-christmas-text">Christmas greeting</label>
-        <input id="setting-christmas-text" name="christmas_banner_text" class="wide-input" type="text" maxlength="150" aria-describedby="setting-christmas-hint">
-        <p id="setting-christmas-hint" class="hint">Shown in a strip on the game's setup screen while the theme is on. Leave empty for the built-in greeting (Merry Christmas from Mokh Rush!, in English or Arabic).</p>
-        <!-- /CHRISTMAS -->
-        <!-- Maintenance mode: hides the Start Game button and shows an overlay on the game screen -->
-        <label class="check-label" for="setting-start-hidden">
-          <input id="setting-start-hidden" name="start_game_hidden" type="checkbox">
-          Maintenance mode: hide the Start Game button
-        </label>
-        <p class="hint">When on, players see a "back within 24 hours" popup instead of the game.</p>
-        <label class="check-label" for="setting-helpers-enabled">
-          <input id="setting-helpers-enabled" name="helpers_enabled" type="checkbox">
-          Game helpers: 3 choices, Swap and Skip
-        </label>
-        <p class="hint">When off, the helper buttons are hidden for new games. A game already in progress keeps its helpers.</p>
-        <!-- Final round (US-44, D-48), shown as "Golden Goal" (D-50): a tiebreaker before the results (D-51) -->
-        <label class="check-label" for="setting-final-round">
-          <input id="setting-final-round" name="final_round_enabled" type="checkbox">
-          <span>Golden Goal <span aria-hidden="true">&#9917;</span>: a tiebreaker question with bets, offered only when players are tied for first</span>
-        </label>
-        <p class="hint">When on, and 2 or more players are tied for first when a new game ends, End Game asks "It's a tie! Golden Goal?" ("Go for goal" or "Skip to results"). Everyone bets from 0 up to their score or the largest point value, whichever is higher. Rounds repeat while the tie lasts. With no tie, the results show as usual.</p>
-        <!-- Daily Challenge (US-43, D-74): shows or hides the Daily Challenge button on the game page -->
-        <label class="check-label" for="setting-daily">
-          <input id="setting-daily" name="daily_enabled" type="checkbox">
-          Daily Challenge
-        </label>
-        <p class="hint">When on, a "Daily Challenge" button shows on the game page: the same 3 questions for everyone each day (UTC). When off, the button is hidden; a challenge a player already started on their device can still be finished.</p>
-        <!-- Daily Crossword (US-58, D-72): shows or hides the crossword button on the game page -->
-        <label class="check-label" for="setting-crossword">
-          <input id="setting-crossword" name="crossword_enabled" type="checkbox">
-          Daily Crossword
-        </label>
-        <p class="hint">When on, a "Daily Crossword" button shows next to the Daily Challenge button: one small crossword a day for everyone, built from text questions at enabled point values. Run sql/migrate-add-daily-crossword.sql first.</p>
-        <!-- Speed Round (US-59, D-73): shows or hides the Speed Round button on the game page -->
-        <label class="check-label" for="setting-speed">
-          <input id="setting-speed" name="speed_enabled" type="checkbox">
-          Speed Round
-        </label>
-        <p class="hint">When on, a "Speed Round" button shows next to the Daily Challenge button: a solo race against one clock, where fast correct answers earn extra time. The personal best is kept on each device; a run with 1 or more correct answers goes on the shared Speed leaderboard under the name the player enters (see the Speed leaderboard panel below).</p>
-        <!-- Ads (D-41): Google AdSense banner on the Streak leaderboard screen -->
-        <label class="check-label" for="setting-ads-enabled">
-          <input id="setting-ads-enabled" name="ads_enabled" type="checkbox">
-          Show ads on the Streak leaderboard screen
-        </label>
-        <label for="setting-ads-client">AdSense publisher ID</label>
-        <input id="setting-ads-client" name="ads_client" class="id-input" type="text" maxlength="30" placeholder="ca-pub-1234567890123456" autocomplete="off" spellcheck="false">
-        <label for="setting-ads-slot">Ad unit slot ID</label>
-        <input id="setting-ads-slot" name="ads_slot" type="text" maxlength="20" inputmode="numeric" placeholder="1234567890" autocomplete="off" spellcheck="false" aria-describedby="setting-ads-hint">
-        <p id="setting-ads-hint" class="hint">From AdSense: Account &gt; Account information (publisher ID) and Ads &gt; By ad unit &gt; Display ads (slot ID). On this computer (localhost) ads run in test mode.</p>
+        <div class="settings-grid">
+          <div class="setting-cell">
+            <label for="setting-categories">Max categories per game</label>
+            <input id="setting-categories" name="categories_per_game" type="number" min="1" max="10" step="1" required>
+          </div>
+          <div class="setting-cell">
+            <label for="setting-timer">Default timer (seconds)</label>
+            <input id="setting-timer" name="timer_seconds" type="number" min="5" max="600" step="1" required>
+          </div>
+          <!-- Maintenance mode: hides the Start Game button and shows an overlay on the game screen -->
+          <div class="setting-cell">
+            <label class="check-label" for="setting-start-hidden">
+              <input id="setting-start-hidden" name="start_game_hidden" type="checkbox">
+              Maintenance mode: hide the Start Game button
+            </label>
+            <p class="hint">When on, players see a "back within 24 hours" popup instead of the game.</p>
+          </div>
+          <!-- "New questions" banner on the game setup screen -->
+          <div class="setting-cell">
+            <label class="check-label" for="setting-banner-enabled">
+              <input id="setting-banner-enabled" name="banner_enabled" type="checkbox">
+              Show the "new questions" banner on the game screen
+            </label>
+            <label for="setting-banner-text">Banner text</label>
+            <input id="setting-banner-text" name="banner_text" class="wide-input" type="text" maxlength="150" required aria-describedby="setting-banner-hint">
+            <p id="setting-banner-hint" class="hint">For example: New questions added in Egyptians category &mdash; try it now!</p>
+          </div>
+          <!-- CHRISTMAS (US-55, D-66): seasonal theme on the game page; remove after Christmas -->
+          <div class="setting-cell">
+            <label class="check-label" for="setting-christmas-theme">
+              <input id="setting-christmas-theme" name="christmas_theme" type="checkbox">
+              Christmas theme on the game page
+            </label>
+            <label for="setting-christmas-text">Christmas greeting</label>
+            <input id="setting-christmas-text" name="christmas_banner_text" class="wide-input" type="text" maxlength="150" aria-describedby="setting-christmas-hint">
+            <p id="setting-christmas-hint" class="hint">Shown in a strip on the game's setup screen while the theme is on. Leave empty for the built-in greeting (Merry Christmas from Mokh Rush!, in English or Arabic).</p>
+          </div>
+          <!-- /CHRISTMAS -->
+          <div class="setting-cell">
+            <label class="check-label" for="setting-helpers-enabled">
+              <input id="setting-helpers-enabled" name="helpers_enabled" type="checkbox">
+              Game helpers: 3 choices, Swap and Skip
+            </label>
+            <p class="hint">When off, the helper buttons are hidden for new games. A game already in progress keeps its helpers.</p>
+          </div>
+          <!-- Final round (US-44, D-48), shown as "Golden Goal" (D-50): a tiebreaker before the results (D-51) -->
+          <div class="setting-cell">
+            <label class="check-label" for="setting-final-round">
+              <input id="setting-final-round" name="final_round_enabled" type="checkbox">
+              <span>Golden Goal <span aria-hidden="true">&#9917;</span>: a tiebreaker question with bets, offered only when players are tied for first</span>
+            </label>
+            <p class="hint">When on, and 2 or more players are tied for first when a new game ends, End Game asks "It's a tie! Golden Goal?" ("Go for goal" or "Skip to results"). Everyone bets from 0 up to their score or the largest point value, whichever is higher. Rounds repeat while the tie lasts. With no tie, the results show as usual.</p>
+          </div>
+          <!-- Daily Challenge (US-43, D-74): shows or hides the Daily Challenge button on the game page -->
+          <div class="setting-cell">
+            <label class="check-label" for="setting-daily">
+              <input id="setting-daily" name="daily_enabled" type="checkbox">
+              Daily Challenge
+            </label>
+            <p class="hint">When on, a "Daily Challenge" button shows on the game page: the same 3 questions for everyone each day (UTC). When off, the button is hidden; a challenge a player already started on their device can still be finished.</p>
+          </div>
+          <!-- Daily Crossword (US-58, D-72): shows or hides the crossword button on the game page -->
+          <div class="setting-cell">
+            <label class="check-label" for="setting-crossword">
+              <input id="setting-crossword" name="crossword_enabled" type="checkbox">
+              Daily Crossword
+            </label>
+            <p class="hint">When on, a "Daily Crossword" button shows next to the Daily Challenge button: one small crossword a day for everyone, built from text questions at enabled point values. Run sql/migrate-add-daily-crossword.sql first.</p>
+          </div>
+          <!-- Speed Round (US-59, D-73): shows or hides the Speed Round button on the game page -->
+          <div class="setting-cell">
+            <label class="check-label" for="setting-speed">
+              <input id="setting-speed" name="speed_enabled" type="checkbox">
+              Speed Round
+            </label>
+            <p class="hint">When on, a "Speed Round" button shows next to the Daily Challenge button: a solo race against one clock, where fast correct answers earn extra time. The personal best is kept on each device; a run with 1 or more correct answers goes on the shared Speed leaderboard under the name the player enters (see the Speed leaderboard panel below).</p>
+          </div>
+          <!-- Ads (D-41): Google AdSense banner on the Streak leaderboard screen -->
+          <div class="setting-cell">
+            <label class="check-label" for="setting-ads-enabled">
+              <input id="setting-ads-enabled" name="ads_enabled" type="checkbox">
+              Show ads on the Streak leaderboard screen
+            </label>
+            <label for="setting-ads-client">AdSense publisher ID</label>
+            <input id="setting-ads-client" name="ads_client" class="id-input" type="text" maxlength="30" placeholder="ca-pub-1234567890123456" autocomplete="off" spellcheck="false">
+            <label for="setting-ads-slot">Ad unit slot ID</label>
+            <input id="setting-ads-slot" name="ads_slot" type="text" maxlength="20" inputmode="numeric" placeholder="1234567890" autocomplete="off" spellcheck="false" aria-describedby="setting-ads-hint">
+            <p id="setting-ads-hint" class="hint">From AdSense: Account &gt; Account information (publisher ID) and Ads &gt; By ad unit &gt; Display ads (slot ID). On this computer (localhost) ads run in test mode.</p>
+          </div>
+        </div>
         <div class="actions">
           <button type="submit" class="btn btn-primary">Save settings</button>
         </div>
@@ -101,17 +125,35 @@
       <p id="settings-msg" class="msg" role="status" aria-live="polite" hidden></p>
     </section>
 
-    <!-- Point values (US-19) -->
-    <section class="panel" id="points-panel" aria-labelledby="points-title">
+    <!-- Point values (US-19): full width under Game settings; the list and the tournament board side by side -->
+    <section class="panel panel-wide" id="points-panel" aria-labelledby="points-title">
       <h2 id="points-title">Point values <span class="hint">(board rows)</span></h2>
-      <form id="points-form" class="inline-form" novalidate>
-        <label for="point-new" class="visually-hidden">New point value</label>
-        <input id="point-new" type="number" min="1" max="1000000" step="1" placeholder="e.g. 1000" required>
-        <button type="submit" class="btn btn-primary">Add</button>
-      </form>
-      <p id="points-msg" class="msg" role="status" aria-live="polite" hidden></p>
-      <p class="hint">Disable a value to hide it from the board without deleting its questions; enable it to bring it back.</p>
-      <ul id="points-list" class="item-list"></ul>
+      <div class="points-layout">
+        <div class="points-main">
+          <form id="points-form" class="inline-form" novalidate>
+            <label for="point-new" class="visually-hidden">New point value</label>
+            <input id="point-new" type="number" min="1" max="1000000" step="1" placeholder="e.g. 1000" required>
+            <button type="submit" class="btn btn-primary">Add</button>
+          </form>
+          <p id="points-msg" class="msg" role="status" aria-live="polite" hidden></p>
+          <p class="hint">Disable a value to hide it from the board without deleting its questions; enable it to bring it back.</p>
+          <ul id="points-list" class="item-list"></ul>
+        </div>
+        <div class="points-side">
+          <!-- Tournament board (US-61, D-77 aa): the point values every tournament match uses; saved on its own -->
+          <form id="tournament-points-form" novalidate>
+            <fieldset id="setting-tournament-points" class="setting-group" aria-describedby="setting-tournament-hint">
+              <legend>Tournament board: point values</legend>
+              <div id="setting-tournament-list" class="setting-checks"></div>
+              <p id="setting-tournament-hint" class="hint">Each tournament match uses the ticked point values as its board rows. A disabled point value is left out while it is disabled. With none ticked (or none of the ticked ones enabled), a match uses the 3 lowest enabled values.</p>
+              <div class="actions">
+                <button type="submit" class="btn btn-primary">Save tournament board</button>
+              </div>
+            </fieldset>
+          </form>
+          <p id="tournament-points-msg" class="msg" role="status" aria-live="polite" hidden></p>
+        </div>
+      </div>
     </section>
 
     <!-- Categories (US-20) -->
@@ -310,6 +352,6 @@
     </section>
   </main>
 
-  <script src="js/admin.962f09ef.js"></script>
+  <script src="js/admin.d7addc60.js"></script>
 </body>
 </html>

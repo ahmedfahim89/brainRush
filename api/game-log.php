@@ -1,14 +1,17 @@
 <?php
-// POST /api/game-log.php  body { mode: 'players'|'teams'|'streak'|'integration'|'crossword'|'speed', players: [name, ...], categories: [id, ...] } -> 201 { logged: true }
+// POST /api/game-log.php  body { mode: 'players'|'teams'|'tournament'|'streak'|'integration'|'crossword'|'speed', players: [name, ...], categories: [id, ...] } -> 201 { logged: true }
 // mode is optional and defaults to 'players'; players holds the player or team names.
 // A Streak Challenge run (US-33) sends mode 'streak', one name (the challenger name) and no categories
 // (its questions come from every category). An Integration Quiz run (integration-quiz.html) sends
 // mode 'integration' the same way; its questions have no category. A Daily Crossword (US-58) sends mode
 // 'crossword' once per device per day, on the first letter, with no name and no categories (players is not read).
 // A Speed Round (US-59, D-73) sends mode 'speed' once per run, when it starts, the same way (no name, no categories).
+// A Tournament (US-61, D-77 m) sends mode 'tournament' once, at its Start, with all 3 to 8 contestant names
+// and no categories (they are chosen before each match, D-77 ab); the matches themselves are not logged.
 // Appends one line per started game to that day's log file, logs/game-YYYY-MM-DD.log:
 //   <YYYY-MM-DD HH:MM, server time> | players: <name>, <name> | categories: <name>, <name>
 //   <YYYY-MM-DD HH:MM, server time> | teams: <name>, <name> | categories: <name>, <name>
+//   <YYYY-MM-DD HH:MM, server time> | tournament: <name>, <name>, <name> | categories: chosen per match
 //   <YYYY-MM-DD HH:MM, server time> | streak: <name> | categories: all
 //   <YYYY-MM-DD HH:MM, server time> | integration: <name> | categories: Integration Quiz
 //   <YYYY-MM-DD HH:MM, server time> | crossword: - | categories: all
@@ -19,10 +22,14 @@
 require_once __DIR__ . '/db.php';
 
 const GAME_LOG_DIR = __DIR__ . '/../logs';
-const GAME_LOG_MAX_BY_MODE = ['players' => 6, 'teams' => 4, 'streak' => 1, 'integration' => 1, 'crossword' => 1, 'speed' => 1]; // MODES limits in js/game.js
+const GAME_LOG_MAX_BY_MODE = ['players' => 6, 'teams' => 4, 'tournament' => 8, 'streak' => 1, 'integration' => 1, 'crossword' => 1, 'speed' => 1]; // MODES limits in js/game.js
+// Modes with more than 1 name at least (a tournament has 3 to 8 contestants: TOURNAMENT_MIN in js/game.js).
+const GAME_LOG_MIN_BY_MODE = ['tournament' => 3];
 // The solo modes: exactly 1 name, no categories sent, and what the line logs as its categories.
 const GAME_LOG_SOLO_CATEGORIES = ['streak' => ['all'], 'integration' => ['Integration Quiz'], 'crossword' => ['all'], 'speed' => ['all']];
 // Modes logged without a name (the Daily Crossword, US-58, D-72 o; the Speed Round, US-59): the line shows "-".
+// Modes with names that send no categories, and what the line logs instead (US-61, D-77 ab).
+const GAME_LOG_FIXED_CATEGORIES = ['tournament' => ['chosen per match']];
 const GAME_LOG_NO_NAME = ['crossword', 'speed'];
 const GAME_LOG_NAME_MAX = 30;      // NAME_MAX in js/game.js (D-22); also the challenger name
 const GAME_LOG_MAX_CATEGORIES = 10; // categories_per_game upper bound
@@ -45,15 +52,16 @@ function read_mode($value): string
     return $value;
 }
 
-/** Validated player or team names (1..limit of the mode, each 1-30 chars after trimming). */
+/** Validated player, team or contestant names (min..limit of the mode, each 1-30 chars after trimming). */
 function read_players($value, string $mode): array
 {
     $max = GAME_LOG_MAX_BY_MODE[$mode];
+    $min = GAME_LOG_MIN_BY_MODE[$mode] ?? 1;
     if (isset(GAME_LOG_SOLO_CATEGORIES[$mode]) && (!is_array($value) || count($value) !== 1)) {
         bad_request("$mode mode takes exactly 1 name");
     }
-    if (!is_array($value) || !$value || count($value) > $max) {
-        bad_request("players must be a list of 1 to $max names");
+    if (!is_array($value) || count($value) < $min || count($value) > $max) {
+        bad_request("players must be a list of $min to $max names");
     }
     return array_map(fn($name) => log_text(require_text($name, 'Player name', GAME_LOG_NAME_MAX)), array_values($value));
 }
@@ -97,7 +105,8 @@ switch ($_SERVER['REQUEST_METHOD']) {
         $mode = read_mode($body['mode'] ?? null);
         $players = in_array($mode, GAME_LOG_NO_NAME, true) ? ['-'] : read_players($body['players'] ?? null, $mode);
         // A streak plays every category and the Integration Quiz its own questions, so they send none.
-        $categories = GAME_LOG_SOLO_CATEGORIES[$mode] ?? read_category_names(db(), $body['categories'] ?? null);
+        // A tournament (US-61, D-77 ab) chooses its categories before each match, so it sends none.
+        $categories = GAME_LOG_SOLO_CATEGORIES[$mode] ?? GAME_LOG_FIXED_CATEGORIES[$mode] ?? read_category_names(db(), $body['categories'] ?? null);
 
         if (!is_dir(GAME_LOG_DIR)) {
             mkdir(GAME_LOG_DIR, 0755, true);
