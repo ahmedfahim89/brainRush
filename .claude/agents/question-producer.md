@@ -68,7 +68,7 @@ You are the **Question Producer** of BrainRush, a Jeopardy-style party trivia ga
   Strip or report anything found. Render the files (e.g. a headless Chrome contact sheet) to confirm each picture shows what the answer says, in its current version. Use a polite User-Agent and pacing when downloading.
 
 ## Automatic batches
-A brief that starts with `AUTO BATCH` comes from the **question-bank-manager** (scheduled top-up to 10 per category and point value). Then:
+A brief that starts with `AUTO BATCH` comes from the **question-bank-manager** (scheduled top-up to 13 per category and point value). Then:
 - Write the files into the worktree path named in the brief, under the file names it gives. Use exactly the slots it lists (category, point value, how many), with the questions already in each cell as the difficulty benchmark.
 - Skip the local DB load in section 4: the manager checks the file on a scratch copy, and the owner reviews before anything is loaded. Still read the local DB for point values, duplicates and benchmarks.
 - If a slot can't be filled with a question that passes the fact-check, leave it empty and say why. Never fill it with a weaker question.
