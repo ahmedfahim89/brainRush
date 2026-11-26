@@ -17,7 +17,7 @@
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0b1026">
-  <link rel="stylesheet" href="css/style.e64ad66b.css">
+  <link rel="stylesheet" href="css/style.4669c09a.css">
   <link rel="stylesheet" href="css/guide.70c9a392.css">
 </head>
 <body class="guide">
@@ -257,10 +257,12 @@
       </ul>
       <h3 id="tournament-bot">Mokh Bot &#129302;</h3>
       <ul>
-        <li>With 3, 5, 6 or 7 contestants the draw has byes. <strong>Mokh Bot &#129302;</strong>, a computer contestant, takes <strong>one</strong> of them at random, so that contestant plays a real (and easy) match instead of going straight through. <strong>Shuffle</strong> draws it again. With 4 or 8 contestants there is no bot.</li>
+        <li>With 3, 5, 6 or 7 contestants the draw has byes. <strong>Mokh Bot &#129302;</strong>, a computer contestant, takes <strong>one</strong> of them at random, so that contestant plays a real match instead of going straight through. <strong>Shuffle</strong> draws it again. With 4 or 8 contestants there is no bot.</li>
         <li>A match against the bot is played in <strong>turns</strong>. A <strong>coin flip</strong> at the start decides who goes first, and a banner over the board says whose turn it is. After each question the turn passes; there is no steal.</li>
-        <li>On your turn, open any box as usual; the bot waits. On the bot's turn the board is locked: the bot picks a box by itself, "thinks" for a few seconds, says its answer, and the game scores it (it is right only about a third of the time or less). Then press <strong>Back to Board</strong>.</li>
-        <li>The bot never uses helpers. If the match is level, it bets and answers in <a href="#golden-goal">Golden Goal</a> by itself too. If it wins, it goes through, and it can even win the tournament.</li>
+        <li>On your turn, open any box as usual; the bot waits. On the bot's turn the board is locked: the bot picks a box by itself, "thinks" for a few seconds, says its answer, and the game scores it. Then press <strong>Back to Board</strong>.</li>
+        <li><strong>How good the bot is</strong> depends on a setting the site's admin chooses, from 0% to 100% right answers (30% unless the admin changes it). When it is wrong it gives a wrong answer or says "I don't know", and both lose the points.</li>
+        <li>The bot plays the board smartly: when it is good, or when it is behind, it goes for the biggest points left; when it is weaker and ahead or level, it plays safe with the smallest. It never knows where the double score box is.</li>
+        <li>The bot never uses helpers. If the match is level, it bets and answers in <a href="#golden-goal">Golden Goal</a> by itself too: the better it is, the more it bets. If it wins, it goes through, and it can even win the tournament.</li>
       </ul>
       <h3>Results</h3>
       <ul>

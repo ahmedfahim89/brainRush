@@ -38,6 +38,9 @@
   const MIDDOT = String.fromCharCode(0x00b7); // "100: 60–100% · 200: 50–90%"
   // Sortable stats columns: the direction of the first click (most attempts / lowest % correct first).
   const STATS_SORTS = { attempts: 'descending', percent: 'ascending' };
+  // Mokh Bot accuracy (US-63, D-79): the API stores right tickets out of 10; a missing row is 3 (30%).
+  const BOT_TICKETS = 10;
+  const BOT_TICKETS_DEFAULT = 3;
   // "Reset all stats" (change request after Sprint 11): empties question_stats for every question.
   const STATS_RESET_PROMPT = 'Reset the stats of every question? All attempts and % correct go back to 0. This cannot be undone.';
   const STATS_RESET_EMPTY = 'Nothing to reset: no question has any attempts yet.';
@@ -89,6 +92,11 @@
     settingTournamentList: byId('setting-tournament-list'), // US-61: tournament board point values
     tournamentPointsForm: byId('tournament-points-form'), // US-61: under Point values, saved on its own
     tournamentPointsMsg: byId('tournament-points-msg'),
+    botAccuracyForm: byId('bot-accuracy-form'), // US-63: Mokh Bot accuracy, saved on its own
+    settingBotAccuracy: byId('setting-bot-accuracy'),
+    settingBotAccuracyOut: byId('setting-bot-accuracy-out'),
+    settingBotAccuracyHint: byId('setting-bot-accuracy-hint'),
+    botAccuracyMsg: byId('bot-accuracy-msg'),
     settingAdsEnabled: byId('setting-ads-enabled'),
     settingAdsClient: byId('setting-ads-client'),
     settingAdsSlot: byId('setting-ads-slot'),
@@ -421,7 +429,44 @@
     dom.settingAdsSlot.value = typeof settings.ads_slot === 'string' ? settings.ads_slot : '';
     state.tournamentPoints = parsePointList(settings.tournament_points); // US-61: "" or missing = none ticked
     renderTournamentPoints();
+    setBotAccuracy(settings.bot_accuracy); // US-63
     renderCategorySummary();
+  }
+
+  /** US-63 (D-79): the slider shows the API's right tickets (0..10) as 0..100%; anything else is 30%. */
+  function setBotAccuracy(tickets) {
+    const valid = Number.isInteger(tickets) && tickets >= 0 && tickets <= BOT_TICKETS;
+    dom.settingBotAccuracy.value = String((valid ? tickets : BOT_TICKETS_DEFAULT) * 10);
+    renderBotAccuracy();
+  }
+
+  /** The slider's right tickets (0..10). */
+  function botAccuracyTickets() {
+    return Math.round(Number(dom.settingBotAccuracy.value) / 10);
+  }
+
+  /** Live "70%" and "Out of 10 answers: 7 right, 2 wrong, 1 I don't know." (wrong gets the larger half). */
+  function renderBotAccuracy() {
+    const right = botAccuracyTickets();
+    const wrong = Math.ceil((BOT_TICKETS - right) / 2);
+    const percent = right * 10 + '%';
+    dom.settingBotAccuracyOut.textContent = percent;
+    dom.settingBotAccuracy.setAttribute('aria-valuetext', percent);
+    dom.settingBotAccuracyHint.textContent = 'Out of 10 answers: ' + right + ' right, ' + wrong + ' wrong, ' +
+      (BOT_TICKETS - right - wrong) + " I don't know.";
+  }
+
+  /** US-63 (D-79): "Save bot accuracy" saves only bot_accuracy (right tickets out of 10). */
+  function onBotAccuracySubmit(event) {
+    event.preventDefault();
+    const submit = dom.botAccuracyForm.querySelector('button[type="submit"]');
+    runAction(dom.botAccuracyMsg, [submit], async () => {
+      const saved = await api('settings.php', 'PUT', { bot_accuracy: botAccuracyTickets() });
+      state.settings = saved;
+      setBotAccuracy(saved.bot_accuracy);
+      showSuccess(dom.botAccuracyMsg, 'Mokh Bot accuracy saved: ' + dom.settingBotAccuracyOut.textContent +
+        '. New tournament matches use it.');
+    });
   }
 
   /** US-61: "200,400,500" -> [200, 400, 500]; anything else is skipped. */
@@ -1649,6 +1694,8 @@
     dom.settingsForm.addEventListener('submit', onSettingsSubmit);
     dom.pointsForm.addEventListener('submit', onPointSubmit);
     dom.tournamentPointsForm.addEventListener('submit', onTournamentPointsSubmit); // US-61
+    dom.botAccuracyForm.addEventListener('submit', onBotAccuracySubmit); // US-63
+    dom.settingBotAccuracy.addEventListener('input', renderBotAccuracy);
     dom.categoryForm.addEventListener('submit', onCategorySubmit);
     dom.qForm.addEventListener('submit', onQuestionSubmit);
     dom.qCancel.addEventListener('click', cancelEdit);

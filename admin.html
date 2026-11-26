@@ -8,7 +8,7 @@
   <link rel="icon" href="img/mokh-favicon.svg" type="image/svg+xml">
   <link rel="icon" href="img/mokh-favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.e64ad66b.css">
+  <link rel="stylesheet" href="css/style.4669c09a.css">
 </head>
 <body class="admin">
   <header class="page-header">
@@ -152,6 +152,23 @@
             </fieldset>
           </form>
           <p id="tournament-points-msg" class="msg" role="status" aria-live="polite" hidden></p>
+          <!-- Mokh Bot accuracy (US-63, D-79): the bot's right answers out of 10 in tournament matches; saved on its own -->
+          <form id="bot-accuracy-form" novalidate>
+            <fieldset class="setting-group">
+              <legend>Tournament: Mokh Bot</legend>
+              <div class="range-row">
+                <label for="setting-bot-accuracy">Mokh Bot accuracy</label>
+                <output id="setting-bot-accuracy-out" for="setting-bot-accuracy">30%</output>
+              </div>
+              <input id="setting-bot-accuracy" class="range-input" type="range" min="0" max="100" step="10" value="30" aria-describedby="setting-bot-accuracy-hint">
+              <p id="setting-bot-accuracy-hint" class="hint">Out of 10 answers: 3 right, 4 wrong, 3 I don't know.</p>
+              <p class="hint">The bot uses it on every board and Golden Goal question, and for its Golden Goal bet. It applies to matches started after the save.</p>
+              <div class="actions">
+                <button type="submit" class="btn btn-primary">Save bot accuracy</button>
+              </div>
+            </fieldset>
+          </form>
+          <p id="bot-accuracy-msg" class="msg" role="status" aria-live="polite" hidden></p>
         </div>
       </div>
     </section>
@@ -352,6 +369,6 @@
     </section>
   </main>
 
-  <script src="js/admin.d7addc60.js"></script>
+  <script src="js/admin.1bb89f58.js"></script>
 </body>
 </html>

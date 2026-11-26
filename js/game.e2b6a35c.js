@@ -223,9 +223,10 @@
   // D-77 g: the first-round matches (0-based) that hold the byes, in this order, per bracket size.
   const BYE_ORDER = { 4: [0], 8: [0, 3, 1] };
   const MATCH_WAYS = ['score', 'goal', 'coin', 'bye']; // how a match was decided
-  // Mokh Bot (US-62, D-78): one weak bot fills one of the byes; its match is turn-based.
-  const BOT_ACCURACY = { low: 0.35, high: 0.2 }; // right-answer chance on the lowest / highest board row
-  const BOT_FINAL_ACCURACY = 0.25;  // on a Golden Goal question (a random bank question)
+  // Mokh Bot (US-62, D-78): one bot fills one of the byes; its match is turn-based.
+  // US-63 (D-79): its accuracy is the Admin's bot_accuracy, right tickets out of 10 (a missing row = 3).
+  const BOT_TICKETS = 10;           // the faces of the bot's dice
+  const BOT_TICKETS_DEFAULT = 3;    // no setting (or an older save): 3 right tickets, 30%
   const BOT_PICK_MS = 1200;         // the bot's turn on the board: it picks a cell after this
   const BOT_HIGHLIGHT_MS = 700;     // its picked cell is highlighted this long before it opens
   const BOT_THINK_MS = [3000, 6000]; // it answers after a random time in this range (before the timer ends)
@@ -369,7 +370,8 @@
   //   An entry with bot: true is Mokh Bot (US-62, D-78): at most one, id = humans + 1, in the second slot
   //   of one bye match (that match is then played, bye false). Its name is t('tournament.botName'),
   //   rewritten on a language switch (relabelBot). A match board with the bot has turn (the id of the
-  //   contestant on turn) and coinShown (the start flip was played); its open question (or Golden Goal)
+  //   contestant on turn), coinShown (the start flip was played) and optionally botTickets (US-63, D-79:
+  //   the bot's right tickets out of 10, read when the match starts; missing = 3); its open question (or Golden Goal)
   //   has botRoll = { right, optionIndex, said? (its answer was shown) } when the bot answers it (optionIndex 1 or 2 = a stored wrong
   //   option, null = "I don't know").
   //   match: { a, b: entry id or null (not known yet), bye: true in a first-round match whose second
@@ -1168,6 +1170,11 @@
     return true;
   }
 
+  /** US-63 (D-79): the bot's right tickets out of 10, a whole number 0..10. */
+  function isValidBotTickets(n) {
+    return Number.isInteger(n) && n >= 0 && n <= BOT_TICKETS;
+  }
+
   /** US-62: the bot's saved result on an open question: missing, or { right, optionIndex: 1 | 2 | null, said? }. */
   function isValidBotRoll(roll) {
     return roll === undefined || (isPlainObject(roll) && typeof roll.right === 'boolean' &&
@@ -1198,6 +1205,7 @@
       isValidStatsSent(g.statsSent) && // US-47
       (g.turn === undefined || (Number.isInteger(g.turn) && findContestant(g, g.turn) !== null)) && // US-62
       (g.coinShown === undefined || typeof g.coinShown === 'boolean') &&
+      (g.botTickets === undefined || isValidBotTickets(g.botTickets)) && // US-63
       isValidUsed(g.used, g) && isValidCurrent(g.current, g);
   }
 
@@ -6894,7 +6902,7 @@
     if (!g || !g.final || g.final.stage !== 'wager' || state.screen !== 'final' || nextWagerContestant(g)) return;
     g.final.stage = 'question';
     const bot = botOf(g);
-    if (bot) g.final.botRoll = rollBotFinal(g.final.question); // US-62: rolled once, saved
+    if (bot) g.final.botRoll = rollBotFinal(g, g.final.question); // US-62: rolled once, saved
     markSeen(g.final.question.id); // opened = played, as on the board
     showFinalQuestion();
   }
@@ -7401,6 +7409,7 @@
         const e = entryOf(tt, c.id);
         return e.name === c.name && e.color === c.color;
       }) && withBot === (g.turn !== undefined) && withBot === (g.coinShown !== undefined) &&
+      (withBot || g.botTickets === undefined) && // US-63: botTickets only on a bot match (optional there)
       isValidScreenFor(screen, g);
   }
 
@@ -7710,11 +7719,17 @@
     let allowed = [];
     let failure = null;
     const ids = selection.ids;
-    // The Admin's tournament values; if the settings cannot be read, the default rows are used.
-    const settingsRead = apiGet('settings.php').then((s) => tournamentPointList(s && s.tournament_points), () => []);
+    // The Admin's tournament values and bot accuracy (US-63); if the settings cannot be read, the
+    // default rows and 3 right tickets are used.
+    const settingsRead = apiGet('settings.php').then(
+      (s) => ({ allowed: tournamentPointList(s && s.tournament_points), tickets: botTicketSetting(s && s.bot_accuracy) }),
+      () => ({ allowed: [], tickets: BOT_TICKETS_DEFAULT }));
+    let tickets = BOT_TICKETS_DEFAULT;
     try {
       board = parseBoard(await apiPost('questions.php?board=1', { categories: ids.join(','), seen: loadSeen() }), ids);
-      allowed = await settingsRead;
+      const read = await settingsRead;
+      allowed = read.allowed;
+      tickets = read.tickets;
     } catch (err) {
       failure = err;
     }
@@ -7724,7 +7739,12 @@
       showMessage(dom.bracketMsg, () => t('tournament.matchFailed', { reason: sentence(localCategoryNames(errorText(failure))) }), 'error');
       return;
     }
-    beginMatch(ref, board, allowed, selection.hidden);
+    beginMatch(ref, board, allowed, selection.hidden, tickets);
+  }
+
+  /** US-63 (D-79): the settings' bot_accuracy (right tickets 0..10); anything else -> 3. */
+  function botTicketSetting(value) {
+    return isValidBotTickets(value) ? value : BOT_TICKETS_DEFAULT;
   }
 
   /** US-61 (D-77 aa): the settings' "200,400,500" -> [200, 400, 500]; anything else -> []. */
@@ -7754,7 +7774,7 @@
    * D-77 i: the match board. Scores start at 0, 3 fresh helpers each, its own Kilo Meshakkal order
    * and double cell, dealt after the cut; Golden Goal always on. Matches are not logged (D-77 m).
    */
-  function beginMatch(ref, board, allowed, hidden) {
+  function beginMatch(ref, board, allowed, hidden, tickets) {
     const tt = tourney;
     const m = matchAt(tt, ref);
     cutRows(board, allowed);
@@ -7782,6 +7802,7 @@
     if (state.game.contestants.some(isBot)) {
       state.game.turn = state.game.contestants[Math.random() < 0.5 ? 0 : 1].id;
       state.game.coinShown = false;
+      state.game.botTickets = tickets; // US-63: fixed for the match, saved with it
     }
     tt.started = true;
     tt.playing = ref;
@@ -7952,11 +7973,12 @@
   }
 
   // ---------- Mokh Bot (US-62, D-78) ----------
-  // One weak bot fills one bye at random (3, 5, 6 or 7 humans). A match with it is turn-based: a coin
+  // One bot fills one bye at random (3, 5, 6 or 7 humans). A match with it is turn-based: a coin
   // flip picks who starts, the turn passes after every question and there is no steal. On its turn
-  // the board is locked, the bot opens a random cell, "thinks", says an answer (the real one when its
-  // saved roll is right, else a stored wrong option or "I don't know") and is scored by itself. In a
-  // Golden Goal it bets by itself and answers the same way. Every bot action is one timeout (botTimer),
+  // the board is locked, the bot opens a cell (US-63: picked by its accuracy and the score), "thinks",
+  // says an answer (the real one when its saved roll is right, else a stored wrong option or "I don't
+  // know") and is scored by itself. In a Golden Goal it bets by itself and answers the same way.
+  // US-63 (D-79): every answer is a roll of a 10-face dice; the Admin's bot_accuracy sets its tickets. Every bot action is one timeout (botTimer),
   // cleared on any screen change and armed again from the saved state, so a reload resumes it.
 
   /** The contestant / entry is the tournament's bot. */
@@ -8011,22 +8033,32 @@
     if (c) c.name = e.name;
   }
 
-  /** { right, optionIndex }: right with chance `accuracy`; a wrong roll picks a stored wrong option. */
-  function botRoll(q, accuracy) {
-    const right = Math.random() < accuracy;
-    return { right: right, optionIndex: !right && hasChoices(q) ? 1 + Math.floor(Math.random() * 2) : null };
+  /** US-63: the match's right tickets out of 10 (a save from before US-63 has none: 3). */
+  function botTickets(g) {
+    return g && isValidBotTickets(g.botTickets) ? g.botTickets : BOT_TICKETS_DEFAULT;
   }
 
-  /** D-78: right about 35% of the time on the lowest row, down to about 20% on the highest. */
+  /**
+   * US-63 (D-79): { right, optionIndex } from one roll of a 10-face dice. Faces 1..tickets are right;
+   * the next ceil((10 - tickets) / 2) are wrong, alternating stored wrong option 1 and 2 ("I don't
+   * know" when the question has none); the rest are "I don't know" (optionIndex null).
+   */
+  function botRoll(q, tickets) {
+    const face = 1 + Math.floor(Math.random() * BOT_TICKETS);
+    const wrong = Math.ceil((BOT_TICKETS - tickets) / 2);
+    if (face <= tickets) return { right: true, optionIndex: null };
+    if (face <= tickets + wrong) return { right: false, optionIndex: hasChoices(q) ? 1 + (face - tickets - 1) % 2 : null };
+    return { right: false, optionIndex: null };
+  }
+
+  /** The bot's roll on a board question (D-79: the same dice on every row). */
   function rollBot(g, categoryId, points) {
-    const rows = g.points.length;
-    const at = rows > 1 ? g.points.indexOf(points) / (rows - 1) : 0;
-    const accuracy = BOT_ACCURACY.low + (BOT_ACCURACY.high - BOT_ACCURACY.low) * at;
-    return botRoll(findCategory(g, categoryId).questions[String(points)], accuracy);
+    return botRoll(findCategory(g, categoryId).questions[String(points)], botTickets(g));
   }
 
-  function rollBotFinal(q) {
-    return botRoll(q, BOT_FINAL_ACCURACY);
+  /** The bot's roll on a Golden Goal question (D-79: the same dice as on the board). */
+  function rollBotFinal(g, q) {
+    return botRoll(q, botTickets(g));
   }
 
   /** What the bot says, in the shown language: the answer or a wrong option cut at its first bracket. */
@@ -8091,16 +8123,12 @@
     if (isBotTurn(g) && !allCellsUsed(g)) botLater(BOT_PICK_MS, botPickCell);
   }
 
-  /** The bot picks a random open cell, highlights it, then opens it as a click would. */
+  /** The bot picks an open cell (botChooseCell), highlights it, then opens it as a click would. */
   function botPickCell() {
     const g = state.game;
     if (!g || state.screen !== 'board' || g.current || !isBotTurn(g)) return;
-    const open = [];
-    g.categories.forEach((c) => g.points.forEach((p) => {
-      if (!hasOwn(g.used, cellKey(c.id, p))) open.push({ id: c.id, points: p });
-    }));
-    if (!open.length) return;
-    const pick = open[Math.floor(Math.random() * open.length)];
+    const pick = botChooseCell(g);
+    if (!pick) return;
     const find = () => dom.board.querySelector('[data-cell="' + cellKey(pick.id, pick.points) + '"]');
     const cell = find();
     if (cell) cell.classList.add('is-bot-pick');
@@ -8110,6 +8138,29 @@
       if (target) target.classList.remove('is-bot-pick');
       openCellWithFx(target, pick.id, pick.points);
     });
+  }
+
+  /**
+   * US-63 (D-79): the bot's cell. With more than half its tickets right it takes the highest open
+   * point value; otherwise the highest when it is behind and the lowest when it is ahead or level.
+   * Then a random category among the open cells of that value. It only uses what the host sees: never
+   * the hidden double cell (D-40), nor the hidden values of the Kilo Meshakkal boxes (US-53), so it
+   * picks a Kilo Meshakkal box (at random) only when no other cell is open.
+   */
+  function botChooseCell(g) {
+    const open = [];
+    const mix = [];
+    g.categories.forEach((c) => g.points.forEach((p) => {
+      if (!hasOwn(g.used, cellKey(c.id, p))) (c.id === MIX ? mix : open).push({ id: c.id, points: p });
+    }));
+    if (!open.length) return mix.length ? mix[Math.floor(Math.random() * mix.length)] : null;
+    const bot = findContestant(g, g.turn);
+    const rival = otherContestant(g, g.turn);
+    const values = open.map((cell) => cell.points);
+    const goHigh = botTickets(g) * 2 > BOT_TICKETS || bot.score < rival.score;
+    const value = goHigh ? Math.max.apply(null, values) : Math.min.apply(null, values);
+    const cells = open.filter((cell) => cell.points === value);
+    return cells[Math.floor(Math.random() * cells.length)];
   }
 
   /**
@@ -8127,7 +8178,7 @@
     if (!onFinal && !isBotTurn(g)) return;
     const marked = hasOwn(open.marks, String(bot.id));
     if (!open.botRoll) { // only a save from before the roll has none
-      open.botRoll = onFinal ? rollBotFinal(open.question) : rollBot(g, open.catId, open.points);
+      open.botRoll = onFinal ? rollBotFinal(g, open.question) : rollBot(g, open.catId, open.points);
       saveState();
     }
     const markLater = () => botLater(BOT_MARK_MS, () => {
@@ -8199,15 +8250,16 @@
     }));
   }
 
-  /** Golden Goal (D-78): the bot locks its bet when its turn comes: 0 to half its limit, in hundreds. */
+  /**
+   * Golden Goal (D-78): the bot locks its bet when its turn comes. US-63 (D-79): its accuracy times
+   * its limit, rounded to the nearest 100 and never above the limit (1000 at 70%: 700; 200 at 30%: 100).
+   */
   function placeBotBet(g) {
     const f = g.final;
     const c = f && f.stage === 'wager' ? nextWagerContestant(g) : null;
     if (!c || !isBot(c)) return;
-    // BUG-62-02: a whole amount 0..half the limit, rounded to the nearest 100 (a 200 limit: 0 or 100)
     const limit = wagerLimit(g, c.score);
-    const amount = Math.floor(Math.random() * (Math.floor(limit / 2) + 1));
-    f.wagers[String(c.id)] = Math.min(limit, Math.round(amount / 100) * 100);
+    f.wagers[String(c.id)] = Math.min(limit, Math.round(limit * botTickets(g) / BOT_TICKETS / 100) * 100);
   }
 
   // ----- The coin flip at the start of a bot match -----

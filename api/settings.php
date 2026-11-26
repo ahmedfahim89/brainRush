@@ -5,6 +5,7 @@
 // CHRISTMAS (US-55, D-66): also christmas_theme (0/1, missing row = 0) and christmas_banner_text (max 150, may be empty, missing row = "").
 // Tournament (US-61, D-77 aa): also tournament_points, the point values a tournament match board uses,
 // as an ascending comma list ("200,400,500"); "" (or a missing row) = the 3 lowest enabled values.
+// Mokh Bot (US-63, D-79): also bot_accuracy, the bot's right tickets out of 10 (0..10 = 0..100%, missing row = 3).
 require_once __DIR__ . '/db.php';
 
 const TOURNAMENT_POINTS_MAX = 20; // at most this many values in tournament_points
@@ -51,6 +52,7 @@ const SETTING_RULES = [
     'crossword_enabled'   => [0, 1], // Daily Crossword button (US-58, D-72 m); a missing row counts as off
     'speed_enabled'       => [0, 1], // Speed Round button (US-59, D-73); a missing row counts as off
     'christmas_theme'     => [0, 1], // CHRISTMAS (US-55): festive look on the game page; a missing row counts as off
+    'bot_accuracy'        => [0, 10], // Mokh Bot (US-63, D-79): right tickets out of 10; a missing row counts as 3
 ];
 
 // Editable text settings and their maximum length in characters.
@@ -86,6 +88,7 @@ function load_settings(PDO $pdo): array
     // CHRISTMAS (US-55): a missing row means off / no custom greeting
     $settings['christmas_theme'] = $settings['christmas_theme'] ?? 0;
     $settings['christmas_banner_text'] = $settings['christmas_banner_text'] ?? '';
+    $settings['bot_accuracy'] = $settings['bot_accuracy'] ?? 3; // US-63 (D-79): a missing row means 30%
     // US-61 (D-77 aa): a missing row means "" (the 3 lowest enabled values)
     $settings['tournament_points'] = isset($rows['tournament_points']) ? (string) $rows['tournament_points'] : '';
     return $settings;
