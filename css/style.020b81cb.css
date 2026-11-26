@@ -2082,3 +2082,60 @@ html[dir="rtl"] .bracket-name { text-align: right; }
   .coin { width: 5.5rem; height: 5.5rem; }
   .coin-face { font-size: 2rem; }
 }
+
+/* ---------- Phone buzzer (US-52, D-80): Game control, board bar button, share and lobby panel ---------- */
+.control-block[hidden] { display: none; }
+.control-options { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.control-option {
+  display: flex;
+  flex: 1 1 15rem;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  color: var(--text);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.control-option input { flex: none; width: 1.1rem; height: 1.1rem; margin: 0.2rem 0 0; accent-color: var(--gold); }
+.control-option:has(input:checked) { border-color: var(--gold); background: rgba(245, 197, 24, 0.12); } /* ds-allow-hardcode: as .report-reason */
+.control-option:has(input:focus-visible) { box-shadow: var(--focus); }
+.control-text { display: flex; flex-direction: column; gap: 0.1rem; }
+.control-name { font-weight: 700; }
+
+.btn-room { font-weight: 600; }
+.btn-room.is-warning { color: var(--gold); border-color: var(--gold); }
+
+.room-card { max-width: 34rem; }
+.room-share { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin: 0.4rem 0 0.6rem; }
+.room-qr { flex: none; width: 11rem; height: 11rem; }
+.room-qr svg { display: block; width: 100%; height: 100%; border-radius: var(--radius); }
+.room-details { flex: 1 1 12rem; min-width: 0; }
+.room-label { margin: 0; color: var(--muted); font-size: 0.85rem; }
+.room-code { margin: 0 0 0.4rem; color: var(--gold); font-size: 2rem; font-weight: 800; letter-spacing: 0.15em; line-height: 1.2; }
+.room-link { display: block; margin-bottom: 0.4rem; font-size: 0.9rem; overflow-wrap: anywhere; }
+.room-copy-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.room-list-title { margin: 0.8rem 0 0.4rem; color: var(--gold); }
+.room-players { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.35rem; margin: 0; padding: 0; list-style: none; } /* BUG-52-04: a long name never widens the card */
+.room-player {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.6rem;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.room-player-dot { flex: none; width: 0.9rem; height: 0.9rem; border-radius: 50%; }
+.room-player-name { flex: 1 1 auto; min-width: 0; overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.room-player-state { flex: none; color: var(--muted); font-size: 0.85rem; }
+.room-player.is-joined .room-player-state { color: var(--success); font-weight: 700; }
+.room-none { margin: 0.2rem 0 0; }
+.double-card .room-taken-title { font-size: 1.5rem; animation: none; } /* BUG-52-02: a notice, not a celebration */
+@media (max-width: 480px) {
+  .room-qr { width: 9rem; height: 9rem; }
+  .room-code { font-size: 1.6rem; }
+}

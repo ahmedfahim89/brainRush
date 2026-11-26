@@ -48,11 +48,11 @@
   <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="css/style.4669c09a.css">
+  <link rel="stylesheet" href="css/style.020b81cb.css">
   <!-- CHRISTMAS (US-55, D-66): seasonal theme, only active under body.theme-christmas; remove after Christmas -->
   <link rel="stylesheet" href="css/christmas.717dbe43.css">
   <!-- Interface language (US-49): loaded first, so an Arabic page is right to left from its first paint -->
-  <script src="js/i18n.eee71543.js"></script>
+  <script src="js/i18n.c6802bfd.js"></script>
 </head>
 <body class="game">
   <!-- CHRISTMAS (US-55, D-66): first in <body> so the last known theme is applied before the first paint; remove after Christmas -->
@@ -174,6 +174,42 @@
     </div>
   </div>
 
+  <!-- Phone buzzer share and lobby panel (US-52, D-80): the QR code and the link hold only the room code -->
+  <div id="room-overlay" class="report-overlay" role="dialog" aria-modal="true" aria-labelledby="room-title" aria-describedby="room-how" hidden>
+    <div class="report-card room-card">
+      <h2 id="room-title" class="report-title" data-i18n="room.title">Join on your phone</h2>
+      <p id="room-how" class="hint report-about"></p>
+      <div class="room-share">
+        <div id="room-qr" class="room-qr"></div>
+        <div class="room-details">
+          <p class="room-label" data-i18n="room.code">Room code</p>
+          <p id="room-code" class="room-code" dir="ltr"></p>
+          <p class="room-label" data-i18n="room.link">Link</p>
+          <a id="room-link" class="room-link" dir="ltr" target="_blank" rel="noopener"></a>
+          <div class="room-copy-row">
+            <button type="button" id="room-copy" class="btn btn-small" data-i18n="room.copy">Copy link</button>
+            <span id="room-copy-status" class="hint" role="status"></span>
+          </div>
+        </div>
+      </div>
+      <p id="room-msg" class="msg" role="alert" hidden></p>
+      <h3 class="room-list-title" data-i18n="room.listTitle">Who has joined</h3>
+      <ul id="room-players" class="room-players"></ul>
+      <div class="actions">
+        <button type="button" id="room-close" class="btn btn-primary" data-i18n="room.close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phone buzzer, BUG-52-02: another tab of this game has taken over; this tab stops until "Use this tab" -->
+  <div id="room-taken-overlay" class="double-overlay" role="alertdialog" aria-modal="true" aria-labelledby="room-taken-title" aria-describedby="room-taken-text" hidden>
+    <div class="double-card">
+      <p id="room-taken-title" class="double-title room-taken-title" data-i18n="room.takenTitle">Open in another tab</p>
+      <p id="room-taken-text" data-i18n="room.takenText">This game is open in another tab, so changes here no longer reach the phones. Carry on in the other tab, or play here instead.</p>
+      <button type="button" id="room-taken-use" class="btn btn-primary btn-large" data-i18n="room.takenUse">Use this tab</button>
+    </div>
+  </div>
+
   <!-- Tournament match categories (US-61, D-77 ab): chosen at Start match, 1 to 3 per match -->
   <div id="pick-overlay" class="report-overlay" role="dialog" aria-modal="true" aria-labelledby="pick-title" aria-describedby="pick-about" hidden>
     <div class="report-card pick-card">
@@ -272,6 +308,23 @@
           <p id="cat-error" class="msg msg-error" role="alert" hidden></p>
         </fieldset>
 
+        <!-- Game control (US-52, D-80): Players and Teams only; Phone buzzer makes a room the phones join at Start -->
+        <fieldset id="control-block" class="setup-block control-block">
+          <legend data-i18n="control.legend">Game control</legend>
+          <div class="control-options" role="radiogroup" aria-label="Game control" data-i18n-attr="aria-label:control.group">
+            <label class="control-option">
+              <input type="radio" name="control" value="host" checked aria-describedby="control-host-hint">
+              <span class="control-text"><span class="control-name" data-i18n="control.host">Host control</span>
+                <small id="control-host-hint" class="hint" data-i18n="control.hostHint">Everyone plays on this screen; the host marks the answers.</small></span>
+            </label>
+            <label class="control-option">
+              <input type="radio" name="control" value="phone" aria-describedby="control-phone-hint">
+              <span class="control-text"><span class="control-name" data-i18n="control.phone">Phone buzzer</span>
+                <small id="control-phone-hint" class="hint" data-i18n="control.phoneHint">Players join with their phones and follow the board live.</small></span>
+            </label>
+          </div>
+        </fieldset>
+
         <div class="setup-pair">
           <fieldset class="setup-block">
             <legend data-i18n="timer.legend">Timer</legend>
@@ -313,6 +366,8 @@
         <p id="board-info" class="hint board-info"></p>
         <!-- Mokh Bot (US-62): whose turn it is in a match against the bot -->
         <p id="turn-banner" class="turn-banner" role="status" tabindex="-1" hidden></p>
+        <!-- Phone buzzer (US-52): "Phones 2/4" opens the share and lobby panel -->
+        <button type="button" id="room-btn" class="btn btn-room" hidden></button>
         <button type="button" id="end-btn" class="btn btn-end" data-i18n="board.end">End Game</button>
       </div>
       <!-- US-10 / D-01: shown when every cell of the board has been played -->
@@ -612,6 +667,8 @@
   <script src="js/share.4fcf5fb3.js"></script>
   <!-- Read aloud (US-48): loaded before game.js, which uses it -->
   <script src="js/speech.019a1850.js"></script>
-  <script src="js/game.e2b6a35c.js"></script>
+  <!-- QR code of the Phone buzzer join link (US-52): loaded before game.js, which uses it -->
+  <script src="js/qrcode.3ccdae91.js"></script>
+  <script src="js/game.78c2221f.js"></script>
 </body>
 </html>

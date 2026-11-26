@@ -12,7 +12,7 @@
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0b1026">
-  <link rel="stylesheet" href="css/style.4669c09a.css">
+  <link rel="stylesheet" href="css/style.020b81cb.css">
   <link rel="stylesheet" href="css/guide.70c9a392.css">
 </head>
 <body class="guide">
@@ -23,13 +23,14 @@
 
   <!-- Privacy Policy (D-41). Keep it in step with what the game stores (game log, localStorage) and with the ads settings. -->
   <main class="guide-main">
-    <p class="guide-intro">Last updated: 26 November 2026. This page explains what data Mokh Rush keeps and how ads use cookies.</p>
+    <p class="guide-intro">Last updated: 27 November 2026. This page explains what data Mokh Rush keeps and how ads use cookies.</p>
 
     <nav class="guide-toc" aria-labelledby="toc-title">
       <h2 id="toc-title">Contents</h2>
       <ol>
         <li><a href="#who">Who runs Mokh Rush</a></li>
         <li><a href="#server">On our server</a></li>
+        <li><a href="#phones">Playing with phones</a></li>
         <li><a href="#reports">Question reports</a></li>
         <li><a href="#browser">In your browser</a></li>
         <li><a href="#ads">Ads and cookies</a></li>
@@ -50,6 +51,13 @@
       <h2>On our server</h2>
       <p>When a game starts, we save the date and time, the player or team names (for a Streak Challenge, the challenger name you enter; for a Tournament, all the contestant names, once when it starts), and the chosen categories in a daily log file. For a Daily Crossword the line holds only the date and time. Only the site owner can read it. We use it to see how the game is played. We never sell or share it. To have a name removed, email us.</p>
       <p>When a Streak Challenge run ends with a streak of 1 or more, we save the challenger name you entered, the streak and the date and time of the run. The public streak leaderboard shows everyone the top 10, one row per person with their best run, name and date, so use a name you're happy to show. The site owner can remove a run at any time; to have yours removed, email us.</p>
+    </section>
+
+    <!-- US-52 / D-80: keep in step with the game_rooms and room_players tables (api/rooms.php) -->
+    <section id="phones" class="guide-section">
+      <h2>Playing with phones</h2>
+      <p>When the host chooses <strong>Phone buzzer</strong>, we keep a game room on our server so the players' phones can follow the board: the room code, the player or team names, their colours and scores, and the board as the phones see it (which cells were played and by whom; never the questions or answers). When a phone picks a name, we save which name it picked and a code that identifies that phone in this room only. The host's key and the phone codes are stored only in scrambled (hashed) form. A room and everything in it are deleted automatically 6 hours after its last use.</p>
+      <p>The phone keeps its room code and its code in the browser (<code>brainrush.phone</code>), so a refresh brings it back to the same name. The host's browser keeps the room code and the host's key with the running game.</p>
     </section>
 
     <!-- US-42 / D-45: keep in step with the question_reports table (question id, reason, note, status, time) -->

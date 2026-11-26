@@ -17,9 +17,9 @@
   const PAGE_TITLE = document.title; // the page's own English tab title (D-64: Arabic shows app.name)
   const API_BASE = 'api/';
   const STORAGE_KEY = 'brainrush.game';
-  // v4 adds the final round (US-44); v3 (helpers, US-32), v2 (used cells + open question) and
-  // v1 (Sprint 3) saves are migrated
-  const STORAGE_VERSION = 4;
+  // v5 adds the game control (US-52: control 'host' | 'phone', with the phone room); v4 (final round,
+  // US-44), v3 (helpers, US-32), v2 (used cells + open question) and v1 (Sprint 3) saves are migrated
+  const STORAGE_VERSION = 5;
   // Ids of the questions opened in this browser, oldest first; new boards avoid them.
   const SEEN_KEY = 'brainrush.seenQuestions';
   const SEEN_MAX = 5000; // BOARD_MAX_SEEN in api/questions.php
@@ -235,6 +235,21 @@
   const COIN_HOLD_MS = 1400;        // the result stays this long, then the overlay fades out
   const ROBOT = String.fromCodePoint(0x1f916); // robot face, on the bot's side of the coin
 
+  // Phone buzzer (US-52, D-80): Players and Teams games may be played with phones. The host's game
+  // stays the source of truth; api/rooms.php keeps only what the phones may see (phonePayload()).
+  const CONTROLS = ['host', 'phone'];
+  const ROOMS_API = 'rooms.php';
+  const ROOM_CODE_PATTERN = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/; // ROOM_CODE_ALPHABET in api/rooms.php
+  const ROOM_TOKEN_PATTERN = /^[0-9a-f]{64}$/;
+  const ROOM_PUSH_MS = 250;   // changes made close together go to the phones in one push
+  const ROOM_LOBBY_MS = 2000; // the host's poll of who has joined
+  const ROOM_RETRY_MS = 5000; // a failed push is tried again after this
+  const PHONE_SCREENS = ['board', 'question', 'final', 'results'];
+  // BUG-52-02: this page load's host session. Only the room's current session may change it, so two
+  // tabs of one game never overwrite each other; the newest tab that loaded (or "Use this tab") wins.
+  const HOST_SESSION = Array.from(window.crypto.getRandomValues(new Uint8Array(16)),
+    (b) => b.toString(16).padStart(2, '0')).join('');
+
   // Central state. `setup` is the form being filled in (memory only);
   // `game` is the running game and is saved to localStorage on every change:
   //   { mode, contestants: [{id, name, color, score, helpers: {choices, swap, skip}}], timerSeconds, points,
@@ -249,6 +264,9 @@
   //     final?: null | { stage, category?, question?, wagers?, marks?, answerShown?, lang? } (see below),
   //     statsSent?: [questionId] (US-47: questions whose outcome was sent; missing = a save from before
   //       US-47, which sends none),
+  //     control?: 'host' | 'phone' (US-52: missing in tournament matches; saves before v5 become 'host'),
+  //     room?: { code, hostToken } (Phone buzzer only: the room made at Start; the host token never
+  //       leaves this browser except to api/rooms.php),
   //     current: null | { catId, points, marks: { "<contestantId>": "correct" | "wrong" }, answerShown,
   //                       lang, by?, choiceOrder?, swap?, timedOut? } }
   // timedOut (US-47, D-55 e): the open question's timer reached 0 at least once (a Reset or a
@@ -392,6 +410,19 @@
   let botSaid = null;
   let botThinking = null; // the open question the bot has started thinking about (BUG-62-03)
 
+  // Phone buzzer (US-52), memory only: the push to the phones (one at a time; lastSent is the last
+  // payload sent, so a change the phones cannot see sends nothing), the lobby poll and its answer
+  // ({ version, mode, players: [{name, color, joined}] }), the panel's message (a function giving the
+  // text, or null), a room renewal in flight and the code the QR picture was drawn for.
+  const phone = {
+    pushTimer: null, pushing: false, again: false, lastSent: null,
+    lobbyTimer: null, lobby: null, shownJoined: null, message: null, renewing: null, qrCode: null,
+    gen: 0, // bumped by stopPhone(): answers that belong to an earlier game are dropped
+    ready: null,    // the claim of a restored room: pushes wait for it
+    claiming: false, // that claim is in flight (the lobby's other_tab is not trusted yet)
+    blocked: false, // BUG-52-02: another tab has taken over this game; this tab no longer saves or pushes
+  };
+
   // Read aloud (US-48), memory only apart from the on-device choice: the browser's speech module
   // (null without speech synthesis), whether the open question is being read, and the choice.
   const speech = window.BrainRushSpeech && window.BrainRushSpeech.supported() ? window.BrainRushSpeech : null;
@@ -517,6 +548,21 @@
     doubleText: byId('double-text'),
     doubleOk: byId('double-ok'),
     startMsg: byId('start-msg'),
+    roomTaken: byId('room-taken-overlay'),   // BUG-52-02: "This game is open in another tab"
+    roomTakenUse: byId('room-taken-use'),
+    controlBlock: byId('control-block'),     // US-52: Game control (Players and Teams only)
+    controlInputs: Array.prototype.slice.call(document.querySelectorAll('input[name="control"]')),
+    roomBtn: byId('room-btn'),               // US-52: "Phones 2/4" on the board bar opens the share panel
+    roomOverlay: byId('room-overlay'),
+    roomHow: byId('room-how'),
+    roomQr: byId('room-qr'),
+    roomCode: byId('room-code'),
+    roomLink: byId('room-link'),
+    roomCopy: byId('room-copy'),
+    roomCopyStatus: byId('room-copy-status'),
+    roomMsg: byId('room-msg'),
+    roomPlayers: byId('room-players'),
+    roomClose: byId('room-close'),
     boardInfo: byId('board-info'),
     turnBanner: byId('turn-banner'),     // US-62: "Sara's turn" in a bot match
     coinOverlay: byId('coin-overlay'),   // US-62: the coin flip at the start of a bot match
@@ -907,6 +953,7 @@
       saveTournament();
       return;
     }
+    if (phone.blocked) return; // BUG-52-02: another tab plays this Phone buzzer game; never overwrite its save
     try {
       if (!state.game) {
         window.localStorage.removeItem(STORAGE_KEY);
@@ -920,6 +967,7 @@
     } catch (err) {
       // Storage full or disabled (e.g. private mode): the game still works, it just won't survive a refresh.
     }
+    if (phoneOn()) schedulePush(); // US-52: every saved change may be one the phones must see
   }
 
   /** Returns { screen, game } from localStorage, or null when nothing valid is saved (corrupt data is removed). */
@@ -981,6 +1029,14 @@
     if (isPlainObject(fin) && fin.round === undefined && fin.usedIds === undefined) {
       const ids = isPlainObject(fin.question) && Number.isInteger(fin.question.id) ? [fin.question.id] : [];
       upgraded.game.final = Object.assign({}, fin, { round: 1, usedIds: ids });
+    }
+    // v4 had no game control (US-52): a saved game is a Host control game.
+    if (upgraded.version === 4 && isPlainObject(upgraded.game)) {
+      upgraded = {
+        version: 5,
+        screen: upgraded.screen,
+        game: Object.assign({}, upgraded.game, { control: 'host' }),
+      };
     }
     return upgraded.version === STORAGE_VERSION ? upgraded : null;
   }
@@ -1206,7 +1262,19 @@
       (g.turn === undefined || (Number.isInteger(g.turn) && findContestant(g, g.turn) !== null)) && // US-62
       (g.coinShown === undefined || typeof g.coinShown === 'boolean') &&
       (g.botTickets === undefined || isValidBotTickets(g.botTickets)) && // US-63
+      isValidControl(g) && // US-52
       isValidUsed(g.used, g) && isValidCurrent(g.current, g);
+  }
+
+  /**
+   * US-52: the game control. Missing (a tournament match, D-80 b) or 'host': no room. 'phone': Players or
+   * Teams only, with the room made at Start.
+   */
+  function isValidControl(g) {
+    if (g.control === undefined || g.control === 'host') return g.room === undefined;
+    return g.control === 'phone' && (g.mode === 'players' || g.mode === 'teams') && isPlainObject(g.room) &&
+      Object.keys(g.room).length === 2 && typeof g.room.code === 'string' && ROOM_CODE_PATTERN.test(g.room.code) &&
+      typeof g.room.hostToken === 'string' && ROOM_TOKEN_PATTERN.test(g.room.hostToken);
   }
 
   /** US-47: the ids whose outcome was sent; missing in a save from before US-47 (then none are sent). */
@@ -1418,8 +1486,12 @@
 
   /** What Back does: the same as the screen's own way back, confirms included. */
   function goBack() {
-    if (!dom.coinOverlay.hidden) {
+    if (isRoomTakenOpen()) {
+      return;                                        // BUG-52-02: only "Use this tab" leaves it
+    } else if (!dom.coinOverlay.hidden) {
       finishCoin();                                  // US-62: the coin flip, skipped to its end
+    } else if (isRoomPanelOpen()) {
+      closeRoomPanel();                              // US-52: the share panel, as Close
     } else if (!dom.doubleOverlay.hidden) {
       closeDoublePopup();
     } else if (isReportOpen()) {
@@ -1542,6 +1614,7 @@
       loadErrorShown: null, // the load error on screen, shown again after a language switch (US-49)
       starting: false,
       streak: false,      // Streak Challenge chosen (US-33): its name field replaces the player row
+      control: 'host',    // US-52: Game control, Host control by default (Players and Teams only)
     };
   }
 
@@ -1731,6 +1804,18 @@
     dom.catBlock.classList.toggle('is-off', off);
     dom.catTourneyNote.hidden = !off;
     if (off) clearMessage(dom.catError);
+    renderControlBlock();
+  }
+
+  /** US-52 (D-80 b): the Game control choice under the categories, in Players and Teams modes only. */
+  function renderControlBlock() {
+    const s = state.setup;
+    dom.controlBlock.hidden = !s || s.streak || s.mode === 'tournament';
+    dom.controlInputs.forEach((input) => { input.checked = !!s && input.value === s.control; });
+  }
+
+  function onControlChange(event) {
+    if (state.setup && CONTROLS.indexOf(event.target.value) !== -1) state.setup.control = event.target.value;
   }
 
   // ---------- Setup: categories and timer (US-04, US-05) ----------
@@ -2214,8 +2299,18 @@
       ]);
       const board = parseBoard(answers[0], ids);
       board.categories.forEach((c) => { c.hidden = selection.hidden.indexOf(c.id) !== -1; });
+      const game = newBoardGame(board, timer);
+      if (game.control === 'phone') {
+        try {
+          game.room = await createRoom(game); // US-52: the phones' room first, so the share panel has its code
+        } catch (err) {
+          // US-06: stay on setup with every input intact; Host control still plays without a room.
+          showMessage(dom.startMsg, () => t('start.roomFailed', { reason: sentence(errorText(err)) }), 'error');
+          return;
+        }
+      }
       preloadImages(board.categories);
-      beginGame(board, timer);
+      beginGame(game);
     } catch (err) {
       // US-06: stay on setup with every input intact.
       showMessage(dom.startMsg, () => t('start.failed', { reason: localCategoryNames(errorText(err)) }), 'error');
@@ -2253,11 +2348,10 @@
   }
 
   /** D-12: the board loaded now is used for the whole game (stored in the game state). */
-  function beginGame(board, timerSeconds) {
+  function newBoardGame(board, timerSeconds) {
     const s = state.setup;
-    clearTournament(); // never left over here; a new game must not come back as a tournament
     board.categories.forEach((c) => { if (c.id === MIX) dealMixColumn(c, board.points); });
-    state.game = {
+    return {
       mode: s.mode,
       contestants: s.entries.map((e, i) => ({
         id: i + 1, name: e.name.trim(), color: e.color, score: 0, helpers: allHelpers(),
@@ -2271,11 +2365,22 @@
       finalRound: s.finalRoundOn, // US-44: admin setting when the game starts (final_round_enabled)
       final: null,
       statsSent: [], // US-47: questions whose outcome was sent (at most once per question per game)
+      control: s.mode !== 'tournament' && s.control === 'phone' ? 'phone' : 'host', // US-52 (D-80 b)
       current: null,
     };
+  }
+
+  function beginGame(game) {
+    clearTournament(); // never left over here; a new game must not come back as a tournament
+    stopPhone();
+    state.game = game;
     renderGame();
-    showScreen('board'); // also saves the state
+    showScreen('board'); // also saves the state (and, in Phone buzzer, sends the board to the phones)
     logGameStart(state.game);
+    if (game.control === 'phone') {
+      startPhone();
+      openRoomPanel(); // the host shares the code before the first question
+    }
   }
 
   /**
@@ -2349,6 +2454,7 @@
     renderBoardDone();
     renderScoreboard();
     renderTurnBanner(); // US-62
+    renderRoomButton(); // US-52
   }
 
   function renderBoardInfo() {
@@ -3378,6 +3484,7 @@
   /** US-16 / D-15: clear the saved game and show an empty Setup with settings reloaded. */
   function newGame() {
     stopTimer();
+    stopPhone(); // US-52: the room is left to expire (6 h)
     state.game = null;
     clearSavedState();
     tourney = null; // US-61: End tournament / New game
@@ -3395,6 +3502,7 @@
     dom.playersBlock.hidden = s.streak;
     dom.catBlock.hidden = s.streak;
     dom.streakBlock.hidden = !s.streak;
+    renderControlBlock(); // US-52
     updateStartButton();
     syncBack(); // Android Back closes the Streak setup (US-40)
   }
@@ -4191,6 +4299,11 @@
     }
     if (isPickOpen()) { // US-61: the match categories popup; Escape is Cancel
       if (event.key === 'Escape') closePicker();
+      return;
+    }
+    if (isRoomTakenOpen()) return; // BUG-52-02: the page waits for "Use this tab"
+    if (isRoomPanelOpen()) { // US-52: the share panel; Escape is Close
+      if (event.key === 'Escape') closeRoomPanel();
       return;
     }
     const solo = streakOnScreen() || dailyOnScreen();
@@ -8630,6 +8743,7 @@
     }
     refreshScreen();
     if (!dom.coinOverlay.hidden && dom.coinResult.textContent) renderCoinText();
+    if (isRoomPanelOpen()) renderRoomPanel(); // US-52
   }
 
   function refreshSetup() {
@@ -8726,6 +8840,363 @@
     if (c) renderWagerPrompt(g, c);
   }
 
+  // ---------- Phone buzzer (US-52, D-80) ----------
+  // In a Phone buzzer game the players' phones follow the board: every saved change goes to
+  // api/rooms.php (debounced, and only when what the phones see has changed), and the host polls who
+  // has joined for the share panel. Host control never gets here: phoneOn() is false, so it makes no
+  // rooms call at all (the regression rule of every phone sprint).
+
+  /** A Phone buzzer game is on this screen (never a tournament match, D-80 b). */
+  function phoneOn() {
+    const g = state.game;
+    return !INTEGRATION && !tourney && !!g && g.control === 'phone' && isPlainObject(g.room);
+  }
+
+  /**
+   * What the phones may see (D-80 p), never the questions or answers: the names, colours and scores, the
+   * column names (none for an unopened "Surprise me!" column; Kilo Meshakkal is named by the phone) and
+   * per cell its value, owner and Swap label. An unused Kilo Meshakkal box sends its emoji only (US-53)
+   * and the double-score mark (D-40) is sent only once its cell is open or played. api/rooms.php checks
+   * the same rules again.
+   */
+  function phonePayload(g) {
+    const index = (id) => g.contestants.findIndex((c) => c.id === id);
+    return {
+      mode: g.mode,
+      screen: PHONE_SCREENS.indexOf(state.screen) === -1 ? 'board' : state.screen,
+      contestants: g.contestants.map((c) => ({ name: c.name, color: c.color, score: c.score })),
+      points: g.points.slice(),
+      categories: g.categories.map((c) => (c.hidden || c.id === MIX
+        ? { hidden: !!c.hidden, mix: c.id === MIX }
+        : { name: c.name, nameAr: isFilled(c.nameAr) ? c.nameAr : null, hidden: false, mix: false })),
+      cells: g.points.map((p, i) => g.categories.map((c) => (c.id === MIX
+        ? phoneCell(g, c, c.order[i], c.faces[i], index) : phoneCell(g, c, p, null, index)))),
+    };
+  }
+
+  function phoneCell(g, category, points, face, index) {
+    const key = cellKey(category.id, points);
+    const double = g.double === key;
+    if (hasOwn(g.used, key)) {
+      const used = g.used[key];
+      const swap = used.swap
+        ? { name: used.swap.catName, nameAr: isFilled(used.swap.catNameAr) ? used.swap.catNameAr : null, points: used.swap.points }
+        : null;
+      return { p: points, used: true, owner: used.owner === null ? null : index(used.owner), x2: double, swap: swap };
+    }
+    const open = g.current !== null && cellKey(g.current.catId, g.current.points) === key;
+    return face ? { face: face, open: open, x2: open && double } : { p: points, open: open, x2: open && double };
+  }
+
+  /** Make the game's room (api/rooms.php create); resolves to { code, hostToken }. */
+  async function createRoom(g) {
+    const data = await apiPost(ROOMS_API + '?action=create', { state: phonePayload(g), session: HOST_SESSION });
+    if (!isPlainObject(data) || typeof data.code !== 'string' || !ROOM_CODE_PATTERN.test(data.code) ||
+        typeof data.host_token !== 'string' || !ROOM_TOKEN_PATTERN.test(data.host_token)) throw textError('err.response');
+    return { code: data.code, hostToken: data.host_token };
+  }
+
+  /** The phones follow this game from now on (a new game, or a restored one). */
+  function startPhone(claim) {
+    phone.lastSent = null;
+    phone.claiming = !!claim;
+    phone.ready = claim ? claimRoom(state.game) : null;
+    schedulePush();
+    pollLobby();
+  }
+
+  /** A restored game: this tab takes the room over (BUG-52-02, the newest tab wins). Never rejects. */
+  async function claimRoom(g) {
+    const gen = phone.gen;
+    try {
+      await apiPost(ROOMS_API + '?action=claim', { code: g.room.code, host_token: g.room.hostToken, session: HOST_SESSION });
+    } catch (err) {
+      if (gen === phone.gen && err.status === 404) renewRoom(g); // expired: a new room with this session
+    } finally {
+      if (gen === phone.gen) phone.claiming = false;
+    }
+  }
+
+  /** BUG-52-02: another tab has taken over: stop saving and pushing, and say so until "Use this tab". */
+  function blockPhone() {
+    if (phone.blocked) return;
+    phone.blocked = true;
+    phone.gen += 1;
+    window.clearTimeout(phone.pushTimer);
+    window.clearTimeout(phone.lobbyTimer);
+    stopTimer();
+    closeRoomPanel();
+    dom.roomTaken.hidden = false;
+    setPageInert(true);
+    dom.roomTakenUse.focus();
+  }
+
+  function isRoomTakenOpen() {
+    return !dom.roomTaken.hidden;
+  }
+
+  /** No more pushes or polls (New Game, or a new game starting); the room is left to expire. */
+  function stopPhone() {
+    phone.gen += 1;
+    window.clearTimeout(phone.pushTimer);
+    window.clearTimeout(phone.lobbyTimer);
+    Object.assign(phone, {
+      pushTimer: null, pushing: false, again: false, lastSent: null, lobbyTimer: null, lobby: null,
+      shownJoined: null, message: null, renewing: null, qrCode: null, ready: null, claiming: false,
+    });
+    closeRoomPanel();
+    dom.roomBtn.hidden = true;
+  }
+
+  function schedulePush() {
+    window.clearTimeout(phone.pushTimer);
+    phone.pushTimer = window.setTimeout(pushNow, ROOM_PUSH_MS);
+  }
+
+  /** Send the board to the phones when what they see changed; one push at a time. */
+  async function pushNow() {
+    phone.pushTimer = null;
+    if (!phoneOn()) return;
+    if (phone.pushing) {
+      phone.again = true;
+      return;
+    }
+    const g = state.game;
+    const gen = phone.gen;
+    const payload = phonePayload(g);
+    const text = JSON.stringify(payload);
+    if (text === phone.lastSent) return;
+    phone.pushing = true;
+    try {
+      if (phone.ready) await phone.ready;
+      if (gen !== phone.gen) return;
+      await apiPost(ROOMS_API + '?action=push', {
+        code: g.room.code, host_token: g.room.hostToken, session: HOST_SESSION, state: payload,
+      });
+      if (gen !== phone.gen) return;
+      phone.lastSent = text;
+      if (phone.message) setPhoneMessage(null);
+    } catch (err) {
+      if (gen !== phone.gen) return;
+      if (err.status === 404) {
+        renewRoom(g); // idle for 6 hours (or deleted): a new room, so the phones can join again
+      } else if (err.status === 409) {
+        blockPhone(); // BUG-52-02: another tab of this game is the host now
+      } else {
+        setPhoneMessage(() => t('room.syncFailed', { reason: sentence(errorText(err)) }));
+        phone.pushTimer = window.setTimeout(pushNow, ROOM_RETRY_MS);
+      }
+    } finally {
+      if (gen === phone.gen) {
+        phone.pushing = false;
+        if (phone.again) {
+          phone.again = false;
+          schedulePush();
+        }
+      }
+    }
+  }
+
+  /** The room has expired: make a new one for the same game and show its code. */
+  function renewRoom(g) {
+    if (phone.renewing) return;
+    const gen = phone.gen;
+    phone.renewing = createRoom(g)
+      .then((room) => {
+        if (gen !== phone.gen || state.game !== g) return;
+        g.room = room;
+        phone.lobby = null;
+        phone.shownJoined = null;
+        phone.lastSent = null;
+        saveState(); // keeps the new room and pushes the board
+        setPhoneMessage(() => t('room.expired'));
+        openRoomPanel();
+      })
+      .catch((err) => {
+        if (gen === phone.gen) setPhoneMessage(() => t('room.syncFailed', { reason: sentence(errorText(err)) }));
+      })
+      .then(() => {
+        if (gen === phone.gen) phone.renewing = null;
+      });
+  }
+
+  /** Who has joined, every ROOM_LOBBY_MS while the game is on (skipped while the tab is hidden). */
+  async function pollLobby() {
+    window.clearTimeout(phone.lobbyTimer);
+    phone.lobbyTimer = null;
+    if (!phoneOn()) return;
+    const g = state.game;
+    const gen = phone.gen;
+    if (!document.hidden) {
+      try {
+        const data = await apiGet(ROOMS_API + '?action=lobby&code=' + encodeURIComponent(g.room.code) +
+          '&session=' + HOST_SESSION);
+        if (gen !== phone.gen) return;
+        if (isPlainObject(data) && data.other_tab === true && !phone.claiming) {
+          blockPhone();
+          return;
+        }
+        if (isPlainObject(data) && Array.isArray(data.players)) phone.lobby = data;
+        renderLobby();
+      } catch (err) {
+        if (gen !== phone.gen) return;
+        if (err.status === 404) renewRoom(g);
+      }
+    }
+    if (gen === phone.gen) phone.lobbyTimer = window.setTimeout(pollLobby, ROOM_LOBBY_MS);
+  }
+
+  /** Joined (true) or waiting (false) per contestant, from the last lobby poll. */
+  function lobbyJoined() {
+    const g = state.game;
+    const players = phone.lobby ? phone.lobby.players : null;
+    if (!Array.isArray(players) || players.length !== g.contestants.length) return g.contestants.map(() => false);
+    return players.map((p) => isPlainObject(p) && p.joined === true);
+  }
+
+  /** The button and the panel's list, redrawn only when someone joined or left (focus stays put). */
+  function renderLobby() {
+    const joined = JSON.stringify(lobbyJoined());
+    if (joined === phone.shownJoined) return;
+    renderRoomButton();
+    if (isRoomPanelOpen()) renderRoomPlayers();
+  }
+
+  function renderRoomButton() {
+    const on = phoneOn();
+    dom.roomBtn.hidden = !on;
+    if (!on) return;
+    const total = state.game.contestants.length;
+    const joined = lobbyJoined().filter(Boolean).length;
+    dom.roomBtn.textContent = t('room.btn', { joined: joined, total: total });
+    dom.roomBtn.setAttribute('aria-label', t('room.btnLabel', { joined: joined, total: total }));
+    dom.roomBtn.classList.toggle('is-warning', phone.message !== null);
+  }
+
+  /** text: a function giving the panel's warning (shown again after a language switch), or null. */
+  function setPhoneMessage(text) {
+    phone.message = text;
+    if (text) showMessage(dom.roomMsg, text, 'warning');
+    else clearMessage(dom.roomMsg);
+    renderRoomButton();
+  }
+
+  function isRoomPanelOpen() {
+    return !dom.roomOverlay.hidden;
+  }
+
+  function joinLink(code) {
+    return new URL('join.html?room=' + code, window.location.href).href;
+  }
+
+  /** The share and lobby panel: QR code, room code, link, joined / waiting per name. */
+  function openRoomPanel() {
+    if (!phoneOn() || isRoomPanelOpen()) return;
+    dom.roomOverlay.hidden = false;
+    setPageInert(true);
+    renderRoomPanel();
+    dom.roomClose.focus();
+  }
+
+  function closeRoomPanel() {
+    if (!isRoomPanelOpen()) return;
+    dom.roomOverlay.hidden = true;
+    setPageInert(false);
+    if (!dom.roomBtn.hidden && state.screen === 'board') dom.roomBtn.focus();
+  }
+
+  function renderRoomPanel() {
+    if (!phoneOn()) return;
+    const g = state.game;
+    const link = joinLink(g.room.code);
+    dom.roomHow.textContent = t('room.how.' + MODES[g.mode].key);
+    dom.roomCode.textContent = g.room.code;
+    dom.roomLink.textContent = link;
+    dom.roomLink.href = link;
+    dom.roomCopyStatus.textContent = '';
+    if (phone.qrCode !== g.room.code) {
+      clear(dom.roomQr);
+      try {
+        dom.roomQr.appendChild(window.BrainRushQR.svg(link, t('room.qrLabel')));
+        phone.qrCode = g.room.code;
+      } catch (err) {
+        // no QR picture: the code and the link still work
+      }
+    } else if (dom.roomQr.firstChild) {
+      dom.roomQr.firstChild.setAttribute('aria-label', t('room.qrLabel'));
+    }
+    if (phone.message) showMessage(dom.roomMsg, phone.message, 'warning');
+    else clearMessage(dom.roomMsg);
+    renderRoomPlayers();
+  }
+
+  function renderRoomPlayers() {
+    const g = state.game;
+    const joined = lobbyJoined();
+    phone.shownJoined = JSON.stringify(joined);
+    renderRoomButton();
+    clear(dom.roomPlayers);
+    g.contestants.forEach((c, i) => {
+      const dot = h('span', { className: 'room-player-dot', 'aria-hidden': 'true' });
+      dot.style.backgroundColor = paletteEntry(c.color).value;
+      dom.roomPlayers.appendChild(h('li', { className: 'room-player' + (joined[i] ? ' is-joined' : '') }, [
+        dot,
+        ownDirection(h('span', { className: 'room-player-name', text: c.name })),
+        h('span', { className: 'room-player-state', text: t(joined[i] ? 'room.joined' : 'room.waiting') }),
+        joined[i] ? h('button', {
+          type: 'button',
+          className: 'btn btn-small',
+          text: t('room.release'),
+          'aria-label': t('room.releaseLabel', { name: iso(c.name) }),
+          onclick: () => releaseName(i),
+        }) : null,
+      ]));
+    });
+    if (!joined.some(Boolean)) dom.roomPlayers.appendChild(h('li', { className: 'hint room-none', text: t('room.none') }));
+  }
+
+  /** Release (D-18 confirm): the name is free again; that phone goes back to the name list. */
+  async function releaseName(index) {
+    if (!phoneOn()) return;
+    const g = state.game;
+    const gen = phone.gen;
+    if (!window.confirm(t('room.releaseConfirm', { name: iso(g.contestants[index].name) }))) return;
+    try {
+      await apiPost(ROOMS_API + '?action=release', {
+        code: g.room.code, host_token: g.room.hostToken, session: HOST_SESSION, contestant: index,
+      });
+      if (gen !== phone.gen) return;
+      if (phone.lobby && isPlainObject(phone.lobby.players[index])) phone.lobby.players[index].joined = false;
+      renderLobby();
+    } catch (err) {
+      if (gen !== phone.gen) return;
+      if (err.status === 404) renewRoom(g);
+      else if (err.status === 409) blockPhone();
+      else setPhoneMessage(() => t('room.releaseFailed', { reason: sentence(errorText(err)) }));
+    }
+  }
+
+  function onRoomCopy() {
+    const link = dom.roomLink.href;
+    const done = (key) => { dom.roomCopyStatus.textContent = t(key); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(() => done('room.copied'), () => done('room.copyFailed'));
+    } else {
+      done('room.copyFailed');
+    }
+  }
+
+  function bindPhoneEvents() {
+    dom.controlInputs.forEach((input) => input.addEventListener('change', onControlChange));
+    dom.roomBtn.addEventListener('click', openRoomPanel);
+    dom.roomClose.addEventListener('click', closeRoomPanel);
+    dom.roomCopy.addEventListener('click', onRoomCopy);
+    dom.roomTakenUse.addEventListener('click', () => window.location.reload()); // the reload claims the room
+    dom.roomOverlay.addEventListener('click', (event) => {
+      if (event.target === dom.roomOverlay) closeRoomPanel(); // a tap beside the card
+    });
+  }
+
   // ---------- Startup ----------
 
   /** Fresh, empty setup with current settings (one empty entry, Players mode). */
@@ -8789,6 +9260,7 @@
     dom.backBtn.addEventListener('click', onBackClick);
     dom.doubleOk.addEventListener('click', closeDoublePopup);
     dom.newGameBtn.addEventListener('click', newGame);
+    bindPhoneEvents();
     bindStreakEvents();
     bindDailyEvents();
     bindCrosswordEvents();
@@ -8803,6 +9275,7 @@
   /** US-17: reopen the saved screen. An open question restarts its timer at full length (D-04). */
   function restoreGame(saved) {
     state.game = saved.game;
+    if (phoneOn()) startPhone(true); // US-52: this tab takes the room over (kept, or renewed if expired)
     if (saved.screen === 'results') {
       renderResults();
       showScreen('results');
