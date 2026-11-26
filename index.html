@@ -48,11 +48,11 @@
   <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="css/style.fb1be6f7.css">
+  <link rel="stylesheet" href="css/style.e64ad66b.css">
   <!-- CHRISTMAS (US-55, D-66): seasonal theme, only active under body.theme-christmas; remove after Christmas -->
   <link rel="stylesheet" href="css/christmas.717dbe43.css">
   <!-- Interface language (US-49): loaded first, so an Arabic page is right to left from its first paint -->
-  <script src="js/i18n.79f363c2.js"></script>
+  <script src="js/i18n.eee71543.js"></script>
 </head>
 <body class="game">
   <!-- CHRISTMAS (US-55, D-66): first in <body> so the last known theme is applied before the first paint; remove after Christmas -->
@@ -78,6 +78,18 @@
       <p id="double-title" class="double-title" data-i18n="double.title">&times;2 Double score!</p>
       <p id="double-text"></p>
       <button type="button" id="double-ok" class="btn btn-primary btn-large" data-i18n="double.ok">Let's play</button>
+    </div>
+  </div>
+
+  <!-- Mokh Bot (US-62, D-78): the coin flip at the start of a match against the bot; it closes by itself -->
+  <div id="coin-overlay" class="double-overlay coin-overlay" role="alertdialog" aria-modal="true" aria-labelledby="coin-title" aria-describedby="coin-result" hidden>
+    <div class="double-card coin-card">
+      <p id="coin-title" class="double-title coin-title" data-i18n="tournament.coinTitle">Coin flip</p>
+      <div id="coin" class="coin" aria-hidden="true">
+        <span class="coin-face coin-a"></span>
+        <span class="coin-face coin-b"></span>
+      </div>
+      <p id="coin-result" class="coin-result" aria-live="polite"></p>
     </div>
   </div>
 
@@ -299,6 +311,8 @@
       <div class="board-bar">
         <h2 id="board-title" class="visually-hidden" data-i18n="board.title">Game board</h2>
         <p id="board-info" class="hint board-info"></p>
+        <!-- Mokh Bot (US-62): whose turn it is in a match against the bot -->
+        <p id="turn-banner" class="turn-banner" role="status" tabindex="-1" hidden></p>
         <button type="button" id="end-btn" class="btn btn-end" data-i18n="board.end">End Game</button>
       </div>
       <!-- US-10 / D-01: shown when every cell of the board has been played -->
@@ -598,6 +612,6 @@
   <script src="js/share.4fcf5fb3.js"></script>
   <!-- Read aloud (US-48): loaded before game.js, which uses it -->
   <script src="js/speech.019a1850.js"></script>
-  <script src="js/game.bcd1d64c.js"></script>
+  <script src="js/game.895be07b.js"></script>
 </body>
 </html>

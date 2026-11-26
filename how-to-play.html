@@ -17,7 +17,7 @@
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0b1026">
-  <link rel="stylesheet" href="css/style.fb1be6f7.css">
+  <link rel="stylesheet" href="css/style.e64ad66b.css">
   <link rel="stylesheet" href="css/guide.70c9a392.css">
 </head>
 <body class="guide">
@@ -244,7 +244,7 @@
       <h3>The draw and the bracket</h3>
       <ul>
         <li><strong>Start Game</strong> draws everyone at random into a bracket: <strong>Semi-finals</strong> and a <strong>Final</strong> for 3 or 4 contestants, <strong>Quarter-finals</strong>, Semi-finals and a Final for 5 to 8.</li>
-        <li>Empty spots are <strong>byes</strong>: a contestant with a bye ("Sara &ndash; bye") goes straight to the next round. Two byes never meet. With 5 contestants, for example, three of them have a bye and two play a quarter-final.</li>
+        <li>Empty spots are <strong>byes</strong>: a contestant with a bye ("Sara &ndash; bye") goes straight to the next round. Two byes never meet. With 5 contestants, for example, three spots are byes: <a href="#tournament-bot">Mokh Bot &#129302;</a> takes one of them, so two contestants have a bye.</li>
         <li>Not happy with the draw? <strong>Shuffle</strong> draws again, until the first match starts.</li>
         <li>The bracket shows every round, the scores of the played matches, a &check; for each winner and the <strong>next match</strong>. <strong>Start match</strong> plays it; <strong>End tournament</strong> stops the tournament without saving it.</li>
       </ul>
@@ -254,6 +254,13 @@
         <li><strong>End Game</strong> (or a full board) ends the match: the higher score goes through, even when both are below zero.</li>
         <li>A <strong>level match</strong> always goes to <a href="#golden-goal">Golden Goal</a>, with no skip: the two bet and answer until one leads. If no new question is left, a <strong>coin toss</strong> decides who goes through.</li>
         <li>The match result shows who won and the score; <strong>Continue</strong> goes back to the bracket with the winner moved on.</li>
+      </ul>
+      <h3 id="tournament-bot">Mokh Bot &#129302;</h3>
+      <ul>
+        <li>With 3, 5, 6 or 7 contestants the draw has byes. <strong>Mokh Bot &#129302;</strong>, a computer contestant, takes <strong>one</strong> of them at random, so that contestant plays a real (and easy) match instead of going straight through. <strong>Shuffle</strong> draws it again. With 4 or 8 contestants there is no bot.</li>
+        <li>A match against the bot is played in <strong>turns</strong>. A <strong>coin flip</strong> at the start decides who goes first, and a banner over the board says whose turn it is. After each question the turn passes; there is no steal.</li>
+        <li>On your turn, open any box as usual; the bot waits. On the bot's turn the board is locked: the bot picks a box by itself, "thinks" for a few seconds, says its answer, and the game scores it (it is right only about a third of the time or less). Then press <strong>Back to Board</strong>.</li>
+        <li>The bot never uses helpers. If the match is level, it bets and answers in <a href="#golden-goal">Golden Goal</a> by itself too. If it wins, it goes through, and it can even win the tournament.</li>
       </ul>
       <h3>Results</h3>
       <ul>
