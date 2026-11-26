@@ -3550,7 +3550,7 @@
       setStreakLoading(false);
       if (!run.queue.length) {
         if (failure) {
-          showStreakFeedback(t(useChance ? 'streak.nextFailedChance' : 'streak.nextFailed', { reason: errorText(failure) }), 'is-bad');
+          showStreakFeedback(t(useChance ? 'streak.nextFailedChance' : 'streak.nextFailed', { reason: sentence(errorText(failure)) }), 'is-bad');
           if (isChancePopupOpen()) fillChancePopup(); // the popup shows the failure too
           return;
         }
