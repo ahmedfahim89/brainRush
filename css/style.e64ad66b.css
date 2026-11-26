@@ -2005,3 +2005,75 @@ html[lang="ar"] .streak-count-line, html[lang="ar"] .final-category-label, html[
 /* The bracket and the tournament results fit one screen with 8 entries (D-30), like the board */
 body[data-screen="bracket"] .site-footer, body[data-screen="tresults"] .site-footer { display: none; }
 html[dir="rtl"] .bracket-name { text-align: right; }
+
+/* ---------- Mokh Bot (US-62, D-78) ---------- */
+/* Logical properties only, so the Arabic page mirrors the banner, the bubble and the rows. */
+/* Whose turn it is in a match against the bot: a pill in the contestant's colour (set by game.js) */
+.turn-banner { margin: 0; padding: 0.15rem 0.8rem; font-weight: 800; border-radius: var(--radius); overflow-wrap: anywhere; }
+.turn-banner[hidden] { display: none; }
+.turn-banner:focus { outline: none; box-shadow: var(--focus); }
+/* The bot's turn: the open cells are locked for the host; the bot's pick lights up before it opens */
+.board.is-locked .board-cell:not(.is-used) { cursor: not-allowed; opacity: 0.6; }
+@media (hover: hover) { .board.is-locked .board-cell:not(.is-used):hover { border-color: var(--border); filter: none; } }
+.board.is-locked .board-cell.is-opening { opacity: 1; }
+.board.is-locked .board-cell.is-bot-pick { opacity: 1; border-color: var(--gold); box-shadow: inset 0 0 0 0.2rem var(--gold); animation: bot-pick 0.7s ease-in-out; }
+@keyframes bot-pick { 50% { transform: scale(1.06); } }
+
+/* Scoring rows: the bot's answer (a speech bubble) or "Thinking...", and the side that waits */
+.srow-note { flex-basis: 100%; min-width: 0; }
+.srow-note:empty { display: none; }
+/* BUG-62-01: the waiting side is greyed by its row and score colour, never by dimming the name chip (AA) */
+.srow.is-waiting { background: var(--panel); border-style: dashed; }
+.srow.is-waiting .srow-score, .srow.is-waiting .srow-tally { color: var(--muted); }
+.srow-wait { color: var(--muted); font-size: 0.9rem; }
+.bot-thinking { color: var(--muted); font-style: italic; animation: bot-think 1.2s ease-in-out infinite; }
+@keyframes bot-think { 50% { opacity: 0.8; } } /* --muted on --panel-2 stays above 4.5:1 */
+.bot-bubble {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0.3rem 0.7rem;
+  color: var(--text);
+  font-weight: 600;
+  background: var(--panel);
+  border: 1px solid var(--gold-dark);
+  border-radius: var(--radius);
+  border-start-start-radius: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The coin flip: two faces in the two contestants' colours; it lands on the one who starts */
+.coin-card { min-width: 16rem; }
+.coin-card .coin-title { animation: none; }
+.coin { position: relative; width: 7rem; height: 7rem; margin: 0.4rem auto 1rem; transform-style: preserve-3d; }
+.coin-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.6rem;
+  font-weight: 800;
+  border: 0.25rem solid var(--gold);
+  border-radius: 50%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.coin-b { transform: rotateY(180deg); }
+.coin.shows-b { transform: rotateY(180deg); }
+.coin.is-spinning.lands-a { animation: coin-spin-a 1.6s cubic-bezier(0.2, 0.7, 0.3, 1) forwards; }
+.coin.is-spinning.lands-b { animation: coin-spin-b 1.6s cubic-bezier(0.2, 0.7, 0.3, 1) forwards; }
+@keyframes coin-spin-a { from { transform: perspective(40rem) rotateY(0); } to { transform: perspective(40rem) rotateY(1800deg); } }
+@keyframes coin-spin-b { from { transform: perspective(40rem) rotateY(0); } to { transform: perspective(40rem) rotateY(1980deg); } }
+.coin-result { min-height: 1.5em; font-size: 1.3rem; font-weight: 800; overflow-wrap: anywhere; }
+.coin-overlay.is-leaving { animation: coin-fade 0.3s ease-in forwards; }
+@keyframes coin-fade { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .coin.is-spinning.lands-a, .coin.is-spinning.lands-b, .coin-overlay.is-leaving,
+  .board.is-locked .board-cell.is-bot-pick, .bot-thinking { animation: none; }
+}
+@media (max-width: 600px) {
+  .turn-banner { padding: 0.1rem 0.6rem; font-size: 0.85rem; }
+  .coin-card { min-width: 0; }
+  .coin { width: 5.5rem; height: 5.5rem; }
+  .coin-face { font-size: 2rem; }
+}

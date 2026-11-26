@@ -223,6 +223,16 @@
   // D-77 g: the first-round matches (0-based) that hold the byes, in this order, per bracket size.
   const BYE_ORDER = { 4: [0], 8: [0, 3, 1] };
   const MATCH_WAYS = ['score', 'goal', 'coin', 'bye']; // how a match was decided
+  // Mokh Bot (US-62, D-78): one weak bot fills one of the byes; its match is turn-based.
+  const BOT_ACCURACY = { low: 0.35, high: 0.2 }; // right-answer chance on the lowest / highest board row
+  const BOT_FINAL_ACCURACY = 0.25;  // on a Golden Goal question (a random bank question)
+  const BOT_PICK_MS = 1200;         // the bot's turn on the board: it picks a cell after this
+  const BOT_HIGHLIGHT_MS = 700;     // its picked cell is highlighted this long before it opens
+  const BOT_THINK_MS = [3000, 6000]; // it answers after a random time in this range (before the timer ends)
+  const BOT_MARK_MS = 1500;         // and is scored this long after its answer shows
+  const COIN_SPIN_MS = 1600;        // the coin flip at the start of a bot match
+  const COIN_HOLD_MS = 1400;        // the result stays this long, then the overlay fades out
+  const ROBOT = String.fromCodePoint(0x1f916); // robot face, on the bot's side of the coin
 
   // Central state. `setup` is the form being filled in (memory only);
   // `game` is the running game and is saved to localStorage on every change:
@@ -356,6 +366,12 @@
   //     order), timerSeconds, helpersOff, rounds: [[match]] (first round first, each round half the one before),
   //     started (the first match has started: no more Shuffle), playing: null | [round, index] (the
   //     match on the board), last: null | [round, index] (the match result on show), finishedAt: null | ms }
+  //   An entry with bot: true is Mokh Bot (US-62, D-78): at most one, id = humans + 1, in the second slot
+  //   of one bye match (that match is then played, bye false). Its name is t('tournament.botName'),
+  //   rewritten on a language switch (relabelBot). A match board with the bot has turn (the id of the
+  //   contestant on turn) and coinShown (the start flip was played); its open question (or Golden Goal)
+  //   has botRoll = { right, optionIndex, said? (its answer was shown) } when the bot answers it (optionIndex 1 or 2 = a stored wrong
+  //   option, null = "I don't know").
   //   match: { a, b: entry id or null (not known yet), bye: true in a first-round match whose second
   //     slot is a bye (a goes through), winner: entry id or null, sa, sb: the scores of a played match
   //     (else null), way: null or one of MATCH_WAYS }
@@ -366,6 +382,13 @@
   // lastPicks keeps the last match's ticks (memory only), so the next popup starts from them.
   let picker = null;
   let lastPicks = [];
+  // Mokh Bot (US-62, D-78), memory only: the one pending bot action (cleared on every screen change),
+  // the coin flip's timer, and the open question (board `current` or Golden Goal `final`) whose answer
+  // the bot has already said.
+  let botTimer = null;
+  let coinTimer = null;
+  let botSaid = null;
+  let botThinking = null; // the open question the bot has started thinking about (BUG-62-03)
 
   // Read aloud (US-48), memory only apart from the on-device choice: the browser's speech module
   // (null without speech synthesis), whether the open question is being read, and the choice.
@@ -493,6 +516,10 @@
     doubleOk: byId('double-ok'),
     startMsg: byId('start-msg'),
     boardInfo: byId('board-info'),
+    turnBanner: byId('turn-banner'),     // US-62: "Sara's turn" in a bot match
+    coinOverlay: byId('coin-overlay'),   // US-62: the coin flip at the start of a bot match
+    coin: byId('coin'),
+    coinResult: byId('coin-result'),
     board: byId('board'),
     boardDone: byId('board-done'),
     boardDoneText: byId('board-done-text'),
@@ -1109,7 +1136,8 @@
     if (current === null) return true;
     if (!isPlainObject(current) || !Number.isInteger(current.catId) || !Number.isInteger(current.points) ||
         typeof current.answerShown !== 'boolean' || !isPlainObject(current.marks) ||
-        !(current.timedOut === undefined || typeof current.timedOut === 'boolean')) return false; // US-47
+        !(current.timedOut === undefined || typeof current.timedOut === 'boolean') || // US-47
+        !isValidBotRoll(current.botRoll)) return false; // US-62
     const key = cellKey(current.catId, current.points);
     if (!isBoardCellKey(key, g) || hasOwn(g.used, key)) return false;
     let correct = 0;
@@ -1140,6 +1168,13 @@
     return true;
   }
 
+  /** US-62: the bot's saved result on an open question: missing, or { right, optionIndex: 1 | 2 | null, said? }. */
+  function isValidBotRoll(roll) {
+    return roll === undefined || (isPlainObject(roll) && typeof roll.right === 'boolean' &&
+      (roll.optionIndex === null || roll.optionIndex === 1 || roll.optionIndex === 2) &&
+      (roll.said === undefined || typeof roll.said === 'boolean')); // said: its answer was shown (OBS-2)
+  }
+
   /** A permutation of [0, 1, 2]. */
   function isValidChoiceOrder(order) {
     return Array.isArray(order) && order.length === CHOICE_LETTERS.length &&
@@ -1161,6 +1196,8 @@
       (g.double === undefined || (typeof g.double === 'string' && isBoardCellKey(g.double, g))) && // games saved before D-40
       typeof g.finalRound === 'boolean' && isValidFinal(g.final, g) &&
       isValidStatsSent(g.statsSent) && // US-47
+      (g.turn === undefined || (Number.isInteger(g.turn) && findContestant(g, g.turn) !== null)) && // US-62
+      (g.coinShown === undefined || typeof g.coinShown === 'boolean') &&
       isValidUsed(g.used, g) && isValidCurrent(g.current, g);
   }
 
@@ -1184,7 +1221,8 @@
     if (!isPlainObject(f.category) || !Number.isInteger(f.category.id) || typeof f.category.name !== 'string' ||
         !isOptionalText(f.category.nameAr) || !isValidQuestion(f.question) || typeof f.answerShown !== 'boolean' ||
         !(f.lang === undefined || f.lang === 'en' || (f.lang === 'ar' && hasArabic(f.question))) ||
-        !isPlainObject(f.wagers) || !isPlainObject(f.marks) || f.usedIds.indexOf(f.question.id) === -1) return false;
+        !isPlainObject(f.wagers) || !isPlainObject(f.marks) || f.usedIds.indexOf(f.question.id) === -1 ||
+        !isValidBotRoll(f.botRoll)) return false; // US-62: the bot's answer to a Golden Goal question
     const ids = g.contestants.map((c) => String(c.id));
     const wagerIds = Object.keys(f.wagers);
     const markIds = Object.keys(f.marks);
@@ -1223,6 +1261,7 @@
 
   function showScreen(name) {
     state.screen = name;
+    stopBot(); // US-62: a pending bot action never fires on another screen (the caller arms it again)
     if (name !== 'question') {
       stopTimer();
       closeReport(); // US-42: the report form belongs to the question screen
@@ -1371,7 +1410,9 @@
 
   /** What Back does: the same as the screen's own way back, confirms included. */
   function goBack() {
-    if (!dom.doubleOverlay.hidden) {
+    if (!dom.coinOverlay.hidden) {
+      finishCoin();                                  // US-62: the coin flip, skipped to its end
+    } else if (!dom.doubleOverlay.hidden) {
       closeDoublePopup();
     } else if (isReportOpen()) {
       closeReport();                                 // US-42: the report form, as Cancel
@@ -1423,7 +1464,7 @@
    */
   function confirmBackToBoard() {
     const cur = state.game && state.game.current;
-    if (!cur) return;
+    if (!cur || botAnswerPending(state.game)) return; // US-62: the bot's question closes once it is scored
     const text = Object.keys(cur.marks).length ? t('question.leaveMarked') : t('question.leaveUnmarked');
     if (!window.confirm(text)) return;
     if (state.game && state.game.current === cur) backToBoard();
@@ -2299,6 +2340,7 @@
     renderBoard();
     renderBoardDone();
     renderScoreboard();
+    renderTurnBanner(); // US-62
   }
 
   function renderBoardInfo() {
@@ -2380,8 +2422,13 @@
         type: 'button',
         className: 'board-cell',
         'aria-label': cellLabel,
-        onclick: (e) => openCellWithFx(e.currentTarget, category.id, points),
+        'data-cell': key, // US-62: the bot finds the cell it picked
+        onclick: (e) => {
+          if (isBotTurn(state.game)) return; // US-62: the bot picks on its turn; the board is locked
+          openCellWithFx(e.currentTarget, category.id, points);
+        },
       };
+      if (isBotTurn(g)) props['aria-disabled'] = 'true';
       if (!face) return h('button', props, [label]);
       props['aria-label'] = t('cell.mix', { name: iso(columnName(category)) });
       props.title = props['aria-label'];
@@ -2503,7 +2550,7 @@
   function renderHelpersLeft(contestant) {
     const left = HELPER_KEYS.filter((key) => contestant.helpers[key]).map(helperName);
     const text = left.length ? t('helpers.left', { list: left.join(t('list.sep')) }) : t('helpers.none');
-    return h('span', { className: 'score-helpers', title: text, hidden: state.game.helpersOff === true }, [
+    return h('span', { className: 'score-helpers', title: text, hidden: state.game.helpersOff === true || isBot(contestant) }, [ // US-62
       h('span', { className: 'visually-hidden', text: text }),
     ].concat(HELPER_KEYS.map((key) => h('span', {
       className: 'score-helper' + (contestant.helpers[key] ? '' : ' is-used'),
@@ -2537,6 +2584,7 @@
     const g = state.game;
     if (!g || state.screen !== 'board' || g.current || hasOwn(g.used, cellKey(categoryId, points))) return;
     g.current = { catId: categoryId, points: points, marks: {}, answerShown: false };
+    if (isBotTurn(g)) g.current.botRoll = rollBot(g, categoryId, points); // US-62: rolled once, saved
     const category = findCategory(g, categoryId);
     category.hidden = false; // a "Surprise me!" column shows its name from its first question on
     // Opened = played: later boards in this browser avoid it.
@@ -2574,6 +2622,7 @@
     resumeTimer();
     dom.qHeading.focus();
     autoRead();
+    armBotAnswer(); // US-62: on the bot's double-score question it starts thinking now
   }
 
   /**
@@ -2601,6 +2650,7 @@
     startTimer(g.timerSeconds, undefined, onBoardTimeUp);
     dom.qHeading.focus();
     onQuestionShown(holdReading === true); // US-48
+    if (holdReading !== true) armBotAnswer(); // US-62 (the double-score popup arms it once closed)
   }
 
   /** US-47 / D-55 e: the board question's timer reached 0; kept for its outcome (saved, a refresh keeps it). */
@@ -2798,6 +2848,7 @@
     if (!hasArabic(q)) return;
     cur.lang = cur.lang === 'ar' ? 'en' : 'ar';
     renderQuestionLang(q);
+    refreshBotRows(); // US-62: the bot's answer in the shown language
     saveState();
   }
 
@@ -2871,9 +2922,11 @@
           onclick: () => markContestant(c, 'wrong'),
         }),
       };
-      const chips = h('span', { className: 'srow-helpers', hidden: g.helpersOff === true },
+      const bot = isBot(c);
+      const chips = h('span', { className: 'srow-helpers', hidden: g.helpersOff === true || bot }, // US-62: no helpers for the bot
         HELPER_KEYS.map((key) => helperBtns[key]));
-      ref.row = h('li', { className: 'srow' }, [name, chips, ref.score, ref.status, ref.correct, ref.wrong]);
+      ref.note = h('span', { className: 'srow-note', 'aria-live': 'polite' }); // US-62: bot match only
+      ref.row = h('li', { className: 'srow' + (bot ? ' is-bot' : '') }, [name, chips, ref.score, ref.status, ref.correct, ref.wrong, ref.note]);
       ref.row.style.borderInlineStartColor = color.value; // the left edge; the right one in Arabic
       dom.scoreRows.appendChild(ref.row);
       return ref;
@@ -2903,7 +2956,9 @@
       ref.status.textContent = mark === 'correct' ? t('score.markedCorrect', who)
         : mark === 'wrong' ? t('score.markedWrong', who) : '';
       HELPER_KEYS.forEach((helper) => updateHelperChip(ref, helper));
+      updateBotRow(ref, mark, cur);
     });
+    dom.backBtn.disabled = botAnswerPending(state.game); // US-62: the bot's question closes once it is scored
   }
 
   /** Enable a helper chip only when its contestant may use it now; the tooltip says why not. */
@@ -2926,6 +2981,10 @@
     const g = state.game;
     const cur = g.current;
     if (g.helpersOff) return t('helper.off');
+    if (isBot(contestant)) return t('helper.notBot'); // US-62: the bot never uses helpers
+    if (g.turn !== undefined && g.turn !== contestant.id) {
+      return t('score.botQuestion', { name: iso(findContestant(g, g.turn).name) });
+    }
     if (swapping !== null) {
       return swapping === contestant.id && key === 'swap' ? t('helper.loading') : t('helper.waitSwap');
     }
@@ -2940,9 +2999,12 @@
   }
 
   /** Apply a Correct / Wrong mark. No undo inside a question (D-06): use the board's +/- buttons. */
-  function markContestant(contestant, result) {
+  function markContestant(contestant, result, byBot) {
     const cur = state.game && state.game.current;
     if (!cur || swapping !== null) return;
+    // US-62: in a bot match only the contestant on turn is scored, and the bot only by itself
+    if (state.game.turn !== undefined && state.game.turn !== contestant.id) return;
+    if (isBot(contestant) && byBot !== true) return;
     const key = String(contestant.id);
     if (hasOwn(cur.marks, key)) return;
     if (result === 'correct' && correctContestantId(cur) !== null) return;
@@ -2955,7 +3017,7 @@
     saveState();
     const ref = scoringRows.find((r) => r.contestant === contestant);
     if (ref) playResultFx(result === 'correct' ? ref.correct : ref.wrong, result);
-    focusNextScoringButton();
+    if (byBot !== true) focusNextScoringButton(); // the bot's own mark never moves the host's focus
   }
 
   /** Short sparks (correct) / boom (wrong) around the clicked button; purely visual, never saved. */
@@ -3105,9 +3167,10 @@
   function backToBoard() {
     const g = state.game;
     const cur = g && g.current;
-    if (!cur) return;
+    if (!cur || botAnswerPending(g)) return; // US-62: the bot's question closes once it is scored
     stopTimer();
-    sendQuestionStat(g, activeQuestion(g).question.id, boardOutcome(cur)); // saved below with the cell
+    // US-62 (D-78 dev choice): the bot's own questions are not counted, its answers are dice rolls
+    if (!isBotTurn(g)) sendQuestionStat(g, activeQuestion(g).question.id, boardOutcome(cur)); // saved below with the cell
     const cell = { owner: correctContestantId(cur) };
     // A Swap replaced the question: the board shows the old value struck through and the new one small.
     // The id lets Golden Goal skip it too (FU-35).
@@ -3116,9 +3179,11 @@
     }
     g.used[cellKey(cur.catId, cur.points)] = cell;
     g.current = null;
+    if (g.turn !== undefined) g.turn = otherContestant(g, g.turn).id; // US-62: the turn passes after every question
     renderGame();
     showScreen('board'); // also saves the state
     if (allCellsUsed(g)) dom.boardDoneBtn.focus();
+    armBotTurn(); // US-62
   }
 
   // ---------- Timer (US-12) ----------
@@ -6651,6 +6716,7 @@
     }
     setGoalText(dom.finalTitle, '', roundSuffix(f.round));
     dom.finalCategory.textContent = iso(finalCategoryName(f));
+    placeBotBet(g); // US-62: the bot locks its bet when its turn comes (the caller saves)
     renderWagerList(g);
     renderWagerTurn(g);
   }
@@ -6672,7 +6738,10 @@
           h('span', { className: 'visually-hidden', text: t('final.scoreLabel') }),
           document.createTextNode(formatScore(c.score)),
         ]),
-        h('span', { className: 'final-wager-state', text: locked ? t('final.betLocked') : c === turn ? t('final.yourTurn') : t('final.waiting') }),
+        h('span', {
+          className: 'final-wager-state',
+          text: locked ? t(isBot(c) ? 'final.botBetLocked' : 'final.betLocked') : c === turn ? t('final.yourTurn') : t('final.waiting'),
+        }),
       ]);
       item.style.borderInlineStartColor = color.value; // the left edge; the right one in Arabic
       dom.finalWagerList.appendChild(item);
@@ -6743,6 +6812,7 @@
       return;
     }
     g.final.wagers[String(c.id)] = Number(raw);
+    placeBotBet(g); // US-62: the bot's turn may come next
     saveState();
     renderWagerList(g);
     renderWagerTurn(g);
@@ -6823,6 +6893,8 @@
     const g = state.game;
     if (!g || !g.final || g.final.stage !== 'wager' || state.screen !== 'final' || nextWagerContestant(g)) return;
     g.final.stage = 'question';
+    const bot = botOf(g);
+    if (bot) g.final.botRoll = rollBotFinal(g.final.question); // US-62: rolled once, saved
     markSeen(g.final.question.id); // opened = played, as on the board
     showFinalQuestion();
   }
@@ -6846,6 +6918,7 @@
     startTimer(g.timerSeconds);
     dom.qHeading.focus();
     onQuestionShown(false); // US-48
+    armBotAnswer(); // US-62
   }
 
   /** The scoring panel during the final question; Back reads "Continue" or "See results" (updateFinalRows). */
@@ -6872,6 +6945,7 @@
     if (!hasArabic(f.question)) return;
     f.lang = f.lang === 'ar' ? 'en' : 'ar';
     renderFinalLang();
+    refreshBotRows(); // US-62
     saveState();
   }
 
@@ -6913,7 +6987,8 @@
       };
       // The wager and the score share one block: on phones they stack, so a mark never widens the row (BUG-9-02).
       const tally = h('span', { className: 'srow-tally' }, [ref.wager, ref.score]);
-      ref.row = h('li', { className: 'srow' }, [name, tally, ref.status, ref.correct, ref.wrong]);
+      ref.note = h('span', { className: 'srow-note', 'aria-live': 'polite' }); // US-62: the bot's answer
+      ref.row = h('li', { className: 'srow' + (isBot(c) ? ' is-bot' : '') }, [name, tally, ref.status, ref.correct, ref.wrong, ref.note]);
       ref.row.style.borderInlineStartColor = color.value; // the left edge; the right one in Arabic
       dom.scoreRows.appendChild(ref.row);
       return ref;
@@ -6947,6 +7022,7 @@
       ref.status.textContent = mark === null ? ''
         : t(mark === 'correct' ? 'final.statusCorrect' : 'final.statusWrong',
           { name: iso(ref.contestant.name), bet: wager, score: formatScore(ref.contestant.score) });
+      updateBotRow(ref, mark, f);
     });
     const allMarked = g.contestants.every((c) => hasOwn(f.marks, String(c.id)));
     dom.backBtn.disabled = !allMarked;
@@ -6959,8 +7035,9 @@
     return isMatch(g) ? t('tournament.seeMatch') : t('run.seeResults');
   }
 
-  function markFinal(contestant, result) {
+  function markFinal(contestant, result, byBot) {
     if (!finalOnScreen()) return;
+    if (isBot(contestant) && byBot !== true) return; // US-62: the bot is marked by itself
     const f = state.game.final;
     const key = String(contestant.id);
     if (hasOwn(f.marks, key)) return;
@@ -6968,7 +7045,7 @@
     contestant.score += result === 'correct' ? f.wagers[key] : -f.wagers[key];
     updateFinalRows();
     saveState();
-    focusNextScoringButton();
+    if (byBot !== true) focusNextScoringButton();
   }
 
   /** The final round is over: Results (with the D-10 tie rule as always). */
@@ -7114,16 +7191,22 @@
    * so two byes never meet; the shuffle only decides who sits where.
    */
   function drawBracket(entries) {
-    const size = bracketSize(entries.length);
-    const byes = BYE_ORDER[size].slice(0, size - entries.length);
-    const order = shuffled(entries.map((e) => e.id));
+    const humans = entries.filter((e) => e.bot !== true);
+    const bot = entries.find((e) => e.bot === true) || null;
+    const size = bracketSize(humans.length);
+    const byes = BYE_ORDER[size].slice(0, size - humans.length);
+    // US-62 (D-78): Mokh Bot takes one of the bye slots at random; the other byes stay byes.
+    const botAt = bot && byes.length ? byes[Math.floor(Math.random() * byes.length)] : -1;
+    const order = shuffled(humans.map((e) => e.id));
     const rounds = [];
     for (let count = size / 2; count >= 1; count /= 2) {
       rounds.push(Array.from({ length: count }, emptyMatch));
     }
     rounds[0].forEach((m, i) => {
       m.a = order.shift();
-      if (byes.indexOf(i) === -1) {
+      if (i === botAt) {
+        m.b = bot.id; // a real match against the bot
+      } else if (byes.indexOf(i) === -1) {
         m.b = order.shift();
       } else {
         m.bye = true; // already through: no board is played
@@ -7198,10 +7281,17 @@
     return null;
   }
 
-  /** 3 to 8 entries: unique ids, names (D-02, D-22) and colours of the 8-colour palette. */
+  /**
+   * 3 to 8 human entries: unique ids, names (D-02, D-22) and colours of the 8-colour palette; plus at most
+   * one Mokh Bot entry (US-62, `bot` optional so older saves load), only when the humans leave a bye.
+   */
   function isValidEntries(list) {
-    return Array.isArray(list) && list.length >= TOURNAMENT_MIN && list.length <= MODES.tournament.limit &&
-      list.every((e) => isPlainObject(e) && typeof e.name === 'string' && e.name === e.name.trim()) &&
+    if (!Array.isArray(list) || !list.every((e) => isPlainObject(e) && (e.bot === undefined || typeof e.bot === 'boolean'))) return false;
+    const humans = list.filter((e) => e.bot !== true).length;
+    const bots = list.length - humans;
+    return humans >= TOURNAMENT_MIN && humans <= MODES.tournament.limit &&
+      (bots === 0 || (bots === 1 && bracketSize(humans) > humans)) &&
+      list.every((e) => typeof e.name === 'string' && e.name === e.name.trim()) &&
       isValidContestants(list.map((e) => ({ id: e.id, name: e.name, color: e.color, score: 0, helpers: allHelpers() })),
         MODES.tournament);
   }
@@ -7235,14 +7325,19 @@
    * the first round, each later slot holding the winner of the match before it, valid results.
    */
   function isValidRounds(rounds, entries) {
-    const size = bracketSize(entries.length);
+    const bot = entries.find((e) => e.bot === true) || null;
+    const humans = entries.length - (bot ? 1 : 0);
+    const size = bracketSize(humans);
     if (!Array.isArray(rounds) || rounds.length !== roundCount(size)) return false;
     if (!rounds.every((round, r) => Array.isArray(round) && round.length === size / Math.pow(2, r + 1) &&
         round.every(isMatchShape))) return false;
-    const byes = BYE_ORDER[size].slice(0, size - entries.length);
+    const byes = BYE_ORDER[size].slice(0, size - humans);
     const placed = [];
+    // US-62: the bot sits in the second slot of exactly one bye match, which is then a real match
+    const botAt = bot ? rounds[0].findIndex((m) => m.b === bot.id) : -1;
+    if (bot && (byes.indexOf(botAt) === -1 || rounds[0].some((m) => m.a === bot.id))) return false;
     const firstOk = rounds[0].every((m, i) => {
-      if (m.bye !== (byes.indexOf(i) !== -1)) return false;
+      if (m.bye !== (byes.indexOf(i) !== -1 && i !== botAt)) return false;
       placed.push(m.a);
       if (!m.bye) placed.push(m.b);
       return !m.bye || (m.b === null && m.winner === m.a && m.way === 'bye' && m.sa === null && m.sb === null);
@@ -7298,17 +7393,21 @@
     }
     if (tt.last !== null) return false;
     const m = matchAt(tt, tt.playing);
+    // US-62: a match with the bot is turn-based (turn and coinShown set); any other has neither
+    const withBot = [m.a, m.b].some((id) => entryOf(tt, id).bot === true);
     return isValidGame(g) && isMatch(g) && g.finalRound === true && g.timerSeconds === tt.timerSeconds &&
       g.contestants.length === 2 && g.contestants[0].id === m.a && g.contestants[1].id === m.b &&
       g.contestants.every((c) => {
         const e = entryOf(tt, c.id);
         return e.name === c.name && e.color === c.color;
-      }) && isValidScreenFor(screen, g);
+      }) && withBot === (g.turn !== undefined) && withBot === (g.coinShown !== undefined) &&
+      isValidScreenFor(screen, g);
   }
 
   /** Reopen the saved tournament screen; a match comes back as a saved game does (D-04, D-25). */
   function restoreTournament(saved) {
     tourney = saved.tournament;
+    relabelBot(tourney, saved.game); // US-62: the bot's name in the page language
     if (saved.screen === 'bracket') {
       showBracket();
     } else if (saved.screen === 'match') {
@@ -7329,6 +7428,8 @@
   function beginTournament(timerSeconds) {
     const s = state.setup;
     const entries = s.entries.map((e, i) => ({ id: i + 1, name: e.name.trim(), color: e.color }));
+    const bot = botEntry(entries); // US-62: Mokh Bot fills one bye (none with 4 or 8 entries)
+    if (bot) entries.push(bot);
     lastPicks = [];
     tourney = {
       startedAt: Date.now(),
@@ -7343,7 +7444,8 @@
     };
     state.game = null;
     clearSavedState();
-    postGameLog({ mode: 'tournament', players: entries.map((e) => e.name) }); // no categories yet (D-77 ab)
+    // no categories yet (D-77 ab); the human names only (US-62: the bot is not a player)
+    postGameLog({ mode: 'tournament', players: entries.filter((e) => e.bot !== true).map((e) => e.name) });
     showBracket();
   }
 
@@ -7676,10 +7778,16 @@
       statsSent: [],
       current: null,
     };
+    // US-62: a match with the bot is turn-based; the coin flip (drawn now, shown next) picks who starts
+    if (state.game.contestants.some(isBot)) {
+      state.game.turn = state.game.contestants[Math.random() < 0.5 ? 0 : 1].id;
+      state.game.coinShown = false;
+    }
     tt.started = true;
     tt.playing = ref;
     renderGame();
     showScreen('board'); // one write: the bracket with the match being played and its board
+    armBotTurn();
   }
 
   /**
@@ -7841,6 +7949,331 @@
   function onTourneyNewGame() {
     if (state.screen !== 'tresults') return;
     newGame();
+  }
+
+  // ---------- Mokh Bot (US-62, D-78) ----------
+  // One weak bot fills one bye at random (3, 5, 6 or 7 humans). A match with it is turn-based: a coin
+  // flip picks who starts, the turn passes after every question and there is no steal. On its turn
+  // the board is locked, the bot opens a random cell, "thinks", says an answer (the real one when its
+  // saved roll is right, else a stored wrong option or "I don't know") and is scored by itself. In a
+  // Golden Goal it bets by itself and answers the same way. Every bot action is one timeout (botTimer),
+  // cleared on any screen change and armed again from the saved state, so a reload resumes it.
+
+  /** The contestant / entry is the tournament's bot. */
+  function isBot(c) {
+    if (!c || !tourney) return false;
+    const e = entryOf(tourney, c.id);
+    return !!e && e.bot === true;
+  }
+
+  /** The bot of this match board, or null (any other game). */
+  function botOf(g) {
+    return isMatch(g) ? g.contestants.find(isBot) || null : null;
+  }
+
+  function otherContestant(g, id) {
+    return g.contestants.find((c) => c.id !== id);
+  }
+
+  /** It is the bot's turn on this match board. */
+  function isBotTurn(g) {
+    return !!g && g.turn !== undefined && isBot(findContestant(g, g.turn));
+  }
+
+  /** The bot's board question is open and the bot is not scored yet: Back to Board waits. */
+  function botAnswerPending(g) {
+    return !!g && !!g.current && isBotTurn(g) && !hasOwn(g.current.marks, String(g.turn));
+  }
+
+  /** t('tournament.botName') in the page language, with " 2" after it when a contestant already has that name. */
+  function botLabel(humans) {
+    const base = t('tournament.botName');
+    const taken = humans.map((e) => e.name.toLowerCase());
+    let name = base;
+    for (let n = 2; taken.indexOf(name.toLowerCase()) !== -1; n += 1) name = base + ' ' + n;
+    return name;
+  }
+
+  /** The bot entry for these human entries, or null when they fill the bracket (4 or 8). */
+  function botEntry(humans) {
+    if (bracketSize(humans.length) === humans.length) return null;
+    const used = humans.map((e) => e.color);
+    const free = FULL_PALETTE.find((p) => used.indexOf(p.value) === -1);
+    return { id: humans.length + 1, name: botLabel(humans), color: free.value, bot: true };
+  }
+
+  /** The bot's name follows the page language: in the tournament and on the match board (g). */
+  function relabelBot(tt, g) {
+    const e = tt ? tt.entries.find((entry) => entry.bot === true) : null;
+    if (!e) return;
+    e.name = botLabel(tt.entries.filter((entry) => entry.bot !== true));
+    const c = g ? findContestant(g, e.id) : null;
+    if (c) c.name = e.name;
+  }
+
+  /** { right, optionIndex }: right with chance `accuracy`; a wrong roll picks a stored wrong option. */
+  function botRoll(q, accuracy) {
+    const right = Math.random() < accuracy;
+    return { right: right, optionIndex: !right && hasChoices(q) ? 1 + Math.floor(Math.random() * 2) : null };
+  }
+
+  /** D-78: right about 35% of the time on the lowest row, down to about 20% on the highest. */
+  function rollBot(g, categoryId, points) {
+    const rows = g.points.length;
+    const at = rows > 1 ? g.points.indexOf(points) / (rows - 1) : 0;
+    const accuracy = BOT_ACCURACY.low + (BOT_ACCURACY.high - BOT_ACCURACY.low) * at;
+    return botRoll(findCategory(g, categoryId).questions[String(points)], accuracy);
+  }
+
+  function rollBotFinal(q) {
+    return botRoll(q, BOT_FINAL_ACCURACY);
+  }
+
+  /** What the bot says, in the shown language: the answer or a wrong option cut at its first bracket. */
+  function botAnswerText(q, roll, lang) {
+    const arabic = lang === 'ar' && hasArabic(q);
+    if (roll.right) return choiceText(arabic ? q.answer_ar : q.answer, arabic);
+    if (roll.optionIndex !== null && hasChoices(q)) return choiceTexts(q, arabic).options[roll.optionIndex];
+    return t('score.botDontKnow');
+  }
+
+  /** The open question the bot may answer: the board's or Golden Goal's, else null. */
+  function botOpenQuestion() {
+    const g = state.game;
+    if (!g || state.screen !== 'question') return null;
+    return finalOnScreen() ? g.final : g.current;
+  }
+
+  /** One pending bot action at a time. */
+  function botLater(ms, action) {
+    if (botTimer !== null) window.clearTimeout(botTimer);
+    botTimer = window.setTimeout(() => {
+      botTimer = null;
+      action();
+    }, ms);
+  }
+
+  /** Any screen change: the bot's pending action and the coin flip stop. */
+  function stopBot() {
+    if (botTimer !== null) window.clearTimeout(botTimer);
+    botTimer = null;
+    if (coinTimer !== null) window.clearTimeout(coinTimer);
+    coinTimer = null;
+    if (!dom.coinOverlay.hidden) {
+      dom.coinOverlay.hidden = true;
+      setPageInert(false);
+    }
+  }
+
+  /** "Sara's turn" over the board of a bot match; the board is locked on the bot's turn. */
+  function renderTurnBanner() {
+    const g = state.game;
+    const on = !!g && g.turn !== undefined && !allCellsUsed(g); // a full board has no turn left
+    dom.turnBanner.hidden = !on;
+    dom.board.classList.toggle('is-locked', on && isBotTurn(g));
+    if (!on) return;
+    const c = findContestant(g, g.turn);
+    const color = paletteEntry(c.color);
+    dom.turnBanner.textContent = t('tournament.turn', { name: iso(c.name) }) +
+      (isBotTurn(g) ? ' ' + t('tournament.botPicking') : '');
+    dom.turnBanner.style.backgroundColor = color.value;
+    dom.turnBanner.style.color = color.ink;
+  }
+
+  /** The board of a bot match is on show: the coin flip first, then on the bot's turn its pick. */
+  function armBotTurn() {
+    const g = state.game;
+    if (!g || state.screen !== 'board' || g.turn === undefined || g.current) return;
+    if (g.coinShown !== true) {
+      showCoin();
+      return;
+    }
+    if (isBotTurn(g) && !allCellsUsed(g)) botLater(BOT_PICK_MS, botPickCell);
+  }
+
+  /** The bot picks a random open cell, highlights it, then opens it as a click would. */
+  function botPickCell() {
+    const g = state.game;
+    if (!g || state.screen !== 'board' || g.current || !isBotTurn(g)) return;
+    const open = [];
+    g.categories.forEach((c) => g.points.forEach((p) => {
+      if (!hasOwn(g.used, cellKey(c.id, p))) open.push({ id: c.id, points: p });
+    }));
+    if (!open.length) return;
+    const pick = open[Math.floor(Math.random() * open.length)];
+    const find = () => dom.board.querySelector('[data-cell="' + cellKey(pick.id, pick.points) + '"]');
+    const cell = find();
+    if (cell) cell.classList.add('is-bot-pick');
+    botLater(BOT_HIGHLIGHT_MS, () => {
+      if (state.game !== g || state.screen !== 'board' || g.current) return;
+      const target = find(); // the board may have been drawn again meanwhile
+      if (target) target.classList.remove('is-bot-pick');
+      openCellWithFx(target, pick.id, pick.points);
+    });
+  }
+
+  /**
+   * The bot's question is open (board on its turn, or Golden Goal): "Thinking..." for 3 to 6 s (always
+   * before the timer ends), then its answer (saved as said), then 1.5 s later its own mark. After a
+   * reload an answer already said shows at once and is scored 1.5 s later; already scored: the answer
+   * shows. A reload or a language switch draws the same answer from the saved roll.
+   */
+  function armBotAnswer() {
+    const g = state.game;
+    const open = botOpenQuestion();
+    const bot = botOf(g);
+    if (!open || !bot) return;
+    const onFinal = open === g.final;
+    if (!onFinal && !isBotTurn(g)) return;
+    const marked = hasOwn(open.marks, String(bot.id));
+    if (!open.botRoll) { // only a save from before the roll has none
+      open.botRoll = onFinal ? rollBotFinal(open.question) : rollBot(g, open.catId, open.points);
+      saveState();
+    }
+    const markLater = () => botLater(BOT_MARK_MS, () => {
+      if (botOpenQuestion() !== open) return;
+      const result = open.botRoll.right ? 'correct' : 'wrong';
+      if (onFinal) markFinal(bot, result, true);
+      else markContestant(bot, result, true);
+    });
+    botThinking = open; // BUG-62-03: "Thinking..." only from now (after the double-score popup)
+    botSaid = marked || open.botRoll.said === true ? open : null;
+    refreshBotRows();
+    if (marked) return;
+    if (botSaid === open) { // OBS-2: said before a reload
+      markLater();
+      return;
+    }
+    const left = timer.running ? timer.endAt - now() : timer.remainingMs;
+    const wanted = BOT_THINK_MS[0] + Math.random() * (BOT_THINK_MS[1] - BOT_THINK_MS[0]);
+    botLater(Math.max(1000, Math.min(wanted, left - BOT_MARK_MS - 500)), () => {
+      if (botOpenQuestion() !== open) return;
+      botSaid = open;
+      open.botRoll.said = true;
+      saveState();
+      refreshBotRows();
+      markLater();
+    });
+  }
+
+  function refreshBotRows() {
+    if (finalOnScreen()) updateFinalRows();
+    else if (state.game && state.game.current) updateScoringRows();
+  }
+
+  /**
+   * The scoring row of a bot match (open = the board question or Golden Goal): the bot's row has no
+   * buttons until it is scored and shows "Thinking..." or its answer; the side that is not on turn is
+   * greyed with "Waiting" or "Mokh Bot's question". Other games: nothing changes.
+   */
+  function updateBotRow(ref, mark, open) {
+    const g = state.game;
+    clear(ref.note);
+    ref.row.classList.remove('is-waiting');
+    if (!botOf(g)) return;
+    const onFinal = open === g.final;
+    const bot = isBot(ref.contestant);
+    const onTurn = onFinal || g.turn === ref.contestant.id;
+    ref.correct.hidden = bot && mark === null;
+    ref.wrong.hidden = bot && mark === null;
+    if (bot || !onTurn) {
+      ref.correct.disabled = true;
+      ref.wrong.disabled = true;
+    }
+    if (!onTurn) {
+      ref.row.classList.add('is-waiting');
+      const text = bot ? t('score.waiting') : t('score.botQuestion', { name: iso(findContestant(g, g.turn).name) });
+      ref.note.appendChild(h('span', { className: 'srow-wait', text: text }));
+      return;
+    }
+    if (!bot) return;
+    if (botSaid !== open && mark === null) { // nothing yet while the double-score popup is open
+      if (botThinking === open) ref.note.appendChild(h('span', { className: 'bot-thinking', text: t('score.botThinking') }));
+      return;
+    }
+    const q = onFinal ? open.question : activeQuestion(g).question;
+    const answer = botAnswerText(q, open.botRoll, open.lang);
+    ref.note.appendChild(h('span', {
+      className: 'bot-bubble',
+      text: t('score.botSays', { name: iso(ref.contestant.name), answer: iso(answer) }),
+    }));
+  }
+
+  /** Golden Goal (D-78): the bot locks its bet when its turn comes: 0 to half its limit, in hundreds. */
+  function placeBotBet(g) {
+    const f = g.final;
+    const c = f && f.stage === 'wager' ? nextWagerContestant(g) : null;
+    if (!c || !isBot(c)) return;
+    // BUG-62-02: a whole amount 0..half the limit, rounded to the nearest 100 (a 200 limit: 0 or 100)
+    const limit = wagerLimit(g, c.score);
+    const amount = Math.floor(Math.random() * (Math.floor(limit / 2) + 1));
+    f.wagers[String(c.id)] = Math.min(limit, Math.round(amount / 100) * 100);
+  }
+
+  // ----- The coin flip at the start of a bot match -----
+
+  /** The coin spins (two faces in the two colours) and lands on the starter; reduced motion: no spin. */
+  function showCoin() {
+    const g = state.game;
+    const faces = dom.coin.querySelectorAll('.coin-face');
+    g.contestants.forEach((c, i) => {
+      const color = paletteEntry(c.color);
+      faces[i].style.backgroundColor = color.value;
+      faces[i].style.color = color.ink;
+      faces[i].textContent = isBot(c) ? ROBOT : Array.from(c.name)[0].toUpperCase(); // the robot, or an initial
+    });
+    const second = g.turn === g.contestants[1].id;
+    dom.coin.className = 'coin';
+    dom.coinResult.textContent = '';
+    dom.coinOverlay.classList.remove('is-leaving');
+    dom.coinOverlay.hidden = false;
+    setPageInert(true);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      dom.coin.classList.add(second ? 'shows-b' : 'shows-a');
+      landCoin();
+      return;
+    }
+    void dom.coin.offsetWidth; // restart the spin
+    dom.coin.classList.add('is-spinning', second ? 'lands-b' : 'lands-a');
+    coinTimer = window.setTimeout(landCoin, COIN_SPIN_MS);
+  }
+
+  function landCoin() {
+    renderCoinText();
+    coinTimer = window.setTimeout(leaveCoin, COIN_HOLD_MS);
+  }
+
+  /** "Sara starts" (also drawn again after a language switch). */
+  function renderCoinText() {
+    const g = state.game;
+    if (!g || g.turn === undefined) return;
+    dom.coinResult.textContent = t('tournament.coinStarts', { name: iso(findContestant(g, g.turn).name) });
+  }
+
+  /** A short fade, then the board (none under reduced motion). */
+  function leaveCoin() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      finishCoin();
+      return;
+    }
+    dom.coinOverlay.classList.add('is-leaving');
+    coinTimer = window.setTimeout(finishCoin, 300);
+  }
+
+  /** The flip is over (or skipped with Back): saved as shown, then the first turn starts. */
+  function finishCoin() {
+    if (coinTimer !== null) window.clearTimeout(coinTimer);
+    coinTimer = null;
+    if (dom.coinOverlay.hidden) return;
+    dom.coinOverlay.hidden = true;
+    dom.coinOverlay.classList.remove('is-leaving');
+    setPageInert(false);
+    const g = state.game;
+    if (!g || g.turn === undefined || state.screen !== 'board') return;
+    g.coinShown = true;
+    saveState();
+    dom.turnBanner.focus();
+    armBotTurn();
   }
 
   function bindTournamentEvents() {
@@ -8139,7 +8572,12 @@
     applyStaticTexts();
     refreshTexts(); // messages on screen that were made by a function
     if (state.setup) refreshSetup(); // also while hidden: Back from the leaderboard shows it as it was
+    if (tourney) { // US-62: the bot's name in the new language, saved
+      relabelBot(tourney, state.game);
+      saveState();
+    }
     refreshScreen();
+    if (!dom.coinOverlay.hidden && dom.coinResult.textContent) renderCoinText();
   }
 
   function refreshSetup() {
@@ -8331,6 +8769,7 @@
       showQuestion();
     } else {
       showScreen('board');
+      armBotTurn(); // US-62: the coin flip (if not played yet) or the bot's pick
     }
   }
 
