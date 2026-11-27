@@ -85,6 +85,7 @@
     settingChristmasText: byId('setting-christmas-text'), // CHRISTMAS (US-55)
     settingStartHidden: byId('setting-start-hidden'),
     settingHelpersEnabled: byId('setting-helpers-enabled'),
+    settingPhoneHelpers: byId('setting-phone-helpers'), // US-64 (owner): helpers in Phone buzzer games
     settingFinalRound: byId('setting-final-round'),
     settingDaily: byId('setting-daily'), // D-74
     settingCrossword: byId('setting-crossword'), // US-58
@@ -416,6 +417,7 @@
     dom.settingBannerEnabled.checked = settings.banner_enabled === 1;
     dom.settingStartHidden.checked = settings.start_game_hidden === 1;
     dom.settingHelpersEnabled.checked = settings.helpers_enabled !== 0; // a missing row means on
+    dom.settingPhoneHelpers.checked = settings.phone_helpers_enabled === 1; // US-64: a missing row means off
     dom.settingFinalRound.checked = settings.final_round_enabled === 1; // US-44: a missing row means off
     dom.settingDaily.checked = settings.daily_enabled !== 0; // D-74: a missing row means on
     dom.settingCrossword.checked = settings.crossword_enabled === 1; // US-58: a missing row means off
@@ -563,6 +565,7 @@
         banner_text: bannerText,
         start_game_hidden: dom.settingStartHidden.checked ? 1 : 0,
         helpers_enabled: dom.settingHelpersEnabled.checked ? 1 : 0,
+        phone_helpers_enabled: dom.settingPhoneHelpers.checked ? 1 : 0, // US-64
         final_round_enabled: dom.settingFinalRound.checked ? 1 : 0,
         daily_enabled: dom.settingDaily.checked ? 1 : 0, // D-74
         crossword_enabled: dom.settingCrossword.checked ? 1 : 0, // US-58

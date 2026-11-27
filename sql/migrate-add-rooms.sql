@@ -14,7 +14,7 @@
 -- Rooms with no request for 6 hours are deleted by api/rooms.php the next time any rooms request
 -- comes in (no cron on shared hosting).
 -- New installs use sql/schema.sql or sql/schema-hosted.sql, which already include these tables.
--- Later phone sprints add room_answers (US-64) and room_bets (US-65) to this file.
+-- Phone Sprint 2 adds room_answers and the open-question columns (US-64); phone Sprint 3 adds room_bets (US-65).
 --
 -- BACK UP THE DATABASE FIRST (phpMyAdmin: Export; locally: mysqldump).
 --   local:   mysql -u root brainrush < sql/migrate-add-rooms.sql
@@ -31,6 +31,10 @@ CREATE TABLE IF NOT EXISTS game_rooms (
   names      TINYINT UNSIGNED NOT NULL,
   state      MEDIUMTEXT   NOT NULL,
   version    INT UNSIGNED NOT NULL DEFAULT 1,
+  q_seq      INT UNSIGNED NOT NULL DEFAULT 0,
+  q_open     TINYINT(1)   NOT NULL DEFAULT 0,
+  q_opened_ms BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  question   MEDIUMTEXT   NULL,
   created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   seen_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -48,5 +52,29 @@ CREATE TABLE IF NOT EXISTS room_players (
   CONSTRAINT fk_room_players_room FOREIGN KEY (room_id) REFERENCES game_rooms (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
+-- Phone Sprint 2 (US-64): one typed answer per contestant per question number (seq). The room keeps
+-- the open question for the phones (q_seq, q_open, q_opened_ms, question: never the answer); an answer
+-- is accepted only while its seq is the open one. received_ms is server time in milliseconds.
+CREATE TABLE IF NOT EXISTS room_answers (
+  room_id     INT UNSIGNED     NOT NULL,
+  seq         INT UNSIGNED     NOT NULL,
+  contestant  TINYINT UNSIGNED NOT NULL,
+  text        VARCHAR(200)     NOT NULL,
+  received_ms BIGINT UNSIGNED  NOT NULL,
+  PRIMARY KEY (room_id, seq, contestant),
+  KEY idx_room_answers_order (room_id, seq, received_ms),
+  CONSTRAINT fk_room_answers_room FOREIGN KEY (room_id) REFERENCES game_rooms (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
 -- Fix round 1 (BUG-52-02): a database that ran an earlier copy of this file gets the column too.
 ALTER TABLE game_rooms ADD COLUMN IF NOT EXISTS host_session CHAR(32) NULL AFTER host_hash;
+
+-- Phone Sprint 2 (US-64): a database that ran an earlier copy of this file gets the question columns.
+ALTER TABLE game_rooms
+  ADD COLUMN IF NOT EXISTS q_seq INT UNSIGNED NOT NULL DEFAULT 0 AFTER version,
+  ADD COLUMN IF NOT EXISTS q_open TINYINT(1) NOT NULL DEFAULT 0 AFTER q_seq,
+  ADD COLUMN IF NOT EXISTS q_opened_ms BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER q_open,
+  ADD COLUMN IF NOT EXISTS question MEDIUMTEXT NULL AFTER q_opened_ms;
+
+-- Owner 2026-11-27 (US-64): helpers in Phone buzzer games, off by default (Admin > Game settings).
+INSERT IGNORE INTO settings (name, value) VALUES ('phone_helpers_enabled', '0');

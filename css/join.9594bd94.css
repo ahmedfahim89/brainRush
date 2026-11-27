@@ -118,6 +118,35 @@
 }
 .jb-double { position: absolute; top: 0.05rem; inset-inline-end: 0.2rem; font-size: 0.6rem; font-weight: 800; line-height: 1; }
 
+/* ---------- The open question (US-64) ---------- */
+.join-question[hidden] { display: none; }
+.join-board[hidden] { display: none; } /* the board waits under the open question */
+.join-question { padding: 0.8rem; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); }
+.jq-head { margin: 0 0 0.5rem; color: var(--gold); font-size: 1.05rem; overflow-wrap: anywhere; }
+.jq-double { display: inline-block; margin-inline-start: 0.4rem; padding: 0 0.4rem; color: var(--bg); font-size: 0.8rem; background: var(--gold); border-radius: var(--radius); }
+.jq-picture { margin: 0 0 0.4rem; }
+.jq-text { margin: 0 0 0.5rem; font-size: 1.25rem; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+.jq-lang { margin: 0 0 0.6rem; }
+.jq-choices { display: grid; gap: 0.4rem; margin: 0 0 0.6rem; padding: 0; list-style: none; }
+.jq-choices[hidden] { display: none; }
+.jq-choice { display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.5rem 0.7rem; color: var(--text); font-size: 1rem; text-align: start; background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; }
+.jq-choice:disabled { cursor: not-allowed; opacity: 0.6; }
+.jq-choice.is-picked { border-color: var(--gold); }
+.jq-choice-letter { flex: none; color: var(--gold); font-weight: 800; }
+.jq-choice-text { min-width: 0; overflow-wrap: anywhere; }
+.jq-timer { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.6rem; margin: 0 0 0.7rem; }
+.jq-timer-value { min-width: 2.5ch; color: var(--gold); font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.jq-timer-value.is-low { color: var(--danger); }
+.jq-track { flex: 1 1 8rem; height: 0.45rem; overflow: hidden; background: var(--panel-2); border-radius: var(--radius); }
+.jq-bar { height: 100%; background: var(--gold); }
+.jq-bar.is-low { background: var(--danger); }
+.jq-timer-note { flex: 1 0 100%; color: var(--muted); font-size: 0.9rem; }
+.jq-form { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.jq-form label { flex: 1 0 100%; font-weight: 600; }
+.jq-input { flex: 1 1 10rem; min-width: 0; font-size: 1.1rem; }
+.jq-form .btn { flex: none; }
+#jq-msg { margin: 0.6rem 0 0; overflow-wrap: anywhere; }
+
 .join-scores-title { margin: 1.1rem 0 0.4rem; color: var(--gold); }
 .join-scores { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 0.4rem; margin: 0; padding: 0; list-style: none; }
 .jb-score {

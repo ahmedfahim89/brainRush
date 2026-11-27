@@ -650,7 +650,7 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 - The phone-sprint DoD above, plus: the host plays a normal game in Phone buzzer mode and phones follow the board live.
 - Latency check recorded in the dev note; if the delay is well over 1 s or the host shows errors, the PO and owner decide before phone Sprint 2.
 
-**Status:** Accepted by the PO 2026-11-27, waiting for the owner's check. Dev note `docs/sprints/phone-sprint-1-dev.md` (fix rounds 1 and 2), test report `docs/sprints/phone-sprint-1-test.md` (first run and Re-test 1); BUG-52-01 to 04 fixed; PO decisions D-80 q to y. Branch `phone-buzzer`, uncommitted. Next: owner's local check (FU-118), commit, PR, hosted migration and deploy (FU-119), live latency and real-phone check (FU-120); native Arabic review FU-121.
+**Status:** Done: accepted by the PO 2026-11-27, owner's check done (FU-118), **merged in PR #162 on 2026-11-27; not deployed live** by the owner's choice. Dev note `docs/sprints/phone-sprint-1-dev.md` (fix rounds 1 and 2), test report `docs/sprints/phone-sprint-1-test.md` (first run and Re-test 1); BUG-52-01 to 04 fixed; PO decisions D-80 q to y. Open: hosted migration and deploy (FU-119), live latency and real-phone check (FU-120), native Arabic review (FU-121).
 
 ### Phone Sprint 2 — Questions and answers on phones (US-64)
 
@@ -673,7 +673,7 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 - The phone-sprint DoD above, plus: a full game (no Golden Goal) is played with every answer typed on phones; the answer text never reaches phones.
 - `room_answers` is in the migrate SQL and both schema files; migrate imported on Hostinger before the code.
 
-**Status:** Deferred by the owner (2026-11-27) until they ask
+**Status:** Started at the owner's request 2026-11-27. **Accepted by the PO 2026-11-27, waiting for the owner's check.** Dev note `docs/sprints/phone-sprint-2-dev.md` (fix round 1), test report `docs/sprints/phone-sprint-2-test.md` (18 PASS, 1 FAIL, 2 PENDING; BUG-64-01 fixed, BUG-64-02 pre-existing and as intended); PO decisions D-80 z to am. Branch `phone-buzzer`, uncommitted; local migration run. Next: owner's local check (FU-122), commit, PR, hosted migration and deploy (FU-123, can be combined with FU-119); retry of a failed question open is FU-124 (Could).
 
 ### Phone Sprint 3 — Golden Goal bets on phones and release (US-65)
 
@@ -745,8 +745,8 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 | 12 | US-50 (cancelled 2026-11-11) |
 | 13 | US-49 (done, accepted 2026-11-09, merged, PR #94) |
 | 14 | none (replaced 2026-11-27 by the Phone buzzer sprints below; US-52 moved to Phone 1) |
-| Phone 1 | US-52 (accepted by the PO 2026-11-27, waiting for the owner's check FU-118; branch `phone-buzzer`) |
-| Phone 2 | US-64 (deferred by the owner 2026-11-27 until they ask) |
+| Phone 1 | US-52 (accepted 2026-11-27, merged, PR #162; not deployed live) |
+| Phone 2 | US-64 (accepted by the PO 2026-11-27, waiting for the owner's check FU-122; branch `phone-buzzer`) |
 | Phone 3 | US-65 (deferred by the owner 2026-11-27 until they ask; FU-117 first) |
 | 15 | US-51 (planned, later; blocked by FU-23) |
 
