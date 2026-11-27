@@ -27,9 +27,9 @@ Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..U
 | 13 | Arabic interface (US-49) | Accepted by the PO 2026-11-09 (ran before Sprint 12); merged to `main` (PR #94, `1629605`); FU-47, FU-48 and FU-49 are Done in the backlog. CR "Arabic category names" accepted 2026-11-09 (D-61); hosted migration before the code (FU-53) |
 | 14 | Phone buzzers (US-52), spike first | Replaced 2026-11-27 by the Phone buzzer plan below (D-80; FU-24 cancelled) |
 | Phone 0 | Phone buzzer docs (stories US-52, US-64, US-65; D-80) | Done (2026-11-27) |
-| Phone 1 | Rooms, joining, live board (US-52) | Done, merged PR #162 (not live) |
-| Phone 2 | Questions and answers on phones (US-64) | Done, merged PR #163 (not live) |
-| Phone 3 | Golden Goal bets on phones, release (US-65) | Accepted by the PO 2026-11-27 (D-80 ar to ba), owner's check done (FU-126), merged PR #164 (not live); release (live smoke test with 3+ real phones, FU-127) and AR review (FU-121) open |
+| Phone 1 | Rooms, joining, live board (US-52) | Done, merged PR #162 (live 2026-11-27, FU-127) |
+| Phone 2 | Questions and answers on phones (US-64) | Done, merged PR #163 (live 2026-11-27, FU-127) |
+| Phone 3 | Golden Goal bets on phones, release (US-65) | Accepted by the PO 2026-11-27 (D-80 ar to ba), owner's check done (FU-126), merged PR #164 (live 2026-11-27, FU-127); release (live smoke test with 3+ real phones, FU-127) and AR review (FU-121) open |
 | 15 | Rewarded second chance in Streak (US-51) | Planned (later; blocked by FU-23) |
 
 Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops) -> product-owner accepts -> scrum-master updates status -> commit on branch `sprint-N` + PR to `main`.
@@ -745,7 +745,7 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 - Owner's local check on port 8007, then one PR on branch `phone-buzzer`, merged by the owner.
 - The live release is **FU-127** (migration first, then code, 3+ real phones smoke test); not part of this sprint.
 
-**Status:** Done. Accepted by the PO with follow-ups, checked by the owner (FU-129) and merged in PR #166 on 2026-11-27, not live. Release follows in FU-127; FU-128 (Could) open.
+**Status:** Done. Accepted by the PO with follow-ups, checked by the owner (FU-129) and merged in PR #166 on 2026-11-27, live 2026-11-27 (FU-127). FU-124, FU-128 done (PR #167).
 
 ---
 
@@ -794,10 +794,10 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 | 12 | US-50 (cancelled 2026-11-11) |
 | 13 | US-49 (done, accepted 2026-11-09, merged, PR #94) |
 | 14 | none (replaced 2026-11-27 by the Phone buzzer sprints below; US-52 moved to Phone 1) |
-| Phone 1 | US-52 (accepted 2026-11-27, merged, PR #162; not deployed live) |
-| Phone 2 | US-64 (accepted by the PO 2026-11-27, waiting for the owner's check FU-122; branch `phone-buzzer`) |
-| Phone 3 | US-65 (deferred by the owner 2026-11-27 until they ask; FU-117 first) |
-| Phone 4 | US-66 (in progress 2026-11-27; D-81, closes FU-125; branch `phone-buzzer`) |
+| Phone 1 | US-52 (accepted 2026-11-27, merged PR #162, live 2026-11-27) |
+| Phone 2 | US-64 (accepted 2026-11-27, merged PR #163, live 2026-11-27) |
+| Phone 3 | US-65 (accepted 2026-11-27, merged PR #164, live 2026-11-27) |
+| Phone 4 | US-66 (accepted 2026-11-27, merged PR #166, live 2026-11-27; D-81, closed FU-125) |
 | 15 | US-51 (planned, later; blocked by FU-23) |
 
 Epic E17 (US-42..US-53): all 12 stories appear in exactly one sprint: Sprints 7-15, except US-52, which moved to Phone Sprint 1 on 2026-11-27 (US-42..US-52 were approved on 2026-11-02; US-53 was added on 2026-11-03). US-64 (Phone Sprint 2) and US-65 (Phone Sprint 3) were added on 2026-11-27 (D-80), each in exactly one phone sprint. Stories US-31..US-41 were delivered outside the sprint cycle (see the status paragraphs at the top) and have no sprint here.
