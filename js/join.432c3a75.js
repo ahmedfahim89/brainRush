@@ -101,12 +101,12 @@
     endedList: byId('join-ended-list'),
     again: byId('join-again'),
     jhBoard: byId('jh-board'),         // US-66
-    jhDouble: byId('jh-double'),
+    jhDouble: null,                    // FU-128: the three chips are built by buildHelperChips()
     jhArmed: byId('jh-armed'),
     jhBoardMsg: byId('jh-board-msg'),
     jhRow: byId('jh-row'),
-    jhFreeze: byId('jh-freeze'),
-    jhHint: byId('jh-hint'),
+    jhFreeze: null,
+    jhHint: null,
     jhOn: byId('jh-on'),
     jhPicker: byId('jh-picker'),
     jhTargets: byId('jh-targets'),
@@ -157,6 +157,25 @@
     });
     (children || []).forEach((child) => { if (child) node.appendChild(child); });
     return node;
+  }
+
+  /**
+   * FU-128: the x2, Freeze and Hint chips exist only in a game with phone helpers (as BUG-66-01 on the host).
+   * Built once, the first time the room reports helpers; a later room on the same page reuses them.
+   */
+  function buildHelperChips() {
+    if (dom.jhDouble) return;
+    const chip = (id, icon, key, onclick) => h('button', { type: 'button', id: id, className: 'jh-chip', onclick: onclick }, [
+      h('span', { className: 'jh-icon', 'aria-hidden': 'true', text: icon }),
+      document.createTextNode(' '),
+      h('span', { 'data-i18n': key, text: t(key) }),
+    ]);
+    dom.jhDouble = chip('jh-double', '\u00d72', 'jh.double', onDouble);
+    dom.jhFreeze = chip('jh-freeze', '\u2744', 'jh.freeze', onFreeze);
+    dom.jhHint = chip('jh-hint', '\u{1F4A1}', 'jh.hint', onHint);
+    dom.jhBoard.insertBefore(dom.jhDouble, dom.jhBoard.firstChild);
+    dom.jhRow.insertBefore(dom.jhFreeze, dom.jhOn);
+    dom.jhRow.insertBefore(dom.jhHint, dom.jhOn);
   }
 
   function clear(node) {
@@ -367,6 +386,7 @@
     app.mine = typeof data.mine === 'string' ? data.mine : null;
     app.bet = isValidBet(data.bet) ? data.bet : null;
     app.helpers = isValidHelpers(data.helpers) ? data.helpers : null; // US-66
+    if (app.helpers) buildHelperChips(); // FU-128: no chips in the page while the room has no helpers
     renderBoard();
   }
 
@@ -1289,9 +1309,6 @@
     });
     dom.again.addEventListener('click', onAgain);
     dom.qLang.addEventListener('click', onQuestionLang);
-    dom.jhFreeze.addEventListener('click', onFreeze); // US-66
-    dom.jhHint.addEventListener('click', onHint);
-    dom.jhDouble.addEventListener('click', onDouble);
     dom.jhCancel.addEventListener('click', onPickerCancel);
     dom.qInput.addEventListener('input', () => {
       if (app.q && app.q.msg) {

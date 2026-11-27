@@ -51,9 +51,8 @@
     <section id="join-board-screen" class="join-screen" aria-labelledby="join-you" hidden>
       <h2 id="join-you" class="join-you"></h2>
       <p id="join-status" class="join-status" role="status"></p>
-      <!-- US-66 (D-81): x2 Double down, armed on the board for the next question -->
+      <!-- US-66 (D-81): x2 Double down, armed on the board for the next question. FU-128: js/join.js adds the chip only when the room has helpers -->
       <div id="jh-board" class="jh-box" hidden>
-        <button type="button" id="jh-double" class="jh-chip"><span class="jh-icon" aria-hidden="true">&times;2</span> <span data-i18n="jh.double">Double down</span></button>
         <p id="jh-armed" class="msg msg-success" role="status" hidden></p>
         <p id="jh-board-msg" class="msg" role="alert" hidden></p>
       </div>
@@ -64,10 +63,8 @@
         <p id="jq-text" class="jq-text"></p>
         <p id="jq-bet" class="jq-bet" hidden></p>
         <button type="button" id="jq-lang" class="btn btn-small jq-lang" hidden></button>
-        <!-- US-66 (D-81): the phone helpers on the open question, each after a confirm -->
+        <!-- US-66 (D-81): the phone helpers on the open question, each after a confirm. FU-128: js/join.js adds the chips only when the room has helpers -->
         <div id="jh-row" class="jh-row" hidden>
-          <button type="button" id="jh-freeze" class="jh-chip"><span class="jh-icon" aria-hidden="true">&#x2744;</span> <span data-i18n="jh.freeze">Freeze</span></button>
-          <button type="button" id="jh-hint" class="jh-chip"><span class="jh-icon" aria-hidden="true">&#x1F4A1;</span> <span data-i18n="jh.hint">Hint</span></button>
           <span id="jh-on" class="jh-on" hidden></span>
         </div>
         <div id="jh-picker" class="jh-picker" role="group" aria-labelledby="jh-picker-title" hidden>
@@ -133,6 +130,6 @@
     <nav aria-label="Site" data-i18n-attr="aria-label:nav.site"><a href="how-to-play.html" target="_blank" rel="noopener" data-i18n="nav.howToPlay">How to play</a> &middot; <a href="privacy.html" target="_blank" rel="noopener" data-i18n="nav.privacy">Privacy</a> &middot; <a href="terms.html" target="_blank" rel="noopener" data-i18n="nav.terms">Terms</a></nav>
   </footer>
 
-  <script src="js/join.d099aa0d.js"></script>
+  <script src="js/join.432c3a75.js"></script>
 </body>
 </html>

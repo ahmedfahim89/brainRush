@@ -254,6 +254,7 @@
   const ROOM_RETRY_MS = 5000; // a failed push is tried again after this
   const PHONE_SCREENS = ['board', 'question', 'final', 'results'];
   const ANSWERS_POLL_MS = 1000; // US-64: the host's poll of the open question's answers
+  const PHONE_OPEN_RETRY_MS = [800, 2000]; // FU-124: a failed open_question is sent again after these waits
   const PHONE_TIMER_MS = 150;   // US-64: timer changes close together go to the phones in one update
   const BETS_POLL_MS = 1000;    // US-65: the host's poll of who has bet
   const REVEAL_RETRY_MS = 3000; // US-65: a failed reveal of the bets is tried again after this
@@ -9582,8 +9583,9 @@
     renderAnswersPanel();
     phoneQueue(async () => {
       if (state.game !== g || phoneHolder() !== cur) return; // closed before its turn: nothing to open
-      const data = await phoneQuestionCall('open_question', { question: phoneQuestion(g), hint: phoneHint(g) });
-      if (!Number.isInteger(data.seq)) return;
+      const data = await phoneOpenWithRetry(g, cur);
+      if (!data || !Number.isInteger(data.seq)) return;
+      if (phone.message) setPhoneMessage(null); // FU-124: a retry got through, so the warning goes
       cur.phoneSeq = data.seq;
       phone.answers = { seq: data.seq, open: true, list: [] };
       if (Array.isArray(data.doubles)) { // US-66: the armed ×2s now on this question, before the first poll
@@ -9594,6 +9596,25 @@
         pollAnswers();
       }
     });
+  }
+
+  /**
+   * FU-124: open_question, sent again up to twice (PHONE_OPEN_RETRY_MS) after a network error or a server
+   * error (5xx), so a short outage does not leave the phones without the question. No retry for an answer
+   * the server meant (4xx: other tab, room gone, closed), or once the host has left this question.
+   * Returns null when the question is no longer the open one.
+   */
+  async function phoneOpenWithRetry(g, cur) {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await phoneQuestionCall('open_question', { question: phoneQuestion(g), hint: phoneHint(g) });
+      } catch (err) {
+        const transient = err.status === undefined || err.status >= 500;
+        if (!transient || attempt >= PHONE_OPEN_RETRY_MS.length) throw err;
+        await new Promise((resolve) => window.setTimeout(resolve, PHONE_OPEN_RETRY_MS[attempt]));
+        if (state.game !== g || phoneHolder() !== cur || phone.blocked) return null;
+      }
+    }
   }
 
   /** The open question's countdown changed: the phones get the new version. */

@@ -745,7 +745,7 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 - Owner's local check on port 8007, then one PR on branch `phone-buzzer`, merged by the owner.
 - The live release is **FU-127** (migration first, then code, 3+ real phones smoke test); not part of this sprint.
 
-**Status:** Accepted by the PO with follow-ups 2026-11-27 (FU-128 Could; owner local check FU-129 before the commit). Release follows in FU-127.
+**Status:** Done. Accepted by the PO with follow-ups, checked by the owner (FU-129) and merged in PR #166 on 2026-11-27, not live. Release follows in FU-127; FU-128 (Could) open.
 
 ---
 
