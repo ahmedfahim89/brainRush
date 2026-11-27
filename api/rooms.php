@@ -7,13 +7,23 @@
 //   POST /api/rooms.php?action=claim    body { code, host_token, session }              -> 200 { version }
 //   POST /api/rooms.php?action=push     body { code, host_token, session, state }       -> 200 { version }
 //   POST /api/rooms.php?action=release  body { code, host_token, session, contestant }  -> 200 { released, version }
-//   push and release from a host session that is not the room's current one -> 409 { error, other_tab: true }
+//   POST /api/rooms.php?action=open_question   body { code, host_token, session, question } -> 200 { seq, version }
+//   POST /api/rooms.php?action=update_question body { code, host_token, session, seq, question } -> 200 { version }
+//   POST /api/rooms.php?action=close_question  body { code, host_token, session, seq }         -> 200 { closed, version }
+//   GET  /api/rooms.php?action=answers&code=&seq=&session=  header X-Host-Token
+//        -> 200 { seq, open, answers: [{ contestant, text, ms }] } in arrival order (ms since the question opened)
+//   push, release and the question calls from a host session that is not the room's current one
+//   -> 409 { error, other_tab: true }
 // Player calls (the room code is public: it is in the link and the QR code):
 //   GET  /api/rooms.php?action=lobby&code=ABC234[&session=<host session>]       -> 200 { version, mode, players[, other_tab] }
 //   POST /api/rooms.php?action=join     body { code, contestant, device_token? } -> 200 { device_token, you, version }
+//   POST /api/rooms.php?action=answer   body { code, device_token, seq, text }      -> 201 { seq, text }
+//        409 { reason: 'duplicate' } for a second answer, 409 { reason: 'late' } once that question is closed
 //   GET  /api/rooms.php?action=state&code=ABC234&since=<version>  header X-Device-Token
-//        -> 200 { changed: false, version } when nothing changed since that version,
-//           else { changed: true, version, you, players, state }
+//        -> 200 { changed: false, version, now } when nothing changed since that version,
+//           else { changed: true, version, now, you, players, state, question, mine }
+//        question = the open (or last closed) question as the phones may see it, or null; mine = this
+//        contestant's answer to it, or null; now = server time in ms (phones work out the countdown).
 // players = [{ name, color, joined }] in the host's order; `contestant` / `you` is an index in it.
 //
 // Rules:
@@ -30,6 +40,14 @@
 //   newest tab that loaded (or tapped "Use this tab") wins. The host's lobby poll sends its session and
 //   gets other_tab: true when another tab has taken over.
 // - Replies carry the version stored by their own update (LAST_INSERT_ID(expr), per connection).
+// - Questions (US-64): the host opens a question (a new seq), may update it (3 choices, pause, reset)
+//   and closes it (timer 0, answer shown, Back, Skip; a Swap opens a new seq). The question payload is
+//   rebuilt from known fields only (room_question()): never the answer, never the picture path (a
+//   picture's file name can name the answer: hasImage only). One answer per contestant per seq, accepted
+//   only while that seq is open (one atomic INSERT ... SELECT), stamped with server time in ms.
+// - Owner CR 2 / CR 3 (US-64): the 3 choices go only to the phone of the contestant who used them: the
+//   question carries by (their index) and room_question_view strips the choices for every other phone.
+//   Nobody is locked out: every phone can still answer (CR 3 reverses CR 2's lock).
 // - Tokens are 64 hex characters from random_bytes(); only their SHA-256 hashes are stored.
 // - Rooms with no request for ROOM_IDLE_HOURS are deleted on the next rooms request (no cron).
 // - A missing token gives 401, a wrong one 403, an unknown or expired room 404, bad input 400.
@@ -50,6 +68,10 @@ const ROOM_NAME_MAX = 30;          // contestant names (NAME_MAX in js/game.js)
 const ROOM_LABEL_MAX = 100;        // category names: VARCHAR(100) name and name_ar in categories
 const ROOM_FACE_MAX = 8;           // characters of a Kilo Meshakkal emoji
 const ROOM_SCORE_MAX = 1000000000;
+const ROOM_TEXT_MAX = 2000;        // question text (the questions are far shorter)
+const ROOM_CHOICE_MAX = 255;       // one of the 3 choices (VARCHAR(255) wrong options)
+const ROOM_ANSWER_MAX = 200;       // a typed answer (VARCHAR(200) in room_answers)
+const ROOM_TIMER_MAX_MS = 600000;  // the timer input allows 5 to 600 seconds
 
 /** Run the request; a database without the room tables gives a clear 503. */
 function rooms_main(): void
@@ -79,6 +101,11 @@ function route_room_request(PDO $pdo): void
         'push' => ['POST', 'room_push'],
         'release' => ['POST', 'room_release'],
         'join' => ['POST', 'room_join'],
+        'open_question' => ['POST', 'room_open_question'],
+        'update_question' => ['POST', 'room_update_question'],
+        'close_question' => ['POST', 'room_close_question'],
+        'answers' => ['GET', 'room_answers'],
+        'answer' => ['POST', 'room_answer'],
     ];
     if (!is_string($action) || !isset($routes[$action])) {
         bad_request('action must be one of: ' . implode(', ', array_keys($routes)));
@@ -106,6 +133,12 @@ function route_room_request(PDO $pdo): void
 function delete_idle_rooms(PDO $pdo): void
 {
     $pdo->exec('DELETE FROM game_rooms WHERE seen_at < NOW() - INTERVAL ' . ROOM_IDLE_HOURS . ' HOUR');
+}
+
+/** Server time in milliseconds: the one clock for opening, answers and the phones' countdown. */
+function now_ms(): int
+{
+    return (int) floor(microtime(true) * 1000);
 }
 
 function new_token(): string
@@ -148,7 +181,7 @@ function require_room_code($value): string
 function find_room(PDO $pdo, string $code): array
 {
     $stmt = $pdo->prepare(
-        'SELECT id, host_hash, host_session, names, version, TIMESTAMPDIFF(SECOND, seen_at, NOW()) AS idle
+        'SELECT id, host_hash, host_session, names, version, q_seq, q_open, q_opened_ms, TIMESTAMPDIFF(SECOND, seen_at, NOW()) AS idle
            FROM game_rooms
           WHERE code = ? AND seen_at >= NOW() - INTERVAL ' . ROOM_IDLE_HOURS . ' HOUR'
     );
@@ -160,6 +193,9 @@ function find_room(PDO $pdo, string $code): array
     $room['id'] = (int) $room['id'];
     $room['names'] = (int) $room['names'];
     $room['version'] = (int) $room['version'];
+    $room['q_seq'] = (int) $room['q_seq'];
+    $room['q_open'] = (int) $room['q_open'] === 1;
+    $room['q_opened_ms'] = (int) $room['q_opened_ms'];
     if ((int) $room['idle'] >= ROOM_TOUCH_SECONDS) {
         $pdo->prepare('UPDATE game_rooms SET seen_at = NOW() WHERE id = ?')->execute([$room['id']]);
     }
@@ -385,16 +421,282 @@ function room_poll(PDO $pdo): void
     }
     $since = parse_int($_GET['since'] ?? null);
     if ($since !== null && $since === $room['version']) {
-        json_response(['changed' => false, 'version' => $room['version']]);
+        json_response(['changed' => false, 'version' => $room['version'], 'now' => now_ms()]);
     }
     [$state, $players] = room_view($pdo, $room);
+    [$question, $mine] = room_question_view($pdo, $room, (int) $you);
     json_response([
         'changed' => true,
         'version' => $room['version'],
+        'now' => now_ms(),
         'you' => (int) $you,
         'players' => $players,
         'state' => $state,
+        'question' => $question,
+        'mine' => $mine,
     ]);
+}
+
+// ---------------------------------------------------------------------------
+// Questions and answers (US-64)
+// ---------------------------------------------------------------------------
+
+/** The host's checks for the question calls: the room, the host token and the current host tab. */
+function require_question_host(PDO $pdo, array $body): array
+{
+    $room = find_room($pdo, require_room_code($body['code'] ?? null));
+    require_host($room, $body['host_token'] ?? null);
+    require_current_session($room, require_session($body['session'] ?? null));
+    return $room;
+}
+
+/** The question the phones see (or null) and this contestant's answer to it (or null). */
+/** The question for one contestant's phone: the 3 choices only for the contestant who used them (owner CR 2). */
+function room_question_view(PDO $pdo, array $room, int $contestant): array
+{
+    if ($room['q_seq'] === 0) {
+        return [null, null];
+    }
+    $stmt = $pdo->prepare('SELECT question FROM game_rooms WHERE id = ?');
+    $stmt->execute([$room['id']]);
+    $question = json_decode((string) $stmt->fetchColumn(), true);
+    if (!is_array($question)) {
+        return [null, null];
+    }
+    $question['seq'] = $room['q_seq'];
+    $question['open'] = $room['q_open'];
+    $by = $question['by'] ?? null;
+    if ($by !== null && $by !== $contestant) {
+        $question['choices'] = null; // never sent to the other phones
+    }
+    $mine = $pdo->prepare('SELECT text FROM room_answers WHERE room_id = ? AND seq = ? AND contestant = ?');
+    $mine->execute([$room['id'], $room['q_seq'], $contestant]);
+    $text = $mine->fetchColumn();
+    return [$question, $text === false ? null : (string) $text];
+}
+
+/** A new question number (also a Swap): the earlier one is closed by it, its late answers are refused. */
+function room_open_question(PDO $pdo, array $body): void
+{
+    $room = require_question_host($pdo, $body);
+    $now = now_ms();
+    $question = room_question($body['question'] ?? null, $now, $room['names']);
+    $update = $pdo->prepare(
+        'UPDATE game_rooms SET q_seq = LAST_INSERT_ID(q_seq + 1), q_open = 1, q_opened_ms = ?, question = ?,
+                version = version + 1, seen_at = NOW()
+          WHERE id = ? AND host_session = ?'
+    );
+    $update->execute([$now, encode_question($question), $room['id'], $body['session']]);
+    if ($update->rowCount() === 0) {
+        json_response(['error' => 'This game is open in another tab.', 'other_tab' => true], 409);
+    }
+    $seq = stored_version($pdo);
+    json_response(['seq' => $seq, 'version' => current_version($pdo, $room['id'])]);
+}
+
+/** 3 choices, pause, resume or reset on the open question: same seq, its answers stay. */
+function room_update_question(PDO $pdo, array $body): void
+{
+    $room = require_question_host($pdo, $body);
+    $seq = parse_int($body['seq'] ?? null);
+    if ($seq === null || $seq !== $room['q_seq'] || !$room['q_open']) {
+        conflict('That question is closed.');
+    }
+    $question = room_question($body['question'] ?? null, now_ms(), $room['names']);
+    $update = $pdo->prepare(
+        'UPDATE game_rooms SET question = ?, version = LAST_INSERT_ID(version + 1), seen_at = NOW()
+          WHERE id = ? AND host_session = ? AND q_seq = ? AND q_open = 1'
+    );
+    $update->execute([encode_question($question), $room['id'], $body['session'], $seq]);
+    if ($update->rowCount() === 0) {
+        conflict('That question is closed.');
+    }
+    json_response(['version' => stored_version($pdo)]);
+}
+
+function room_close_question(PDO $pdo, array $body): void
+{
+    $room = require_question_host($pdo, $body);
+    $seq = parse_int($body['seq'] ?? null);
+    if ($seq === null || $seq < 1) {
+        bad_request('seq must be the question number');
+    }
+    $update = $pdo->prepare(
+        'UPDATE game_rooms SET q_open = 0, version = LAST_INSERT_ID(version + 1), seen_at = NOW()
+          WHERE id = ? AND q_seq = ? AND q_open = 1'
+    );
+    $update->execute([$room['id'], $seq]);
+    $closed = $update->rowCount() > 0;
+    json_response(['closed' => $closed, 'version' => $closed ? stored_version($pdo) : $room['version']]);
+}
+
+/** The host's poll of one question's answers, in arrival order (server time). */
+function room_answers(PDO $pdo): void
+{
+    $room = find_room($pdo, require_room_code($_GET['code'] ?? null));
+    require_host($room, $_SERVER['HTTP_X_HOST_TOKEN'] ?? null);
+    require_current_session($room, require_session($_GET['session'] ?? null));
+    $seq = parse_int($_GET['seq'] ?? null);
+    if ($seq === null || $seq < 1) {
+        bad_request('seq must be the question number');
+    }
+    $stmt = $pdo->prepare(
+        'SELECT contestant, text, received_ms FROM room_answers WHERE room_id = ? AND seq = ?
+          ORDER BY received_ms, contestant'
+    );
+    $stmt->execute([$room['id'], $seq]);
+    $answers = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $answers[] = [
+            'contestant' => (int) $row['contestant'],
+            'text' => $row['text'],
+            'ms' => $seq === $room['q_seq'] ? max(0, (int) $row['received_ms'] - $room['q_opened_ms']) : null,
+        ];
+    }
+    json_response(['seq' => $seq, 'open' => $seq === $room['q_seq'] && $room['q_open'], 'answers' => $answers]);
+}
+
+/** A phone's answer: once per contestant per question, only while that question is open. */
+function room_answer(PDO $pdo, array $body): void
+{
+    $room = find_room($pdo, require_room_code($body['code'] ?? null));
+    $token = $body['device_token'] ?? null;
+    if (!is_token($token)) {
+        json_response(['error' => 'Pick your name first.'], 401);
+    }
+    $stmt = $pdo->prepare('SELECT contestant FROM room_players WHERE room_id = ? AND device_hash = ?');
+    $stmt->execute([$room['id'], token_hash($token)]);
+    $you = $stmt->fetchColumn();
+    if ($you === false) {
+        json_response(['error' => 'This phone is no longer joined to the game. Pick your name again.'], 403);
+    }
+    $seq = parse_int($body['seq'] ?? null);
+    if ($seq === null || $seq < 1) {
+        bad_request('seq must be the question number');
+    }
+    $text = answer_text($body['text'] ?? null);
+    // Atomic: the row goes in only while this seq is the open question, so a close always wins.
+    $insert = $pdo->prepare(
+        'INSERT INTO room_answers (room_id, seq, contestant, text, received_ms)
+         SELECT id, ?, ?, ?, ? FROM game_rooms WHERE id = ? AND q_seq = ? AND q_open = 1'
+    );
+    try {
+        $insert->execute([$seq, (int) $you, $text, now_ms(), $room['id'], $seq]);
+    } catch (PDOException $e) {
+        if (is_duplicate_key($e)) {
+            json_response(['error' => 'You already sent an answer to this question.', 'reason' => 'duplicate'], 409);
+        }
+        throw $e;
+    }
+    if ($insert->rowCount() === 0) {
+        json_response(['error' => 'Too late: the question is closed.', 'reason' => 'late'], 409);
+    }
+    json_response(['seq' => $seq, 'text' => $text], 201);
+}
+
+/** A typed answer: control characters become spaces, trimmed, 1 to 200 characters; 400 otherwise. */
+function answer_text($value): string
+{
+    if (!is_string($value)) {
+        bad_request('text must be text');
+    }
+    $text = trim((string) preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $value));
+    if ($text === '') {
+        bad_request('Type an answer first.');
+    }
+    if (text_length($text) > ROOM_ANSWER_MAX) {
+        bad_request('An answer can be at most ' . ROOM_ANSWER_MAX . ' characters.');
+    }
+    return $text;
+}
+
+/** Question text may hold line breaks: control characters become spaces, then the usual text check. */
+function question_text($value, string $label, int $max, bool $nullable)
+{
+    if (is_string($value)) {
+        $value = trim((string) preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $value));
+        if ($value === '' && $nullable) {
+            return null;
+        }
+    }
+    return state_text($value, $label, $max, $nullable);
+}
+
+function current_version(PDO $pdo, int $roomId): int
+{
+    $stmt = $pdo->prepare('SELECT version FROM game_rooms WHERE id = ?');
+    $stmt->execute([$roomId]);
+    return (int) $stmt->fetchColumn();
+}
+
+function encode_question(array $question): string
+{
+    $json = json_encode($question, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($json === false || strlen($json) > ROOM_STATE_MAX) {
+        bad_request('question is too large');
+    }
+    return $json;
+}
+
+/**
+ * The question as the phones may see it, rebuilt from known fields only: never the answer and never the
+ * picture's path. $now stamps the countdown (the phones count down from it with their clock offset).
+ */
+function room_question($input, int $now, int $names): array
+{
+    $q = state_object($input, 'question');
+    $by = $q['by'] ?? null;
+    if ($by !== null && (!is_int($by) || $by < 0 || $by >= $names)) {
+        bad_request('question.by must be a contestant index or null');
+    }
+    $byHelper = $q['byHelper'] ?? null;
+    if ($by !== null && $byHelper !== 'choices') {
+        bad_request('question.byHelper must be choices');
+    }
+    $mix = state_bool($q['mix'] ?? false, 'question.mix');
+    $points = $q['points'] ?? null;
+    if (!is_int($points) || $points < 1 || $points > ROOM_SCORE_MAX) {
+        bad_request('question.points must be positive');
+    }
+    $choices = null;
+    if (($q['choices'] ?? null) !== null) {
+        $list = state_list($q['choices'], 'question.choices', 3, 3);
+        $choices = [];
+        foreach ($list as $i => $c) {
+            $c = state_object($c, "question.choices[$i]");
+            $choices[] = [
+                'text' => question_text($c['text'] ?? null, "question.choices[$i].text", ROOM_CHOICE_MAX, false),
+                'textAr' => question_text($c['textAr'] ?? null, "question.choices[$i].textAr", ROOM_CHOICE_MAX, true),
+            ];
+        }
+    }
+    $timer = state_object($q['timer'] ?? null, 'question.timer');
+    $total = $timer['totalMs'] ?? null;
+    $left = $timer['remainingMs'] ?? null;
+    if (!is_int($total) || $total < 1000 || $total > ROOM_TIMER_MAX_MS || !is_int($left) || $left < 0 || $left > $total) {
+        bad_request('question.timer must have totalMs and remainingMs');
+    }
+    return [
+        'catName' => $mix ? null : state_text($q['catName'] ?? null, 'question.catName', ROOM_LABEL_MAX, false),
+        'catNameAr' => $mix ? null : state_text($q['catNameAr'] ?? null, 'question.catNameAr', ROOM_LABEL_MAX, true),
+        'mix' => $mix,
+        'subName' => $mix ? state_text($q['subName'] ?? null, 'question.subName', ROOM_LABEL_MAX, true) : null,
+        'subNameAr' => $mix ? state_text($q['subNameAr'] ?? null, 'question.subNameAr', ROOM_LABEL_MAX, true) : null,
+        'points' => $points,
+        'x2' => state_bool($q['x2'] ?? false, 'question.x2'),
+        'text' => question_text($q['text'] ?? null, 'question.text', ROOM_TEXT_MAX, false),
+        'textAr' => question_text($q['textAr'] ?? null, 'question.textAr', ROOM_TEXT_MAX, true),
+        'hasImage' => state_bool($q['hasImage'] ?? false, 'question.hasImage'),
+        'choices' => $choices,
+        'by' => $by,
+        'byHelper' => $by === null ? null : $byHelper,
+        'timer' => [
+            'totalMs' => $total,
+            'remainingMs' => $left,
+            'running' => state_bool($timer['running'] ?? false, 'question.timer.running'),
+            'atMs' => $now,
+        ],
+    ];
 }
 
 // ---------------------------------------------------------------------------

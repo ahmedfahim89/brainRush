@@ -46,6 +46,7 @@ const SETTING_RULES = [
     'banner_enabled'      => [0, 1], // "new questions" banner on the game setup screen
     'start_game_hidden'   => [0, 1], // maintenance mode: hides Start Game and shows an overlay
     'helpers_enabled'     => [0, 1], // 3 choices, Swap and Skip; a missing row counts as on
+    'phone_helpers_enabled' => [0, 1], // helpers in Phone buzzer games (owner, US-64); a missing row counts as off
     'ads_enabled'         => [0, 1], // AdSense banner on the Streak leaderboard (D-41); a missing row counts as off
     'final_round_enabled' => [0, 1], // final wager round before Results (US-44); a missing row counts as off
     'daily_enabled'       => [0, 1], // Daily Challenge button (US-43, D-74); a missing row counts as on
@@ -85,6 +86,7 @@ function load_settings(PDO $pdo): array
     $settings['daily_enabled'] = $settings['daily_enabled'] ?? 1; // D-74: a missing row means on (it was always shown)
     $settings['crossword_enabled'] = $settings['crossword_enabled'] ?? 0; // US-58: a missing row means off
     $settings['speed_enabled'] = $settings['speed_enabled'] ?? 0; // US-59: a missing row means off
+    $settings['phone_helpers_enabled'] = $settings['phone_helpers_enabled'] ?? 0; // US-64 (owner): a missing row means off
     // CHRISTMAS (US-55): a missing row means off / no custom greeting
     $settings['christmas_theme'] = $settings['christmas_theme'] ?? 0;
     $settings['christmas_banner_text'] = $settings['christmas_banner_text'] ?? '';

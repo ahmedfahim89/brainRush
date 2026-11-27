@@ -211,6 +211,10 @@ CREATE TABLE IF NOT EXISTS game_rooms (
   names      TINYINT UNSIGNED NOT NULL,
   state      MEDIUMTEXT   NOT NULL,
   version    INT UNSIGNED NOT NULL DEFAULT 1,
+  q_seq      INT UNSIGNED NOT NULL DEFAULT 0,
+  q_open     TINYINT(1)   NOT NULL DEFAULT 0,
+  q_opened_ms BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  question   MEDIUMTEXT   NULL,
   created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   seen_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -228,6 +232,19 @@ CREATE TABLE IF NOT EXISTS room_players (
   CONSTRAINT fk_room_players_room FOREIGN KEY (room_id) REFERENCES game_rooms (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
+-- Phone buzzer answers (US-64): one typed answer per contestant per question number (seq), accepted
+-- only while that question is open; received_ms is server time in milliseconds. Same as sql/migrate-add-rooms.sql.
+CREATE TABLE IF NOT EXISTS room_answers (
+  room_id     INT UNSIGNED     NOT NULL,
+  seq         INT UNSIGNED     NOT NULL,
+  contestant  TINYINT UNSIGNED NOT NULL,
+  text        VARCHAR(200)     NOT NULL,
+  received_ms BIGINT UNSIGNED  NOT NULL,
+  PRIMARY KEY (room_id, seq, contestant),
+  KEY idx_room_answers_order (room_id, seq, received_ms),
+  CONSTRAINT fk_room_answers_room FOREIGN KEY (room_id) REFERENCES game_rooms (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
 -- ---------------------------------------------------------------------------
 -- Seed data
 -- ---------------------------------------------------------------------------
@@ -238,6 +255,7 @@ INSERT IGNORE INTO settings (name, value) VALUES
   ('banner_enabled', '0'),
   ('start_game_hidden', '0'),
   ('helpers_enabled', '1'),
+  ('phone_helpers_enabled', '0'),
   ('banner_text', 'New questions added - try them now!');
 
 INSERT IGNORE INTO point_values (points) VALUES

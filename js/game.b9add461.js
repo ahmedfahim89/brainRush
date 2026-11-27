@@ -245,6 +245,10 @@
   const ROOM_LOBBY_MS = 2000; // the host's poll of who has joined
   const ROOM_RETRY_MS = 5000; // a failed push is tried again after this
   const PHONE_SCREENS = ['board', 'question', 'final', 'results'];
+  const ANSWERS_POLL_MS = 1000; // US-64: the host's poll of the open question's answers
+  const PHONE_TIMER_MS = 150;   // US-64: timer changes close together go to the phones in one update
+  const ANSWERS_MIN_PX = 44;    // owner CR 1: the Answers list never gets lower than about 2 rows
+  const ANSWERS_GAP_PX = 6;     // room kept under Back to Board
   // BUG-52-02: this page load's host session. Only the room's current session may change it, so two
   // tabs of one game never overwrite each other; the newest tab that loaded (or "Use this tab") wins.
   const HOST_SESSION = Array.from(window.crypto.getRandomValues(new Uint8Array(16)),
@@ -268,7 +272,8 @@
   //     room?: { code, hostToken } (Phone buzzer only: the room made at Start; the host token never
   //       leaves this browser except to api/rooms.php),
   //     current: null | { catId, points, marks: { "<contestantId>": "correct" | "wrong" }, answerShown,
-  //                       lang, by?, choiceOrder?, swap?, timedOut? } }
+  //                       lang, by?, choiceOrder?, swap?, timedOut?, phoneSeq? } }
+  // phoneSeq (US-64): the room's question number of the open question in a Phone buzzer game.
   // timedOut (US-47, D-55 e): the open question's timer reached 0 at least once (a Reset or a
   // refresh doesn't undo it; a Swap clears it, the new question has its own timer).
   // final (US-44): stage 'offer' (End Game offered the round) has no other field. From 'wager' on:
@@ -421,6 +426,9 @@
     ready: null,    // the claim of a restored room: pushes wait for it
     claiming: false, // that claim is in flight (the lobby's other_tab is not trusted yet)
     blocked: false, // BUG-52-02: another tab has taken over this game; this tab no longer saves or pushes
+    // US-64: the question calls run one after another (qChain); qTimer debounces timer updates; the
+    // answers of the open question (answers = { seq, open, list }) are polled every ANSWERS_POLL_MS.
+    qChain: Promise.resolve(), qTimer: null, answersTimer: null, answers: null,
   };
 
   // Read aloud (US-48), memory only apart from the on-device choice: the browser's speech module
@@ -595,6 +603,9 @@
     scoringTitle: byId('scoring-title'),
     scoringHint: byId('scoring-hint'),
     scoreRows: byId('score-rows'),
+    answersPanel: byId('answers-panel'),     // US-64: the phones' answers in arrival order
+    answersList: byId('answers-list'),
+    answersHint: byId('answers-hint'),
     backBtn: byId('back-btn'),
     streakPanel: byId('streak-panel'),
     streakPanelTitle: byId('streak-panel-title'),
@@ -853,6 +864,7 @@
         ? new Error(data.error)
         : textError('err.http', { status: response.status });
       error.status = response.status; // e.g. 409 = no question left to draw (Golden Goal, D-51)
+      error.data = data; // US-64: e.g. { other_tab: true } from api/rooms.php
       throw error;
     }
     if (data === null) throw textError('err.response');
@@ -1195,7 +1207,8 @@
     if (!isPlainObject(current) || !Number.isInteger(current.catId) || !Number.isInteger(current.points) ||
         typeof current.answerShown !== 'boolean' || !isPlainObject(current.marks) ||
         !(current.timedOut === undefined || typeof current.timedOut === 'boolean') || // US-47
-        !isValidBotRoll(current.botRoll)) return false; // US-62
+        !isValidBotRoll(current.botRoll) || // US-62
+        !(current.phoneSeq === undefined || (Number.isInteger(current.phoneSeq) && current.phoneSeq > 0))) return false; // US-64
     const key = cellKey(current.catId, current.points);
     if (!isBoardCellKey(key, g) || hasOwn(g.used, key)) return false;
     let correct = 0;
@@ -1211,7 +1224,7 @@
   /**
    * Helper fields of the open question (US-32): `by` is a real contestant, and a shown choice
    * order or Swap question was paid for with that contestant's helper. With a helper used, only
-   * `by` can have been scored.
+   * `by` can have been scored (Host control; owner CR 3: anyone in a Phone buzzer game).
    */
   function isValidHelperUse(current, g) {
     const hasChoices = current.choiceOrder !== undefined;
@@ -1220,10 +1233,18 @@
     if (!hasChoices && !hasSwap) return false; // Skip closes the question, so it is never saved open
     const user = Number.isInteger(current.by) ? findContestant(g, current.by) : null;
     if (user === null) return false;
-    if (Object.keys(current.marks).some((id) => Number(id) !== user.id)) return false;
+    if (helperLimitsScoring(g) && Object.keys(current.marks).some((id) => Number(id) !== user.id)) return false;
     if (hasChoices && (user.helpers.choices || !isValidChoiceOrder(current.choiceOrder))) return false;
     if (hasSwap && (user.helpers.swap || !isValidSwap(current.swap))) return false;
     return true;
+  }
+
+  /**
+   * After a helper, only its user can be scored (US-32), except in a Phone buzzer game (owner CR 3): there
+   * every phone can still answer, so the host can score anyone who answered. The helper is still spent.
+   */
+  function helperLimitsScoring(g) {
+    return g.control !== 'phone';
   }
 
   /** US-63 (D-79): the bot's right tickets out of 10, a whole number 0..10. */
@@ -1601,6 +1622,7 @@
       entries: [],
       maintenance: false, // start_game_hidden from settings (maintenance mode)
       helpersOn: true,    // helpers_enabled from settings; a new game keeps it
+      phoneHelpersOn: false, // phone_helpers_enabled (US-64, owner): helpers in Phone buzzer games; off by default
       finalRoundOn: false, // final_round_enabled from settings (US-44); a new game keeps it
       dailyOn: true,      // daily_enabled from settings (D-74): the Daily Challenge button
       speedOn: false,     // speed_enabled from settings (US-59): the Speed Round button
@@ -1982,6 +2004,7 @@
       setAdConfig(settings);
       s.maintenance = settings.start_game_hidden === 1;
       s.helpersOn = settings.helpers_enabled !== 0; // a missing row means on
+      s.phoneHelpersOn = settings.phone_helpers_enabled === 1; // US-64: a missing row means off
       s.finalRoundOn = settings.final_round_enabled === 1; // US-44: a missing row means off
       s.dailyOn = settings.daily_enabled !== 0; // D-74: a missing row means on
       s.crosswordOn = settings.crossword_enabled === 1; // US-58: a missing row means off
@@ -2331,6 +2354,7 @@
       const settings = await apiGet('settings.php');
       if (!isPlainObject(settings)) return;
       s.helpersOn = settings.helpers_enabled !== 0;         // a missing row means on
+      s.phoneHelpersOn = settings.phone_helpers_enabled === 1; // US-64: a missing row means off
       s.finalRoundOn = settings.final_round_enabled === 1;  // US-44: a missing row means off
     } catch (err) {
       // keep the values loaded with Setup
@@ -2357,7 +2381,9 @@
         id: i + 1, name: e.name.trim(), color: e.color, score: 0, helpers: allHelpers(),
       })),
       timerSeconds: timerSeconds, // this game only; the admin setting is not changed
-      helpersOff: !s.helpersOn,   // admin setting when the game starts (helpers_enabled)
+      // admin settings when the game starts: helpers_enabled, and for a Phone buzzer game also
+      // phone_helpers_enabled (US-64, owner 2026-11-27: off by default, helpers open loopholes when everyone answers)
+      helpersOff: !s.helpersOn || (s.mode !== 'tournament' && s.control === 'phone' && !s.phoneHelpersOn),
       points: board.points,
       categories: board.categories,
       used: {},
@@ -2706,6 +2732,7 @@
     const double = isDoubleCurrent(g);
     showQuestion(double); // the double-score popup comes first; reading waits for it (US-48)
     if (double) showDoublePopup();
+    if (phoneOn()) phoneOpenQuestion(); // US-64: the question goes to the phones
   }
 
   /**
@@ -2773,6 +2800,7 @@
     if (!cur || cur.timedOut) return;
     cur.timedOut = true;
     saveState();
+    if (phoneOn()) phoneCloseQuestion(cur); // US-64: answers after the timer's end are late
   }
 
   /**
@@ -2993,6 +3021,7 @@
     renderAnswerState(true);
     updateScoringRows(); // no helpers once the answer is shown
     saveState();
+    if (phoneOn()) phoneCloseQuestion(cur); // US-64: no answers once the answer is shown
     dom.answerText.focus();
   }
 
@@ -3058,7 +3087,7 @@
     scoringRows.forEach((ref) => {
       const key = String(ref.contestant.id);
       const mark = hasOwn(cur.marks, key) ? cur.marks[key] : null;
-      const out = cur.by !== undefined && cur.by !== ref.contestant.id;
+      const out = cur.by !== undefined && cur.by !== ref.contestant.id && helperLimitsScoring(state.game);
       ref.correct.disabled = mark !== null || someoneCorrect || out || swapping !== null;
       ref.wrong.disabled = mark !== null || out || swapping !== null;
       ref.correct.classList.toggle('is-chosen', mark === 'correct');
@@ -3122,7 +3151,7 @@
     const key = String(contestant.id);
     if (hasOwn(cur.marks, key)) return;
     if (result === 'correct' && correctContestantId(cur) !== null) return;
-    if (cur.by !== undefined && cur.by !== contestant.id) return; // the helper made it their question
+    if (cur.by !== undefined && cur.by !== contestant.id && helperLimitsScoring(state.game)) return; // the helper made it their question
     // D-40: only a Correct is doubled on the double-score cell; a Wrong costs the normal points.
     const points = activeQuestion(state.game).points;
     cur.marks[key] = result;
@@ -3177,6 +3206,7 @@
     renderQuestionLang(activeQuestion(g).question);
     updateScoringRows();
     saveState();
+    if (phoneOn()) phoneUpdateQuestion(); // US-64: the 3 options show on the phones
   }
 
   /** Skip: lose half the points (of the Swap question after a Swap); the cell closes grey. */
@@ -3225,6 +3255,7 @@
     delete cur.timedOut; // US-47: the swapped-away question is not counted; the new one has its own timer
     markSeen(swap.question.id);
     showQuestion(); // new heading, picture and points, timer from the start; also saves
+    if (phoneOn()) phoneOpenQuestion(); // US-64: a new question number; answers to the old one are late
   }
 
   /** Ids of every question on this board, so the Swap never brings one of them. */
@@ -3292,7 +3323,9 @@
       cell.swap = { catName: cur.swap.catName, catNameAr: cur.swap.catNameAr, points: cur.swap.points, id: cur.swap.question.id };
     }
     g.used[cellKey(cur.catId, cur.points)] = cell;
+    if (phoneOn()) phoneCloseQuestion(cur); // US-64: Back to Board and Skip close it on the phones
     g.current = null;
+    if (phoneOn()) renderAnswersPanel(); // hidden until the next board question (never shown in Golden Goal)
     if (g.turn !== undefined) g.turn = otherContestant(g, g.turn).id; // US-62: the turn passes after every question
     renderGame();
     showScreen('board'); // also saves the state
@@ -3347,6 +3380,7 @@
     timer.running = true;
     timer.handle = window.setInterval(tickTimer, TIMER_TICK_MS);
     renderTimer();
+    phoneTimerChanged(); // US-64: Resume and Reset reach the phones' countdown
   }
 
   function pauseTimer() {
@@ -3354,6 +3388,7 @@
     timer.remainingMs = Math.max(0, timer.endAt - now());
     stopTimer();
     renderTimer();
+    phoneTimerChanged(); // US-64: Pause pauses the phones' countdown
   }
 
   function stopTimer() {
@@ -8819,6 +8854,7 @@
       renderQuestionHeading(activeQuestion(g));
       renderQuestionLang(activeQuestion(g).question);
       renderScoringRows();
+      renderAnswersPanel(); // US-64
     }
     renderTimer();
   }
@@ -8863,7 +8899,7 @@
     const index = (id) => g.contestants.findIndex((c) => c.id === id);
     return {
       mode: g.mode,
-      screen: PHONE_SCREENS.indexOf(state.screen) === -1 ? 'board' : state.screen,
+      screen: finalOnScreen() ? 'final' : (PHONE_SCREENS.indexOf(state.screen) === -1 ? 'board' : state.screen),
       contestants: g.contestants.map((c) => ({ name: c.name, color: c.color, score: c.score })),
       points: g.points.slice(),
       categories: g.categories.map((c) => (c.hidden || c.id === MIX
@@ -8940,9 +8976,13 @@
     phone.gen += 1;
     window.clearTimeout(phone.pushTimer);
     window.clearTimeout(phone.lobbyTimer);
+    window.clearTimeout(phone.qTimer);
+    window.clearTimeout(phone.answersTimer);
+    dom.answersPanel.hidden = true;
     Object.assign(phone, {
       pushTimer: null, pushing: false, again: false, lastSent: null, lobbyTimer: null, lobby: null,
       shownJoined: null, message: null, renewing: null, qrCode: null, ready: null, claiming: false,
+      qChain: Promise.resolve(), qTimer: null, answersTimer: null, answers: null,
     });
     closeRoomPanel();
     dom.roomBtn.hidden = true;
@@ -9192,9 +9232,247 @@
     dom.roomClose.addEventListener('click', closeRoomPanel);
     dom.roomCopy.addEventListener('click', onRoomCopy);
     dom.roomTakenUse.addEventListener('click', () => window.location.reload()); // the reload claims the room
+    window.addEventListener('resize', fitAnswersList); // owner CR 1
     dom.roomOverlay.addEventListener('click', (event) => {
       if (event.target === dom.roomOverlay) closeRoomPanel(); // a tap beside the card
     });
+  }
+
+  // ---------- Phone buzzer: questions and answers (US-64, D-80 e to g, m) ----------
+  // A board question in a Phone buzzer game goes to the phones (open_question; a Swap opens a new
+  // number), its changes follow (3 choices, Pause, Resume, Reset: update_question) and it closes at
+  // timer 0, Show Answer, Back to Board and Skip (close_question). The calls run one after another
+  // (phone.qChain), so a close never overtakes its open. The host polls the answers and lists them in
+  // the Answers panel; the host still judges with Correct / Wrong. Golden Goal is not sent (phone
+  // Sprint 3): every call here needs an open board question (state.game.current).
+
+  /** A board question of this Phone buzzer game is on the question screen (never Golden Goal). */
+  function phoneQuestionLive() {
+    return phoneOn() && !phone.blocked && !!state.game.current && state.screen === 'question';
+  }
+
+  /** The countdown as the phones need it; the server stamps it with its own time. */
+  function phoneTimer() {
+    const left = timer.running ? Math.max(0, timer.endAt - now()) : timer.remainingMs;
+    return { totalMs: Math.round(timer.totalMs), remainingMs: Math.round(Math.min(left, timer.totalMs)), running: timer.running };
+  }
+
+  /**
+   * The open question as the phones may see it: the category, points, the ×2, the texts and the 3 choices
+   * in the host's order once the helper is used (the server gives them only to the phone of the contestant in by,
+   * owner CR 3). Never the answer, the answer's position among the
+   * choices or the picture's path (its file name can name the answer: hasImage only).
+   */
+  function phoneQuestion(g) {
+    const cur = g.current;
+    const active = activeQuestion(g);
+    const q = active.question;
+    const category = findCategory(g, cur.catId);
+    const mix = !cur.swap && category.id === MIX;
+    // Owner CR 3: the 3 choices go only to the phone of the contestant who used them (the server filters them);
+    // nobody is locked out, and Swap goes to every phone.
+    const by = cur.by === undefined || cur.choiceOrder === undefined ? -1 : g.contestants.findIndex((c) => c.id === cur.by);
+    const cat = cur.swap ? { name: cur.swap.catName, nameAr: cur.swap.catNameAr } : { name: category.name, nameAr: category.nameAr };
+    let choices = null;
+    if (cur.choiceOrder !== undefined && hasChoices(q)) {
+      const en = choiceTexts(q, false).options;
+      const ar = choiceTexts(q, true);
+      choices = cur.choiceOrder.map((i) => ({ text: en[i], textAr: ar.arabic ? ar.options[i] : null }));
+    }
+    return {
+      catName: mix ? null : cat.name,
+      catNameAr: mix || !isFilled(cat.nameAr) ? null : cat.nameAr,
+      mix: mix,
+      subName: mix && isFilled(q.catName) ? q.catName : null,
+      subNameAr: mix && isFilled(q.catNameAr) ? q.catNameAr : null,
+      points: active.points,
+      x2: isDoubleCurrent(g),
+      text: q.question,
+      textAr: hasArabic(q) ? q.question_ar : null,
+      hasImage: !!q.image,
+      choices: choices,
+      by: by === -1 ? null : by,                  // owner CR 3: the choices' owner only
+      byHelper: by === -1 ? null : 'choices',
+      timer: phoneTimer(),
+    };
+  }
+
+  /** Queue a question call; each waits for the claim of a restored room and for the call before it. */
+  function phoneQueue(task) {
+    const gen = phone.gen;
+    phone.qChain = phone.qChain
+      .then(() => phone.ready)
+      .then(() => (gen === phone.gen && !phone.blocked ? task() : null))
+      .catch(() => {});
+  }
+
+  /** A host question call. 409 other_tab hands over to the other tab; 404 renews the room. */
+  async function phoneQuestionCall(action, body) {
+    const g = state.game;
+    try {
+      return await apiPost(ROOMS_API + '?action=' + action,
+        Object.assign({ code: g.room.code, host_token: g.room.hostToken, session: HOST_SESSION }, body));
+    } catch (err) {
+      if (err.status === 409 && err.data && err.data.other_tab === true) blockPhone();
+      else if (err.status === 404) renewRoom(g);
+      else if (err.status !== 409) setPhoneMessage(() => t('room.syncFailed', { reason: sentence(errorText(err)) }));
+      throw err;
+    }
+  }
+
+  /** The question just opened (a cell or a Swap) goes to the phones with a new number. */
+  function phoneOpenQuestion() {
+    const g = state.game;
+    const cur = g.current;
+    phone.answers = { seq: null, open: true, list: [] };
+    renderAnswersPanel();
+    phoneQueue(async () => {
+      if (state.game !== g || g.current !== cur) return; // closed before its turn: nothing to open
+      const data = await phoneQuestionCall('open_question', { question: phoneQuestion(g) });
+      if (!Number.isInteger(data.seq)) return;
+      cur.phoneSeq = data.seq;
+      phone.answers = { seq: data.seq, open: true, list: [] };
+      if (g.current === cur) {
+        saveState();
+        pollAnswers();
+      }
+    });
+  }
+
+  /** The open question changed (3 choices, or its countdown): the phones get the new version. */
+  function phoneUpdateQuestion() {
+    const g = state.game;
+    const cur = g.current;
+    phoneQueue(async () => {
+      if (state.game !== g || g.current !== cur || !cur.phoneSeq || !phone.answers || !phone.answers.open) return;
+      if (state.screen !== 'question') return;
+      try {
+        await phoneQuestionCall('update_question', { seq: cur.phoneSeq, question: phoneQuestion(g) });
+      } catch (err) {
+        if (err.status === 409 && phone.answers && phone.answers.seq === cur.phoneSeq) phone.answers.open = false;
+      }
+    });
+  }
+
+  /** Pause, Resume and Reset of a board question reach the phones (debounced). */
+  function phoneTimerChanged() {
+    if (!phoneQuestionLive()) return;
+    window.clearTimeout(phone.qTimer);
+    phone.qTimer = window.setTimeout(() => {
+      phone.qTimer = null;
+      if (phoneQuestionLive()) phoneUpdateQuestion();
+    }, PHONE_TIMER_MS);
+  }
+
+  /** Timer 0, Show Answer, Back to Board or Skip: the phones' question closes; later answers are late. */
+  function phoneCloseQuestion(cur) {
+    window.clearTimeout(phone.qTimer);
+    if (phone.answers && (phone.answers.seq === null || phone.answers.seq === cur.phoneSeq)) phone.answers.open = false;
+    renderAnswersPanel();
+    phoneQueue(async () => {
+      if (!cur.phoneSeq) return;
+      await phoneQuestionCall('close_question', { seq: cur.phoneSeq });
+      if (phone.answers && phone.answers.seq === cur.phoneSeq) {
+        phone.answers.open = false;
+        if (state.game && state.game.current === cur) pollAnswers(); // the final list, then the poll stops
+      }
+    });
+  }
+
+  /** A host refresh on a board question: the phones' countdown restarts with the host's (D-04), the panel comes back. */
+  function phoneRestoreQuestion() {
+    const cur = state.game.current;
+    if (!cur) return;
+    if (!cur.phoneSeq) { // the refresh came before the open call answered
+      phoneOpenQuestion();
+      return;
+    }
+    const closed = cur.answerShown || cur.timedOut === true;
+    phone.answers = { seq: cur.phoneSeq, open: !closed, list: [] };
+    renderAnswersPanel();
+    if (closed) phoneCloseQuestion(cur); // closed already (or the close was lost with the refresh)
+    else phoneUpdateQuestion();
+    phoneQueue(async () => pollAnswers());
+  }
+
+  /** The answers of the open question, every ANSWERS_POLL_MS until it closes (then once more). */
+  async function pollAnswers() {
+    window.clearTimeout(phone.answersTimer);
+    phone.answersTimer = null;
+    const g = state.game;
+    const a = phone.answers;
+    if (!phoneOn() || phone.blocked || !g.current || !a || !a.seq || a.seq !== g.current.phoneSeq) return;
+    const gen = phone.gen;
+    try {
+      const data = await apiCall(ROOMS_API + '?action=answers&code=' + encodeURIComponent(g.room.code) + '&seq=' + a.seq +
+        '&session=' + HOST_SESSION, { headers: { Accept: 'application/json', 'X-Host-Token': g.room.hostToken }, cache: 'no-store' });
+      if (gen !== phone.gen || phone.answers !== a) return;
+      if (isPlainObject(data) && Array.isArray(data.answers)) {
+        a.list = data.answers.filter((x) => isPlainObject(x) && Number.isInteger(x.contestant) && typeof x.text === 'string');
+        if (data.open === false) a.open = false;
+        renderAnswersPanel();
+      }
+    } catch (err) {
+      if (gen !== phone.gen) return;
+      if (err.status === 409 && err.data && err.data.other_tab === true) {
+        blockPhone();
+        return;
+      }
+    }
+    if (gen === phone.gen && phone.answers === a && a.open && state.game === g && g.current) {
+      phone.answersTimer = window.setTimeout(pollAnswers, ANSWERS_POLL_MS);
+    }
+  }
+
+  /** "+3.2 s": the time from the question's opening to the answer's arrival (server time). */
+  function answerTime(ms) {
+    return Number.isInteger(ms) ? ltr(t('answers.time', { s: (ms / 1000).toFixed(1) })) : '';
+  }
+
+  /**
+   * The Answers panel (Phone buzzer only): the answers in arrival order, the name in its colour, the text
+   * (as text, never HTML) and "+3.2 s". It never scores: the host still uses Correct / Wrong below it.
+   */
+  function renderAnswersPanel() {
+    const g = state.game;
+    const show = phoneOn() && !!g.current && state.screen === 'question' && !!phone.answers;
+    dom.answersPanel.hidden = !show;
+    dom.scoringHint.hidden = show; // the panel takes the hint's room: Back to Board stays on screen (D-30)
+    if (!show) return;
+    const a = phone.answers;
+    clear(dom.answersList);
+    a.list.forEach((x) => {
+      const c = g.contestants[x.contestant];
+      if (!c) return;
+      const color = paletteEntry(c.color);
+      const name = h('span', { className: 'answer-name', text: iso(c.name) });
+      name.style.backgroundColor = color.value;
+      name.style.color = color.ink;
+      dom.answersList.appendChild(h('li', { className: 'answer-row' }, [
+        name,
+        ownDirection(h('span', { className: 'answer-said', text: x.text, title: x.text, dir: 'auto' })),
+        h('span', { className: 'answer-time', text: answerTime(x.ms) }),
+      ]));
+    });
+    const key = a.list.length ? (a.open ? '' : 'answers.closed') : (a.open ? 'answers.waiting' : 'answers.none');
+    dom.answersHint.textContent = key ? t(key) : '';
+    dom.answersHint.hidden = !key;
+    fitAnswersList();
+  }
+
+  /**
+   * Owner CR 1 (D-30): the list takes the room left above the bottom of the window, so Back to Board stays
+   * on screen; it never gets lower than ANSWERS_MIN_PX (it scrolls inside instead).
+   */
+  function fitAnswersList() {
+    const list = dom.answersList;
+    if (dom.answersPanel.hidden) return;
+    list.style.maxHeight = 'none';
+    const spare = window.innerHeight - dom.backBtn.getBoundingClientRect().bottom - ANSWERS_GAP_PX;
+    if (spare >= 0) return; // everything fits
+    // A layout that scrolls anyway (narrow, stacked) keeps the whole list; only a one-screen layout is capped.
+    if (list.scrollHeight + spare < ANSWERS_MIN_PX) return;
+    list.style.maxHeight = (list.scrollHeight + spare) + 'px';
   }
 
   // ---------- Startup ----------
@@ -9292,6 +9570,7 @@
       showFinalQuestion(); // its timer restarts at full length, like a board question (D-04)
     } else if (saved.screen === 'question') {
       showQuestion();
+      if (phoneOn()) phoneRestoreQuestion(); // US-64: the phones' question and the Answers panel come back
     } else {
       showScreen('board');
       armBotTurn(); // US-62: the coin flip (if not played yet) or the bot's pick

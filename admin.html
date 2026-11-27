@@ -8,7 +8,7 @@
   <link rel="icon" href="img/mokh-favicon.svg" type="image/svg+xml">
   <link rel="icon" href="img/mokh-favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.020b81cb.css">
+  <link rel="stylesheet" href="css/style.0ba46723.css">
 </head>
 <body class="admin">
   <header class="page-header">
@@ -72,6 +72,14 @@
               Game helpers: 3 choices, Swap and Skip
             </label>
             <p class="hint">When off, the helper buttons are hidden for new games. A game already in progress keeps its helpers.</p>
+          </div>
+          <!-- Phone buzzer (US-64, owner 2026-11-27): helpers in Phone buzzer games; off by default -->
+          <div class="setting-cell">
+            <label class="check-label" for="setting-phone-helpers">
+              <input id="setting-phone-helpers" name="phone_helpers_enabled" type="checkbox">
+              Helpers in Phone buzzer mode
+            </label>
+            <p class="hint">Off by default: in a Phone buzzer game everyone answers at once, and a helper used after an answer came in can throw that answer away. When on (and Game helpers is on), Phone buzzer games show the 3 choices, Swap and Skip buttons. Host control and Tournament are not affected.</p>
           </div>
           <!-- Final round (US-44, D-48), shown as "Golden Goal" (D-50): a tiebreaker before the results (D-51) -->
           <div class="setting-cell">
@@ -369,6 +377,6 @@
     </section>
   </main>
 
-  <script src="js/admin.1bb89f58.js"></script>
+  <script src="js/admin.cc30aa42.js"></script>
 </body>
 </html>

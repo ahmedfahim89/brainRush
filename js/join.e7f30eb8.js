@@ -6,6 +6,9 @@
 // while the page is hidden. The device token from `join` is kept in localStorage with the room code,
 // so a refreshed phone rejoins as the same name. The link holds only the room code, never a token.
 // Every text comes from js/i18n.js; API and host text is rendered with textContent (never innerHTML).
+// US-64: while the host has a question open, the phone shows it (category, points, text, countdown) with
+// a text box and Send; the first answer sent is locked; when it closes the phone goes straight back to
+// the board (US-64: within about 1 s), whose status line says the question is closed for a moment. The countdown follows the host's (server time plus this phone's clock offset).
 'use strict';
 
 (function () {
@@ -30,6 +33,10 @@
   const TIMES = String.fromCharCode(0x00d7);
   const EN_DASH = String.fromCharCode(0x2013);
   const SCREENS = ['board', 'question', 'final', 'results'];
+  const ANSWER_MAX = 200;        // ROOM_ANSWER_MAX in api/rooms.php
+  const CLOSED_NOTE_MS = 3000;   // after a question closes, the board's status line says so this long
+  const TICK_MS = 250;           // the countdown on the phone
+  const CHOICE_LETTERS = ['A', 'B', 'C'];
 
   const byId = (id) => document.getElementById(id);
   const dom = {
@@ -47,6 +54,19 @@
     board: byId('join-board'),
     scores: byId('join-scores'),
     langBtns: Array.prototype.slice.call(document.querySelectorAll('[data-ui-lang]')),
+    question: byId('join-question'),   // US-64
+    qHead: byId('jq-head'),
+    qPicture: byId('jq-picture'),
+    qText: byId('jq-text'),
+    qLang: byId('jq-lang'),
+    qChoices: byId('jq-choices'),
+    qTimerValue: byId('jq-timer-value'),
+    qBar: byId('jq-bar'),
+    qTimerNote: byId('jq-timer-note'),
+    qForm: byId('jq-form'),
+    qInput: byId('jq-input'),
+    qSend: byId('jq-send'),
+    qMsg: byId('jq-msg'),
   };
 
   // view: 'code' | 'pick' | 'board'. players = [{name, color, joined}] from the last poll; game = the
@@ -66,6 +86,11 @@
     failures: 0,
     timer: null,
     run: 0,          // a poll answer from before the last view change is dropped
+    question: null,  // US-64: the room's open (or last closed) question, from the state poll
+    mine: null,      // this contestant's answer to it, from the server (a refreshed phone stays locked)
+    offset: 0,       // server time minus this phone's clock (ms), for the countdown
+    q: null,         // the question on screen: { seq, data, lang, sent, late, locked, sending, msg, wasOpen, closedUntil, choicesKey }
+    ticker: null,
   };
 
   // ---------- Helpers ----------
@@ -169,6 +194,7 @@
     if (!response.ok || data === null || typeof data !== 'object') {
       const error = new Error(data && typeof data.error === 'string' ? data.error : 'http');
       error.status = response.ok ? 0 : response.status;
+      error.data = data; // US-64: { reason: 'duplicate' | 'late' } of a refused answer
       throw error;
     }
     return data;
@@ -199,6 +225,7 @@
 
   function setView(view) {
     app.view = view;
+    stopTicker();
     app.run += 1;
     Object.keys(dom.screens).forEach((key) => { dom.screens[key].hidden = key !== view; });
     render();
@@ -253,6 +280,7 @@
   }
 
   function applyState(data) {
+    if (Number.isFinite(data.now)) app.offset = data.now - Date.now();
     if (data.changed === false) return;
     if (!isValidState(data)) return; // an odd answer: keep what is on screen, ask again next time
     if (app.version === null) savePlace(app.code, app.token); // refreshes its age once per page load
@@ -261,6 +289,8 @@
     app.players = data.players;
     app.game = data.state;
     app.mode = data.state.mode === 'teams' ? 'teams' : 'players';
+    app.question = isValidQuestion(data.question) ? data.question : null;
+    app.mine = typeof data.mine === 'string' ? data.mine : null;
     renderBoard();
   }
 
@@ -278,6 +308,9 @@
     app.you = null;
     app.version = null;
     app.game = null;
+    app.question = null;
+    app.mine = null;
+    app.q = null;
     savePlace(app.code, null);
   }
 
@@ -406,9 +439,231 @@
     }
     const me = g.contestants[app.you];
     dom.you.textContent = t('join.you', { name: iso(me.name) });
-    dom.status.textContent = t('join.status.' + (SCREENS.indexOf(g.screen) === -1 ? 'board' : g.screen));
+    const asking = renderQuestionView();
+    dom.status.textContent = asking ? '' : (closedNote() || boardStatus(g));
     renderGrid(g);
     renderScores(g);
+  }
+
+  // ---------- The open question (US-64) ----------
+
+  function isValidQuestion(q) {
+    const tm = q && q.timer;
+    return !!q && typeof q === 'object' && Number.isInteger(q.seq) && typeof q.open === 'boolean' &&
+      typeof q.text === 'string' && Number.isInteger(q.points) && !!tm && typeof tm === 'object' &&
+      Number.isInteger(tm.totalMs) && tm.totalMs > 0 && Number.isInteger(tm.remainingMs) && Number.isFinite(tm.atMs) &&
+      typeof tm.running === 'boolean' &&
+      (q.choices === null || (Array.isArray(q.choices) && q.choices.length === 3 && q.choices.every((c) => c && typeof c.text === 'string')));
+  }
+
+  /**
+   * The board's status line. BUG-64-01: while the host still shows a question that is closed (timer 0,
+   * Show Answer, Skip), it says so ("Too late" when this phone's answer was refused), not "open".
+   */
+  function boardStatus(g) {
+    const screen = SCREENS.indexOf(g.screen) === -1 ? 'board' : g.screen;
+    const q = app.question;
+    if (screen === 'question' && q && !q.open) {
+      return t(app.q && app.q.seq === q.seq && app.q.late ? 'jq.late' : 'jq.closed');
+    }
+    return t('join.status.' + screen);
+  }
+
+  /** The question is on screen only while it is open. */
+  function questionShown() {
+    return !!app.question && app.question.open;
+  }
+
+  /** Just after a question closed: the board's status line ("closed", or "Too late" for a refused answer). */
+  function closedNote() {
+    if (!app.q || Date.now() >= app.q.closedUntil) return '';
+    return t(app.q.late ? 'jq.late' : 'jq.closed');
+  }
+
+  /** Show the question or the board; returns true when the question is shown. */
+  function renderQuestionView() {
+    const q = app.question;
+    if (q && !q.open && app.q && app.q.seq === q.seq && app.q.wasOpen) { // it has just closed
+      app.q.wasOpen = false;
+      app.q.closedUntil = Date.now() + CLOSED_NOTE_MS;
+      window.setTimeout(() => { if (app.view === 'board') renderBoard(); }, CLOSED_NOTE_MS + 50);
+    }
+    const show = questionShown();
+    dom.question.hidden = !show;
+    dom.board.hidden = show;
+    if (!show) {
+      stopTicker();
+      return false;
+    }
+    if (!app.q || app.q.seq !== q.seq) startQuestion(q);
+    app.q.data = q;
+    if (q.open) app.q.wasOpen = true;
+    if (app.mine !== null && app.q.sent === null) app.q.sent = app.mine; // sent from this name before a refresh
+    fillQuestion();
+    renderAnswerState();
+    renderTimer();
+    if (app.ticker === null) app.ticker = window.setInterval(renderTimer, TICK_MS);
+    return true;
+  }
+
+  /** A new question number (a new cell, or a Swap): an empty box; Arabic first when it has Arabic (US-49). */
+  function startQuestion(q) {
+    app.q = {
+      seq: q.seq, data: q, lang: q.textAr ? 'ar' : 'en', sent: null, late: false, locked: false,
+      sending: false, msg: null, wasOpen: q.open, closedUntil: 0, choicesKey: null,
+    };
+    dom.qInput.value = '';
+  }
+
+  function stopTicker() {
+    if (app.ticker !== null) window.clearInterval(app.ticker);
+    app.ticker = null;
+  }
+
+  function questionLangText(text, textAr) {
+    return app.q.lang === 'ar' && typeof textAr === 'string' && textAr !== '' ? textAr : text;
+  }
+
+  /** Heading, picture note, text, language button and the 3 choices; the typed text is never touched. */
+  function fillQuestion() {
+    const q = app.q.data;
+    const cat = q.mix
+      ? t('cat.mixName') + (q.subName ? ': ' + localName(q.subName, q.subNameAr) : '')
+      : localName(q.catName, q.catNameAr);
+    clear(dom.qHead);
+    dom.qHead.appendChild(document.createTextNode(iso(cat) + ' ' + EN_DASH + ' ' + q.points));
+    if (q.x2) dom.qHead.appendChild(h('span', { className: 'jq-double', text: t('jq.double') }));
+    dom.qPicture.hidden = !q.hasImage;
+    const arabic = app.q.lang === 'ar' && !!q.textAr;
+    dom.qText.textContent = arabic ? q.textAr : q.text;
+    dom.qText.dir = arabic ? 'rtl' : 'ltr';
+    dom.qText.lang = arabic ? 'ar' : 'en';
+    dom.qLang.hidden = !q.textAr;
+    dom.qLang.textContent = arabic ? 'English' : 'العربية';
+    dom.qLang.setAttribute('aria-label', arabic ? t('lang.showEnglish') : t('lang.showArabic'));
+    renderChoices(q, arabic);
+  }
+
+  /** The 3 choices (once the host used the helper), as buttons that fill the box; Send still sends. */
+  function renderChoices(q, arabic) {
+    const key = JSON.stringify([q.seq, q.choices, arabic]);
+    dom.qChoices.hidden = !q.choices;
+    if (key === app.q.choicesKey) return;
+    app.q.choicesKey = key;
+    clear(dom.qChoices);
+    if (!q.choices) return;
+    dom.qChoices.setAttribute('aria-label', t('jq.choices'));
+    q.choices.forEach((c, i) => {
+      const text = arabic && c.textAr ? c.textAr : c.text;
+      const btn = h('button', { type: 'button', className: 'jq-choice', onclick: () => onChoice(btn, text) }, [
+        h('span', { className: 'jq-choice-letter', text: CHOICE_LETTERS[i], 'aria-hidden': 'true' }),
+        h('span', { className: 'jq-choice-text', text: text, dir: 'auto' }),
+      ]);
+      dom.qChoices.appendChild(h('li', {}, [btn]));
+    });
+  }
+
+  function onChoice(btn, text) {
+    if (!app.q || answerLocked()) return;
+    dom.qInput.value = text;
+    Array.prototype.forEach.call(dom.qChoices.querySelectorAll('.jq-choice'), (b) => b.classList.toggle('is-picked', b === btn));
+    if (app.q.msg) app.q.msg = null;
+    renderAnswerState();
+    dom.qSend.focus(); // the player still taps Send (US-64)
+  }
+
+  function onQuestionLang() {
+    if (!app.q || !app.q.data.textAr) return;
+    app.q.lang = app.q.lang === 'ar' ? 'en' : 'ar';
+    fillQuestion();
+  }
+
+  function answerLocked() {
+    const a = app.q;
+    return a.sent !== null || a.late || a.locked || a.sending || !a.data.open;
+  }
+
+  /** The box, Send, the choices and the message: sending, sent (locked), too late, closed or an error. */
+  function renderAnswerState() {
+    const a = app.q;
+    const locked = answerLocked();
+    dom.qInput.disabled = locked;
+    dom.qSend.disabled = locked;
+    Array.prototype.forEach.call(dom.qChoices.querySelectorAll('.jq-choice'), (b) => { b.disabled = locked; });
+    if (a.sending) showMsg(dom.qMsg, t('jq.sending'), 'warning');
+    else if (a.sent !== null) showMsg(dom.qMsg, t('jq.sent', { text: iso(a.sent) }), 'success');
+    else if (a.late) showMsg(dom.qMsg, t('jq.late'), 'error');
+    else if (!a.data.open) showMsg(dom.qMsg, t('jq.closed'), 'warning');
+    else if (a.msg) showMsg(dom.qMsg, t(a.msg), 'error');
+    else dom.qMsg.hidden = true;
+  }
+
+  /** The countdown from the host's last timer (server time, this phone's clock offset). */
+  function renderTimer() {
+    if (!app.q) return;
+    const q = app.q.data;
+    const tm = q.timer;
+    const serverNow = Date.now() + app.offset;
+    const left = tm.running && q.open ? Math.max(0, tm.remainingMs - (serverNow - tm.atMs)) : Math.max(0, tm.remainingMs);
+    const low = left <= tm.totalMs / 3;
+    dom.qTimerValue.textContent = ltr(String(Math.ceil(left / 1000)));
+    dom.qTimerValue.classList.toggle('is-low', low);
+    dom.qBar.style.width = (100 * left / tm.totalMs).toFixed(1) + '%';
+    dom.qBar.classList.toggle('is-low', low);
+    let note = '';
+    if (q.open && !tm.running) note = t('jq.paused');
+    else if (q.open && left === 0) note = t('jq.timeUp');
+    dom.qTimerNote.textContent = note;
+  }
+
+  /** Send the answer once: locked after; "Too late" once the host closed the question. */
+  async function onSend(event) {
+    event.preventDefault();
+    const a = app.q;
+    if (!a || answerLocked()) return;
+    const text = dom.qInput.value.replace(/[\u0000-\u001f\u007f]+/g, ' ').trim();
+    if (!text) a.msg = 'jq.empty';
+    else if (Array.from(text).length > ANSWER_MAX) a.msg = 'jq.tooLong';
+    if (a.msg) {
+      renderAnswerState();
+      dom.qInput.focus();
+      return;
+    }
+    a.sending = true;
+    renderAnswerState();
+    const seq = a.seq;
+    try {
+      const data = await call('action=answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ code: app.code, device_token: app.token, seq: seq, text: text }),
+      });
+      if (app.q !== a) return;
+      a.sent = typeof data.text === 'string' ? data.text : text;
+    } catch (err) {
+      if (app.q !== a) return;
+      const reason = err.data && err.data.reason;
+      if (err.status === 409 && reason === 'late') {
+        a.late = true;
+      } else if (err.status === 409) { // sent already (another tab or a lost reply): the server's copy shows next poll
+        a.locked = true;
+        app.version = null;
+        schedule(0);
+      } else if (err.status === 404) {
+        a.sending = false;
+        gameEnded();
+        return;
+      } else if (err.status === 401 || err.status === 403) {
+        a.sending = false;
+        onPollError(err, true);
+        return;
+      } else {
+        a.msg = 'jq.failed';
+      }
+    } finally {
+      a.sending = false;
+    }
+    renderAnswerState();
   }
 
   function columnName(c) {
@@ -507,6 +762,14 @@
 
   function init() {
     dom.codeForm.addEventListener('submit', onCodeSubmit);
+    dom.qForm.addEventListener('submit', onSend);
+    dom.qLang.addEventListener('click', onQuestionLang);
+    dom.qInput.addEventListener('input', () => {
+      if (app.q && app.q.msg) {
+        app.q.msg = null;
+        renderAnswerState();
+      }
+    });
     dom.codeInput.addEventListener('input', () => {
       dom.codeError.hidden = true;
       dom.codeInput.removeAttribute('aria-invalid');

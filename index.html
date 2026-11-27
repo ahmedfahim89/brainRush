@@ -48,11 +48,11 @@
   <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="css/style.020b81cb.css">
+  <link rel="stylesheet" href="css/style.0ba46723.css">
   <!-- CHRISTMAS (US-55, D-66): seasonal theme, only active under body.theme-christmas; remove after Christmas -->
   <link rel="stylesheet" href="css/christmas.717dbe43.css">
   <!-- Interface language (US-49): loaded first, so an Arabic page is right to left from its first paint -->
-  <script src="js/i18n.c6802bfd.js"></script>
+  <script src="js/i18n.c8f82b64.js"></script>
 </head>
 <body class="game">
   <!-- CHRISTMAS (US-55, D-66): first in <body> so the last known theme is applied before the first paint; remove after Christmas -->
@@ -432,6 +432,13 @@
             Helpers, once per game before anyone is scored: ABC 3 choices, &#8644; swap, &frac12; skip for half the points.</p>
           <p id="helper-msg" class="msg msg-error" role="alert" hidden></p>
           <ul id="score-rows" class="score-rows"></ul>
+          <!-- Phone buzzer (US-64, owner CR 1): the phones' answers in arrival order, under the scoring rows at
+               the column's full width; the host still judges with Correct / Wrong above -->
+          <div id="answers-panel" class="answers-panel" hidden>
+            <h4 class="answers-title" data-i18n="answers.title">Answers from phones</h4>
+            <ol id="answers-list" class="answers-list" aria-live="polite"></ol>
+            <p id="answers-hint" class="hint answers-hint"></p>
+          </div>
           <button type="button" id="back-btn" class="btn btn-primary btn-large btn-block" data-i18n="scoring.back">Back to Board</button>
         </section>
 
@@ -669,6 +676,6 @@
   <script src="js/speech.019a1850.js"></script>
   <!-- QR code of the Phone buzzer join link (US-52): loaded before game.js, which uses it -->
   <script src="js/qrcode.3ccdae91.js"></script>
-  <script src="js/game.78c2221f.js"></script>
+  <script src="js/game.b9add461.js"></script>
 </body>
 </html>

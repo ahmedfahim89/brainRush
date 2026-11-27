@@ -11,10 +11,10 @@
   <link rel="icon" href="img/mokh-favicon.svg" type="image/svg+xml">
   <link rel="icon" href="img/mokh-favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.020b81cb.css">
-  <link rel="stylesheet" href="css/join.65369f06.css">
+  <link rel="stylesheet" href="css/style.0ba46723.css">
+  <link rel="stylesheet" href="css/join.9594bd94.css">
   <!-- Interface language (US-49): loaded first, so an Arabic page is right to left from its first paint -->
-  <script src="js/i18n.c6802bfd.js"></script>
+  <script src="js/i18n.c8f82b64.js"></script>
 </head>
 <body class="join">
   <header class="page-header join-header">
@@ -51,6 +51,26 @@
     <section id="join-board-screen" class="join-screen" aria-labelledby="join-you" hidden>
       <h2 id="join-you" class="join-you"></h2>
       <p id="join-status" class="join-status" role="status"></p>
+      <!-- The open question (US-64): the answer is never on the phone; the picture stays on the host screen -->
+      <section id="join-question" class="join-question" aria-labelledby="jq-head" hidden>
+        <h3 id="jq-head" class="jq-head"></h3>
+        <p id="jq-picture" class="hint jq-picture" hidden data-i18n="jq.picture">Look at the host screen for the picture.</p>
+        <p id="jq-text" class="jq-text"></p>
+        <button type="button" id="jq-lang" class="btn btn-small jq-lang" hidden></button>
+        <ol id="jq-choices" class="jq-choices" hidden></ol>
+        <div class="jq-timer" role="timer" aria-labelledby="jq-timer-label">
+          <span id="jq-timer-label" class="visually-hidden" data-i18n="jq.secondsLeft">Seconds left</span>
+          <span id="jq-timer-value" class="jq-timer-value"></span>
+          <div class="jq-track" aria-hidden="true"><div id="jq-bar" class="jq-bar"></div></div>
+          <span id="jq-timer-note" class="jq-timer-note"></span>
+        </div>
+        <form id="jq-form" class="jq-form" novalidate>
+          <label for="jq-input" data-i18n="jq.label">Your answer</label>
+          <input id="jq-input" class="jq-input" type="text" maxlength="200" autocomplete="off" autocapitalize="sentences" dir="auto" enterkeyhint="send" aria-describedby="jq-msg">
+          <button type="submit" id="jq-send" class="btn btn-primary btn-large" data-i18n="jq.send">Send</button>
+        </form>
+        <p id="jq-msg" class="msg" role="status" hidden></p>
+      </section>
       <h3 class="visually-hidden" data-i18n="join.board">Game board</h3>
       <div id="join-board" class="join-board"></div>
       <h3 class="join-scores-title" data-i18n="join.scores">Scores</h3>
@@ -62,6 +82,6 @@
     <nav aria-label="Site" data-i18n-attr="aria-label:nav.site"><a href="how-to-play.html" target="_blank" rel="noopener" data-i18n="nav.howToPlay">How to play</a> &middot; <a href="privacy.html" target="_blank" rel="noopener" data-i18n="nav.privacy">Privacy</a> &middot; <a href="terms.html" target="_blank" rel="noopener" data-i18n="nav.terms">Terms</a></nav>
   </footer>
 
-  <script src="js/join.d2eda833.js"></script>
+  <script src="js/join.e7f30eb8.js"></script>
 </body>
 </html>

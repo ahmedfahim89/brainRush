@@ -2135,6 +2135,20 @@ html[dir="rtl"] .bracket-name { text-align: right; }
 .room-player.is-joined .room-player-state { color: var(--success); font-weight: 700; }
 .room-none { margin: 0.2rem 0 0; }
 .double-card .room-taken-title { font-size: 1.5rem; animation: none; } /* BUG-52-02: a notice, not a celebration */
+
+/* Answers panel (US-64): the phones' answers in arrival order, above the scoring rows */
+.answers-panel { margin: 0.3rem 0 0.4rem; padding: 0.25rem 0.6rem; background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius); }
+.answers-panel[hidden] { display: none; }
+.answers-title { margin: 0 0 0.2rem; color: var(--gold); font-size: 0.9rem; }
+/* game.js (fitAnswersList) caps the height to the room left above Back to Board (D-30); the gutter keeps
+   the scrollbar off the times (owner CR 1) */
+.answers-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.15rem; margin: 0; padding: 0; overflow-y: auto; scrollbar-gutter: stable; list-style: none; }
+.answer-row { display: grid; grid-template-columns: minmax(0, 10rem) minmax(0, 1fr) max-content; align-items: baseline; gap: 0.6rem; min-width: 0; padding-inline-end: 0.3rem; }
+.answer-name { justify-self: start; max-width: 100%; overflow: hidden; padding: 0.05rem 0.45rem; font-size: 0.85rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; border-radius: var(--radius); }
+.answer-said { min-width: 0; overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; } /* full text in the tooltip */
+.answer-time { white-space: nowrap; color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.answers-hint { margin: 0; }
+.answers-hint[hidden] { display: none; }
 @media (max-width: 480px) {
   .room-qr { width: 9rem; height: 9rem; }
   .room-code { font-size: 1.6rem; }
