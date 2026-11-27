@@ -14,7 +14,8 @@
 -- Rooms with no request for 6 hours are deleted by api/rooms.php the next time any rooms request
 -- comes in (no cron on shared hosting).
 -- New installs use sql/schema.sql or sql/schema-hosted.sql, which already include these tables.
--- Phone Sprint 2 adds room_answers and the open-question columns (US-64); phone Sprint 3 adds room_bets (US-65).
+-- Phone Sprint 2 adds room_answers and the open-question columns (US-64); phone Sprint 3 adds room_bets and
+-- the bet-round columns (US-65).
 --
 -- BACK UP THE DATABASE FIRST (phpMyAdmin: Export; locally: mysqldump).
 --   local:   mysql -u root brainrush < sql/migrate-add-rooms.sql
@@ -35,6 +36,10 @@ CREATE TABLE IF NOT EXISTS game_rooms (
   q_open     TINYINT(1)   NOT NULL DEFAULT 0,
   q_opened_ms BIGINT UNSIGNED NOT NULL DEFAULT 0,
   question   MEDIUMTEXT   NULL,
+  b_seq      INT UNSIGNED NOT NULL DEFAULT 0,
+  b_open     TINYINT(1)   NOT NULL DEFAULT 0,
+  b_revealed TINYINT(1)   NOT NULL DEFAULT 0,
+  bet        MEDIUMTEXT   NULL,
   created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   seen_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -66,6 +71,21 @@ CREATE TABLE IF NOT EXISTS room_answers (
   CONSTRAINT fk_room_answers_room FOREIGN KEY (room_id) REFERENCES game_rooms (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
+-- Phone Sprint 3 (US-65): one Golden Goal bet per contestant per bet round (bet_seq), a whole number from
+-- 0 to that contestant's limit (D-48), accepted only while the round is open. The room keeps the round:
+-- b_seq (its number), b_open, b_revealed (the host asked for the amounts after marking) and bet (JSON:
+-- the category, the Golden Goal round and each contestant's score and limit). Amounts go to the host
+-- only after marking, and each phone sees only its own bet.
+CREATE TABLE IF NOT EXISTS room_bets (
+  room_id     INT UNSIGNED     NOT NULL,
+  bet_seq     INT UNSIGNED     NOT NULL,
+  contestant  TINYINT UNSIGNED NOT NULL,
+  amount      INT UNSIGNED     NOT NULL,
+  received_ms BIGINT UNSIGNED  NOT NULL,
+  PRIMARY KEY (room_id, bet_seq, contestant),
+  CONSTRAINT fk_room_bets_room FOREIGN KEY (room_id) REFERENCES game_rooms (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
 -- Fix round 1 (BUG-52-02): a database that ran an earlier copy of this file gets the column too.
 ALTER TABLE game_rooms ADD COLUMN IF NOT EXISTS host_session CHAR(32) NULL AFTER host_hash;
 
@@ -75,6 +95,13 @@ ALTER TABLE game_rooms
   ADD COLUMN IF NOT EXISTS q_open TINYINT(1) NOT NULL DEFAULT 0 AFTER q_seq,
   ADD COLUMN IF NOT EXISTS q_opened_ms BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER q_open,
   ADD COLUMN IF NOT EXISTS question MEDIUMTEXT NULL AFTER q_opened_ms;
+
+-- Phone Sprint 3 (US-65): a database that ran an earlier copy of this file gets the bet columns.
+ALTER TABLE game_rooms
+  ADD COLUMN IF NOT EXISTS b_seq INT UNSIGNED NOT NULL DEFAULT 0 AFTER question,
+  ADD COLUMN IF NOT EXISTS b_open TINYINT(1) NOT NULL DEFAULT 0 AFTER b_seq,
+  ADD COLUMN IF NOT EXISTS b_revealed TINYINT(1) NOT NULL DEFAULT 0 AFTER b_open,
+  ADD COLUMN IF NOT EXISTS bet MEDIUMTEXT NULL AFTER b_revealed;
 
 -- Owner 2026-11-27 (US-64): helpers in Phone buzzer games, off by default (Admin > Game settings).
 INSERT IGNORE INTO settings (name, value) VALUES ('phone_helpers_enabled', '0');

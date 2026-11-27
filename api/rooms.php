@@ -12,18 +12,32 @@
 //   POST /api/rooms.php?action=close_question  body { code, host_token, session, seq }         -> 200 { closed, version }
 //   GET  /api/rooms.php?action=answers&code=&seq=&session=  header X-Host-Token
 //        -> 200 { seq, open, answers: [{ contestant, text, ms }] } in arrival order (ms since the question opened)
-//   push, release and the question calls from a host session that is not the room's current one
-//   -> 409 { error, other_tab: true }
+//   POST /api/rooms.php?action=start_bets  body { code, host_token, session, bet: { round, catName, catNameAr, scores } }
+//        -> 200 { seq, version } (US-65: a Golden Goal bet round; the same open round again gives its seq back)
+//   GET  /api/rooms.php?action=bets_status&code=&seq=&session=  header X-Host-Token
+//        -> 200 { seq, open, revealed, count, players: [{ bet, joined }] }: who has bet, never an amount
+//   POST /api/rooms.php?action=close_bets  body { code, host_token, session, seq }  -> 200 { closed, version, bets }
+//        bets[i] = true when contestant i has bet (the final list once closed; never an amount)
+//   POST /api/rooms.php?action=reveal_bets body { code, host_token, session, seq }  -> 200 { seq, amounts }
+//        amounts[i] = contestant i's bet, or null when they did not bet (closes the round first)
+//   POST /api/rooms.php?action=close  body { code, host_token, session }  -> 200 { closed: true } (New Game)
+//   push, release, the question and bet calls and close from a host session that is not the room's
+//   current one -> 409 { error, other_tab: true }
 // Player calls (the room code is public: it is in the link and the QR code):
 //   GET  /api/rooms.php?action=lobby&code=ABC234[&session=<host session>]       -> 200 { version, mode, players[, other_tab] }
 //   POST /api/rooms.php?action=join     body { code, contestant, device_token? } -> 200 { device_token, you, version }
 //   POST /api/rooms.php?action=answer   body { code, device_token, seq, text }      -> 201 { seq, text }
 //        409 { reason: 'duplicate' } for a second answer, 409 { reason: 'late' } once that question is closed
+//   POST /api/rooms.php?action=bet      body { code, device_token, seq, amount }    -> 201 { seq, amount }
+//        400 outside 0 .. this contestant's limit; 409 { reason: 'duplicate' } for a second bet,
+//        409 { reason: 'closed' } once the round is closed
 //   GET  /api/rooms.php?action=state&code=ABC234&since=<version>  header X-Device-Token
 //        -> 200 { changed: false, version, now } when nothing changed since that version,
-//           else { changed: true, version, now, you, players, state, question, mine }
+//           else { changed: true, version, now, you, players, state, question, mine, bet }
 //        question = the open (or last closed) question as the phones may see it, or null; mine = this
 //        contestant's answer to it, or null; now = server time in ms (phones work out the countdown).
+//        bet = the last Golden Goal bet round for this contestant only (category, own score, own limit,
+//        own bet or null), or null: never another contestant's amount (US-65).
 // players = [{ name, color, joined }] in the host's order; `contestant` / `you` is an index in it.
 //
 // Rules:
@@ -48,10 +62,16 @@
 // - Owner CR 2 / CR 3 (US-64): the 3 choices go only to the phone of the contestant who used them: the
 //   question carries by (their index) and room_question_view strips the choices for every other phone.
 //   Nobody is locked out: every phone can still answer (CR 3 reverses CR 2's lock).
+// - Golden Goal bets (US-65, D-80 h, j, k): the host opens a bet round (b_seq) with the category and
+//   the scores; the server works out each limit (D-48: score or the largest point value of the board,
+//   whichever is higher) and accepts one whole-number bet per contestant while the round is open (one
+//   atomic INSERT ... SELECT). The host sees who has bet (bets_status), never the amounts, until it
+//   asks for them with reveal_bets after marking. A missing bet counts as 0 on the host (D-80 k).
+//   A bet does not bump the version: the phone that sent it knows, and a refresh gets its own amount.
 // - Tokens are 64 hex characters from random_bytes(); only their SHA-256 hashes are stored.
 // - Rooms with no request for ROOM_IDLE_HOURS are deleted on the next rooms request (no cron).
 // - A missing token gives 401, a wrong one 403, an unknown or expired room 404, bad input 400.
-//   A database without the tables (sql/migrate-add-rooms.sql not run) gives 503.
+//   A database without the tables or columns (sql/migrate-add-rooms.sql not run) gives 503.
 require_once __DIR__ . '/db.php';
 
 const ROOM_IDLE_HOURS = 6;
@@ -62,6 +82,7 @@ const ROOM_BODY_MAX = 262144;      // bytes of a request body
 const ROOM_STATE_MAX = 131072;     // bytes of the stored state (a 10 x 20 board with long names is far below)
 const ROOM_MODES = ['players' => 6, 'teams' => 4]; // D-80 b: Players and Teams only, with their limits
 const ROOM_SCREENS = ['board', 'question', 'final', 'results'];
+const ROOM_GOAL_STAGES = ['offer', 'bets', 'question']; // US-65: where Golden Goal is, for the phones
 const ROOM_MAX_POINTS = 50;        // board rows (any number of enabled point values; far above a real board)
 const ROOM_MAX_CATEGORIES = 20;    // board columns
 const ROOM_NAME_MAX = 30;          // contestant names (NAME_MAX in js/game.js)
@@ -81,8 +102,9 @@ function rooms_main(): void
         delete_idle_rooms($pdo);
         route_room_request($pdo);
     } catch (PDOException $e) {
-        if (is_missing_table($e)) {
-            error_log('BrainRush API: the room tables are missing (run sql/migrate-add-rooms.sql).');
+        // A missing table, or a missing column of a later phone sprint (42S22): the migration has not run.
+        if (is_missing_table($e) || ($e->getCode() === '42S22' && (int) ($e->errorInfo[1] ?? 0) === 1054)) {
+            error_log('BrainRush API: the room tables are missing or out of date (run sql/migrate-add-rooms.sql).');
             json_response(['error' => 'Phone buzzer is not set up on this server yet.'], 503);
         }
         throw $e;
@@ -106,6 +128,12 @@ function route_room_request(PDO $pdo): void
         'close_question' => ['POST', 'room_close_question'],
         'answers' => ['GET', 'room_answers'],
         'answer' => ['POST', 'room_answer'],
+        'start_bets' => ['POST', 'room_start_bets'],
+        'bets_status' => ['GET', 'room_bets_status'],
+        'close_bets' => ['POST', 'room_close_bets'],
+        'reveal_bets' => ['POST', 'room_reveal_bets'],
+        'bet' => ['POST', 'room_bet'],
+        'close' => ['POST', 'room_close'],
     ];
     if (!is_string($action) || !isset($routes[$action])) {
         bad_request('action must be one of: ' . implode(', ', array_keys($routes)));
@@ -181,7 +209,8 @@ function require_room_code($value): string
 function find_room(PDO $pdo, string $code): array
 {
     $stmt = $pdo->prepare(
-        'SELECT id, host_hash, host_session, names, version, q_seq, q_open, q_opened_ms, TIMESTAMPDIFF(SECOND, seen_at, NOW()) AS idle
+        'SELECT id, host_hash, host_session, names, version, q_seq, q_open, q_opened_ms, b_seq, b_open, b_revealed,
+                TIMESTAMPDIFF(SECOND, seen_at, NOW()) AS idle
            FROM game_rooms
           WHERE code = ? AND seen_at >= NOW() - INTERVAL ' . ROOM_IDLE_HOURS . ' HOUR'
     );
@@ -196,6 +225,9 @@ function find_room(PDO $pdo, string $code): array
     $room['q_seq'] = (int) $room['q_seq'];
     $room['q_open'] = (int) $room['q_open'] === 1;
     $room['q_opened_ms'] = (int) $room['q_opened_ms'];
+    $room['b_seq'] = (int) $room['b_seq'];
+    $room['b_open'] = (int) $room['b_open'] === 1;
+    $room['b_revealed'] = (int) $room['b_revealed'] === 1;
     if ((int) $room['idle'] >= ROOM_TOUCH_SECONDS) {
         $pdo->prepare('UPDATE game_rooms SET seen_at = NOW() WHERE id = ?')->execute([$room['id']]);
     }
@@ -434,6 +466,7 @@ function room_poll(PDO $pdo): void
         'state' => $state,
         'question' => $question,
         'mine' => $mine,
+        'bet' => room_bet_view($pdo, $room, (int) $you),
     ]);
 }
 
@@ -654,9 +687,18 @@ function room_question($input, int $now, int $names): array
         bad_request('question.byHelper must be choices');
     }
     $mix = state_bool($q['mix'] ?? false, 'question.mix');
+    // US-65: the Golden Goal question has no points (each contestant plays for their bet) but its round
+    $goal = state_bool($q['goal'] ?? false, 'question.goal');
+    $goalRound = $q['goalRound'] ?? null;
+    if ($goal && (!is_int($goalRound) || $goalRound < 1 || $goalRound > 1000)) {
+        bad_request('question.goalRound must be the Golden Goal round');
+    }
+    if ($goal && $mix) {
+        bad_request('question.mix must be false on the Golden Goal question');
+    }
     $points = $q['points'] ?? null;
-    if (!is_int($points) || $points < 1 || $points > ROOM_SCORE_MAX) {
-        bad_request('question.points must be positive');
+    if ($goal ? $points !== null : (!is_int($points) || $points < 1 || $points > ROOM_SCORE_MAX)) {
+        bad_request($goal ? 'question.points must be null on the Golden Goal question' : 'question.points must be positive');
     }
     $choices = null;
     if (($q['choices'] ?? null) !== null) {
@@ -683,7 +725,9 @@ function room_question($input, int $now, int $names): array
         'subName' => $mix ? state_text($q['subName'] ?? null, 'question.subName', ROOM_LABEL_MAX, true) : null,
         'subNameAr' => $mix ? state_text($q['subNameAr'] ?? null, 'question.subNameAr', ROOM_LABEL_MAX, true) : null,
         'points' => $points,
-        'x2' => state_bool($q['x2'] ?? false, 'question.x2'),
+        'goal' => $goal,
+        'goalRound' => $goal ? $goalRound : null,
+        'x2' => !$goal && state_bool($q['x2'] ?? false, 'question.x2'),
         'text' => question_text($q['text'] ?? null, 'question.text', ROOM_TEXT_MAX, false),
         'textAr' => question_text($q['textAr'] ?? null, 'question.textAr', ROOM_TEXT_MAX, true),
         'hasImage' => state_bool($q['hasImage'] ?? false, 'question.hasImage'),
@@ -697,6 +741,232 @@ function room_question($input, int $now, int $names): array
             'atMs' => $now,
         ],
     ];
+}
+
+// ---------------------------------------------------------------------------
+// Golden Goal bets (US-65, D-80 h, j, k)
+// ---------------------------------------------------------------------------
+
+/** The stored bet round (category, round, scores and limits per contestant), or null. */
+function room_bet_round(PDO $pdo, array $room): ?array
+{
+    if ($room['b_seq'] === 0) {
+        return null;
+    }
+    $stmt = $pdo->prepare('SELECT bet FROM game_rooms WHERE id = ?');
+    $stmt->execute([$room['id']]);
+    $bet = json_decode((string) $stmt->fetchColumn(), true);
+    return is_array($bet) && isset($bet['limits'], $bet['scores']) ? $bet : null;
+}
+
+/** The bet round as this contestant's phone sees it: their own score, limit and bet only. */
+function room_bet_view(PDO $pdo, array $room, int $contestant): ?array
+{
+    $bet = room_bet_round($pdo, $room);
+    if ($bet === null || !isset($bet['limits'][$contestant])) {
+        return null;
+    }
+    $mine = $pdo->prepare('SELECT amount FROM room_bets WHERE room_id = ? AND bet_seq = ? AND contestant = ?');
+    $mine->execute([$room['id'], $room['b_seq'], $contestant]);
+    $amount = $mine->fetchColumn();
+    return [
+        'seq' => $room['b_seq'],
+        'open' => $room['b_open'],
+        'revealed' => $room['b_revealed'],
+        'round' => (int) $bet['round'],
+        'catName' => $bet['catName'],
+        'catNameAr' => $bet['catNameAr'],
+        'score' => (int) $bet['scores'][$contestant],
+        'limit' => (int) $bet['limits'][$contestant],
+        'mine' => $amount === false ? null : (int) $amount,
+    ];
+}
+
+/** The bet round number of a call; 400 when it is not a positive whole number. */
+function require_bet_seq($value): int
+{
+    $seq = parse_int($value);
+    if ($seq === null || $seq < 1) {
+        bad_request('seq must be the bet round number');
+    }
+    return $seq;
+}
+
+/**
+ * A new bet round: the category and every contestant's score; the server works out each limit (D-48).
+ * A refresh or a lost reply asks again for the same round: while that round is still open, its seq comes back.
+ */
+function room_start_bets(PDO $pdo, array $body): void
+{
+    $room = require_question_host($pdo, $body);
+    $input = state_object($body['bet'] ?? null, 'bet');
+    $round = $input['round'] ?? null;
+    if (!is_int($round) || $round < 1 || $round > 1000) {
+        bad_request('bet.round must be the Golden Goal round');
+    }
+    $scores = state_list($input['scores'] ?? null, 'bet.scores', $room['names'], $room['names']);
+    foreach ($scores as $score) {
+        if (!is_int($score) || abs($score) > ROOM_SCORE_MAX) {
+            bad_request('bet.scores must be whole numbers, one per contestant');
+        }
+    }
+    $catName = question_text($input['catName'] ?? null, 'bet.catName', ROOM_LABEL_MAX, false);
+    $catNameAr = question_text($input['catNameAr'] ?? null, 'bet.catNameAr', ROOM_LABEL_MAX, true);
+    $current = room_bet_round($pdo, $room);
+    if ($room['b_open'] && $current !== null && (int) $current['round'] === $round) {
+        json_response(['seq' => $room['b_seq'], 'version' => $room['version']]);
+    }
+    [$state] = room_view($pdo, $room);
+    $largest = max($state['points']); // D-48: the largest value of this game's board
+    $bet = [
+        'round' => $round,
+        'catName' => $catName,
+        'catNameAr' => $catNameAr,
+        'scores' => $scores,
+        'limits' => array_map(fn (int $score): int => max($score, $largest), $scores),
+    ];
+    $update = $pdo->prepare(
+        'UPDATE game_rooms SET b_seq = LAST_INSERT_ID(b_seq + 1), b_open = 1, b_revealed = 0, bet = ?,
+                version = version + 1, seen_at = NOW()
+          WHERE id = ? AND host_session = ?'
+    );
+    $update->execute([encode_question($bet), $room['id'], $body['session']]);
+    if ($update->rowCount() === 0) {
+        json_response(['error' => 'This game is open in another tab.', 'other_tab' => true], 409);
+    }
+    $seq = stored_version($pdo);
+    json_response(['seq' => $seq, 'version' => current_version($pdo, $room['id'])]);
+}
+
+/** The host's poll during the bets: who has bet and who has a phone, never an amount. */
+function room_bets_status(PDO $pdo): void
+{
+    $room = find_room($pdo, require_room_code($_GET['code'] ?? null));
+    require_host($room, $_SERVER['HTTP_X_HOST_TOKEN'] ?? null);
+    require_current_session($room, require_session($_GET['session'] ?? null));
+    $seq = require_bet_seq($_GET['seq'] ?? null);
+    $stmt = $pdo->prepare('SELECT contestant FROM room_bets WHERE room_id = ? AND bet_seq = ?');
+    $stmt->execute([$room['id'], $seq]);
+    $bet = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $index) {
+        $bet[(int) $index] = true;
+    }
+    $joined = joined_indexes($pdo, $room['id']);
+    $players = [];
+    for ($i = 0; $i < $room['names']; $i++) {
+        $players[] = ['bet' => isset($bet[$i]), 'joined' => isset($joined[$i])];
+    }
+    $current = $seq === $room['b_seq'];
+    json_response([
+        'seq' => $seq,
+        'open' => $current && $room['b_open'],
+        'revealed' => $current && $room['b_revealed'],
+        'count' => count($bet),
+        'players' => $players,
+    ]);
+}
+
+/** No more bets in this round (the question opens, or the host left Golden Goal); closing twice is harmless. */
+function room_close_bets(PDO $pdo, array $body): void
+{
+    $room = require_question_host($pdo, $body);
+    $seq = require_bet_seq($body['seq'] ?? null);
+    $update = $pdo->prepare(
+        'UPDATE game_rooms SET b_open = 0, version = LAST_INSERT_ID(version + 1), seen_at = NOW()
+          WHERE id = ? AND b_seq = ? AND b_open = 1'
+    );
+    $update->execute([$room['id'], $seq]);
+    $closed = $update->rowCount() > 0;
+    $version = $closed ? stored_version($pdo) : $room['version'];
+    // OBS-65-02: who has bet once the round is closed, the list that is scored (never an amount)
+    $stmt = $pdo->prepare('SELECT contestant FROM room_bets WHERE room_id = ? AND bet_seq = ?');
+    $stmt->execute([$room['id'], $seq]);
+    $bets = array_fill(0, $room['names'], false);
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $index) {
+        $bets[(int) $index] = true;
+    }
+    json_response(['closed' => $closed, 'version' => $version, 'bets' => $bets]);
+}
+
+/** After marking: the amounts, to the host only. It closes the round first; asking again gives the same answer. */
+function room_reveal_bets(PDO $pdo, array $body): void
+{
+    $room = require_question_host($pdo, $body);
+    $seq = require_bet_seq($body['seq'] ?? null);
+    if ($seq > $room['b_seq']) {
+        not_found('There is no such bet round in this game.');
+    }
+    if ($seq === $room['b_seq'] && ($room['b_open'] || !$room['b_revealed'])) {
+        $pdo->prepare(
+            'UPDATE game_rooms SET b_open = 0, b_revealed = 1, version = version + 1, seen_at = NOW()
+              WHERE id = ? AND b_seq = ?'
+        )->execute([$room['id'], $seq]);
+    }
+    $stmt = $pdo->prepare('SELECT contestant, amount FROM room_bets WHERE room_id = ? AND bet_seq = ?');
+    $stmt->execute([$room['id'], $seq]);
+    $amounts = array_fill(0, $room['names'], null); // null = no bet (the host counts it as 0, D-80 k)
+    foreach ($stmt->fetchAll() as $row) {
+        $amounts[(int) $row['contestant']] = (int) $row['amount'];
+    }
+    json_response(['seq' => $seq, 'amounts' => $amounts]);
+}
+
+/** A phone's bet: a whole number from 0 to this contestant's limit, once per round, only while it is open. */
+function room_bet(PDO $pdo, array $body): void
+{
+    $room = find_room($pdo, require_room_code($body['code'] ?? null));
+    $token = $body['device_token'] ?? null;
+    if (!is_token($token)) {
+        json_response(['error' => 'Pick your name first.'], 401);
+    }
+    $stmt = $pdo->prepare('SELECT contestant FROM room_players WHERE room_id = ? AND device_hash = ?');
+    $stmt->execute([$room['id'], token_hash($token)]);
+    $you = $stmt->fetchColumn();
+    if ($you === false) {
+        json_response(['error' => 'This phone is no longer joined to the game. Pick your name again.'], 403);
+    }
+    $you = (int) $you;
+    $seq = require_bet_seq($body['seq'] ?? null);
+    $bet = room_bet_round($pdo, $room);
+    if ($bet === null || $seq !== $room['b_seq'] || !$room['b_open']) {
+        json_response(['error' => 'Too late: the bets are closed.', 'reason' => 'closed'], 409);
+    }
+    // BUG-65-01: a contestant who has bet already gets 409 duplicate, whatever the second amount is.
+    $sent = $pdo->prepare('SELECT 1 FROM room_bets WHERE room_id = ? AND bet_seq = ? AND contestant = ?');
+    $sent->execute([$room['id'], $seq, $you]);
+    if ($sent->fetchColumn() !== false) {
+        json_response(['error' => 'You already bet in this round.', 'reason' => 'duplicate'], 409);
+    }
+    $limit = (int) $bet['limits'][$you];
+    $amount = $body['amount'] ?? null;
+    if (!is_int($amount) || $amount < 0 || $amount > $limit) {
+        bad_request('Bet a whole number from 0 to ' . $limit . '.');
+    }
+    // Atomic: the row goes in only while this round is open, so a close always wins.
+    $insert = $pdo->prepare(
+        'INSERT INTO room_bets (room_id, bet_seq, contestant, amount, received_ms)
+         SELECT id, ?, ?, ?, ? FROM game_rooms WHERE id = ? AND b_seq = ? AND b_open = 1'
+    );
+    try {
+        $insert->execute([$seq, $you, $amount, now_ms(), $room['id'], $seq]);
+    } catch (PDOException $e) {
+        if (is_duplicate_key($e)) {
+            json_response(['error' => 'You already bet in this round.', 'reason' => 'duplicate'], 409);
+        }
+        throw $e;
+    }
+    if ($insert->rowCount() === 0) {
+        json_response(['error' => 'Too late: the bets are closed.', 'reason' => 'closed'], 409);
+    }
+    json_response(['seq' => $seq, 'amount' => $amount], 201);
+}
+
+/** New Game: the host closes the room (with its players, answers and bets); its phones then show "This game has ended." */
+function room_close(PDO $pdo, array $body): void
+{
+    $room = require_question_host($pdo, $body);
+    $pdo->prepare('DELETE FROM game_rooms WHERE id = ? AND host_session = ?')->execute([$room['id'], $body['session']]);
+    json_response(['closed' => true]);
 }
 
 // ---------------------------------------------------------------------------
@@ -736,9 +1006,14 @@ function room_state($input, ?int $names): array
     $points = state_points($input['points'] ?? null);
     $categories = state_categories($input['categories'] ?? null);
     $cells = state_cells($input['cells'] ?? null, count($points), $categories, count($contestants));
+    $goal = $input['goal'] ?? null;
+    if ($goal !== null && (!is_string($goal) || !in_array($goal, ROOM_GOAL_STAGES, true) || $screen !== 'final')) {
+        bad_request('state.goal must be null or one of: ' . implode(', ', ROOM_GOAL_STAGES) . ' (on the final screen)');
+    }
     return [
         'mode' => $mode,
         'screen' => $screen,
+        'goal' => $goal,
         'contestants' => $contestants,
         'points' => $points,
         'categories' => $categories,

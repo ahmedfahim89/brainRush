@@ -147,6 +147,38 @@
 .jq-form .btn { flex: none; }
 #jq-msg { margin: 0.6rem 0 0; overflow-wrap: anywhere; }
 
+/* ---------- Golden Goal bet and game over (US-65) ---------- */
+.join-bet[hidden], .join-over[hidden], .jq-bet[hidden], .jbet-cat[hidden], .jbet-score[hidden] { display: none; }
+.join-scores-title[hidden], .join-scores[hidden], #join-ended-over[hidden], #jbet-form[hidden] { display: none; }
+.join-bet { padding: 0.8rem; background: var(--panel); border: 1px solid var(--gold-dark); border-radius: var(--radius); }
+.jbet-cat { margin: 0 0 0.3rem; font-size: 1.2rem; font-weight: 800; overflow-wrap: anywhere; }
+.jbet-score { margin: 0 0 0.7rem; color: var(--muted); font-weight: 700; }
+.jbet-range { flex: 1 0 100%; margin: 0; }
+.jbet-input { font-variant-numeric: tabular-nums; letter-spacing: 0.05em; }
+#jbet-msg { margin: 0.6rem 0 0; overflow-wrap: anywhere; }
+.jq-bet { margin: 0 0 0.6rem; color: var(--gold); font-weight: 700; }
+.join-over { margin: 0 0 1rem; }
+.jover-title { margin: 0 0 0.3rem; color: var(--gold); }
+.jover-winner { margin: 0 0 0.7rem; font-size: 1.25rem; font-weight: 800; overflow-wrap: anywhere; }
+.jover-list { display: grid; gap: 0.4rem; margin: 0 0 1rem; padding: 0; list-style: none; }
+.jover-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 0.5rem;
+  min-width: 0;
+  padding: 0.45rem 0.7rem;
+  background: var(--panel-2);
+  border-inline-start: 6px solid var(--border);
+  border-radius: var(--radius);
+}
+.jover-row.is-me { box-shadow: 0 0 0 2px var(--gold); }
+.jover-row.is-winner .jover-name { color: var(--gold); }
+.jover-rank { flex: none; color: var(--muted); font-weight: 700; }
+.jover-name { flex: 1 1 auto; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.jover-score { flex: none; font-size: 1.15rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+#join-again { margin-top: 0.4rem; }
+
 .join-scores-title { margin: 1.1rem 0 0.4rem; color: var(--gold); }
 .join-scores { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 0.4rem; margin: 0; padding: 0; list-style: none; }
 .jb-score {

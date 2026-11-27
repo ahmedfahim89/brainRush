@@ -1,6 +1,6 @@
 # BrainRush — Sprint Plan
 
-Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..US-30 in Sprints 1-6, decisions D-01..D-32, follow-ups FU-01..FU-15; Epic E17 US-42..US-53 in Sprints 7-15, open owner questions FU-20..FU-24; FU-24 cancelled 2026-11-27). Phone buzzer (US-52, US-64, US-65, D-80): phone Sprints 0-3 on branch `phone-buzzer`, see the section after Sprint 13; open owner question FU-117.
+Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..US-30 in Sprints 1-6, decisions D-01..D-32, follow-ups FU-01..FU-15; Epic E17 US-42..US-53 in Sprints 7-15, open owner questions FU-20..FU-24; FU-24 cancelled 2026-11-27). Phone buzzer (US-52, US-64, US-65, D-80): phone Sprints 0-3 on branch `phone-buzzer`, see the section after Sprint 13; FU-117 answered 2026-11-27 (Host control bet rule).
 
 **Overall status (2026-10-19):** Sprints 1-6 Done and shipped. Sprint 6 (Question bank) and D-32 (pick 1..N categories) were merged via PR #11 on 2026-10-11, and the hosted DB is migrated (FU-11). Follow-ups FU-10..FU-15 are all Done; no open items. Later owner requests were shipped outside the sprint cycle: Egypt questions (PR #13, #16), Arabic localization (PR #17, #19), the Gen Z set (PR #18), the AI set (PR #20), the Egyptians set (`sql/add-egyptians-questions.sql`, PR #22, 2026-10-15), the game start log (`api/game-log.php` writes one line per started game with time, player names and categories to a daily `logs/game-YYYY-MM-DD.log`, blocked from the web; PR #24, deployed 2026-10-18) and the "new questions" banner (gold strip at the top of the setup screen; Admin > Game settings turns it on or off and sets its text, stored as `banner_enabled` / `banner_text` settings, no DB migration; branch `new-questions-banner`, 2026-10-19).
 
@@ -27,9 +27,9 @@ Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..U
 | 13 | Arabic interface (US-49) | Accepted by the PO 2026-11-09 (ran before Sprint 12); merged to `main` (PR #94, `1629605`); FU-47, FU-48 and FU-49 are Done in the backlog. CR "Arabic category names" accepted 2026-11-09 (D-61); hosted migration before the code (FU-53) |
 | 14 | Phone buzzers (US-52), spike first | Replaced 2026-11-27 by the Phone buzzer plan below (D-80; FU-24 cancelled) |
 | Phone 0 | Phone buzzer docs (stories US-52, US-64, US-65; D-80) | Done (2026-11-27) |
-| Phone 1 | Rooms, joining, live board (US-52) | Planned |
-| Phone 2 | Questions and answers on phones (US-64) | Planned |
-| Phone 3 | Golden Goal bets on phones, release (US-65) | Planned (blocked until FU-117 is answered) |
+| Phone 1 | Rooms, joining, live board (US-52) | Done, merged PR #162 (not live) |
+| Phone 2 | Questions and answers on phones (US-64) | Done, merged PR #163 (not live) |
+| Phone 3 | Golden Goal bets on phones, release (US-65) | Accepted by the PO 2026-11-27 (D-80 ar to ba), owner's check done (FU-126), committed; release (live smoke test with 3+ real phones, FU-127) and AR review (FU-121) open |
 | 15 | Rewarded second chance in Streak (US-51) | Planned (later; blocked by FU-23) |
 
 Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops) -> product-owner accepts -> scrum-master updates status -> commit on branch `sprint-N` + PR to `main`.
@@ -673,7 +673,7 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 - The phone-sprint DoD above, plus: a full game (no Golden Goal) is played with every answer typed on phones; the answer text never reaches phones.
 - `room_answers` is in the migrate SQL and both schema files; migrate imported on Hostinger before the code.
 
-**Status:** Started at the owner's request 2026-11-27. **Accepted by the PO 2026-11-27, waiting for the owner's check.** Dev note `docs/sprints/phone-sprint-2-dev.md` (fix round 1), test report `docs/sprints/phone-sprint-2-test.md` (18 PASS, 1 FAIL, 2 PENDING; BUG-64-01 fixed, BUG-64-02 pre-existing and as intended); PO decisions D-80 z to am. Branch `phone-buzzer`, uncommitted; local migration run. Next: owner's local check (FU-122), commit, PR, hosted migration and deploy (FU-123, can be combined with FU-119); retry of a failed question open is FU-124 (Could).
+**Status:** Started at the owner's request 2026-11-27. **Accepted by the PO 2026-11-27; owner's check done (FU-122); merged in PR #163 on 2026-11-27; not deployed live.** Dev note `docs/sprints/phone-sprint-2-dev.md` (fix round 1), test report `docs/sprints/phone-sprint-2-test.md` (18 PASS, 1 FAIL, 2 PENDING; BUG-64-01 fixed, BUG-64-02 pre-existing and as intended); PO decisions D-80 z to am. Branch `phone-buzzer`, uncommitted; local migration run. Next: owner's local check (FU-122), commit, PR, hosted migration and deploy (FU-123, can be combined with FU-119); retry of a failed question open is FU-124 (Could).
 
 ### Phone Sprint 3 — Golden Goal bets on phones and release (US-65)
 
@@ -696,7 +696,7 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 - The phone-sprint DoD above, plus: a full game including Golden Goal is played in both Host control and Phone buzzer.
 - Live smoke test on Hostinger with 3 or more real phones after the deploy (observed delay and server errors noted); owner accepts the release.
 
-**Status:** Deferred by the owner (2026-11-27) until they ask; when resumed, still blocked until FU-117 is answered
+**Status:** Started on the owner's request 2026-11-27 (FU-117 answered: bet limit = Host control rule, D-48). **Accepted by the PO 2026-11-27, owner's check done (FU-126), committed on `phone-buzzer` 2026-11-27.** Dev note `docs/sprints/phone-sprint-3-dev.md` (fix round 1), test report `docs/sprints/phone-sprint-3-test.md` (first run 27 PASS, 3 FAIL, 5 PENDING; Re-test 1: 12 PASS, 0 FAIL, 2 PENDING; BUG-65-01 to 03 and OBS-65-02 fixed); PO decisions D-80 ar to ba. Branch `phone-buzzer`, uncommitted; local migration run. Next: owner's local check (FU-126, includes the Tournament Golden Goal and the negative-score Arabic offer), commit, PR. The DoD's live smoke test with 3+ real phones and the owner's release acceptance are FU-127 (combined with FU-119, FU-120 and FU-123; the owner is not deploying for now); native Arabic review FU-121.
 
 ---
 

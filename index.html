@@ -48,11 +48,11 @@
   <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="css/style.0ba46723.css">
+  <link rel="stylesheet" href="css/style.f2b51c93.css">
   <!-- CHRISTMAS (US-55, D-66): seasonal theme, only active under body.theme-christmas; remove after Christmas -->
   <link rel="stylesheet" href="css/christmas.717dbe43.css">
   <!-- Interface language (US-49): loaded first, so an Arabic page is right to left from its first paint -->
-  <script src="js/i18n.c8f82b64.js"></script>
+  <script src="js/i18n.c2a5d0ae.js"></script>
 </head>
 <body class="game">
   <!-- CHRISTMAS (US-55, D-66): first in <body> so the last known theme is applied before the first paint; remove after Christmas -->
@@ -490,6 +490,17 @@
           </div>
           <p id="final-wager-error" class="field-error" role="alert" hidden></p>
         </form>
+        <!-- Phone buzzer (US-65): the bets are made on the phones; the host sees who has bet, never an amount -->
+        <div id="final-phone" class="final-phone" hidden>
+          <p id="final-phone-count" class="final-phone-count" role="status"></p>
+          <p class="hint" data-i18n="final.phoneHint">Each one bets privately on their phone. The bets show here once everyone is marked.</p>
+          <p id="final-phone-msg" class="msg" role="alert" hidden></p>
+          <div class="actions final-phone-actions">
+            <button type="button" id="final-phone-continue" class="btn btn-large" data-i18n="final.phoneContinue">Continue without missing bets</button>
+            <!-- The share panel, so a name can be released or a phone can join during the wait -->
+            <button type="button" id="final-phone-room" class="btn btn-room"></button>
+          </div>
+        </div>
         <div id="final-ready" class="final-ready" hidden>
           <p class="final-ready-text" data-i18n="final.allIn">All bets are in!</p>
           <button type="button" id="final-open" class="btn btn-primary btn-large" data-i18n="final.open">Show the question</button>
@@ -676,6 +687,6 @@
   <script src="js/speech.019a1850.js"></script>
   <!-- QR code of the Phone buzzer join link (US-52): loaded before game.js, which uses it -->
   <script src="js/qrcode.3ccdae91.js"></script>
-  <script src="js/game.b9add461.js"></script>
+  <script src="js/game.6ed2351f.js"></script>
 </body>
 </html>
