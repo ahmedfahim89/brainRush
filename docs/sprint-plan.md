@@ -29,7 +29,7 @@ Owner: Scrum Master. Inputs: `docs/spec.md`, `docs/product-backlog.md` (US-01..U
 | Phone 0 | Phone buzzer docs (stories US-52, US-64, US-65; D-80) | Done (2026-11-27) |
 | Phone 1 | Rooms, joining, live board (US-52) | Done, merged PR #162 (not live) |
 | Phone 2 | Questions and answers on phones (US-64) | Done, merged PR #163 (not live) |
-| Phone 3 | Golden Goal bets on phones, release (US-65) | Accepted by the PO 2026-11-27 (D-80 ar to ba), owner's check done (FU-126), committed; release (live smoke test with 3+ real phones, FU-127) and AR review (FU-121) open |
+| Phone 3 | Golden Goal bets on phones, release (US-65) | Accepted by the PO 2026-11-27 (D-80 ar to ba), owner's check done (FU-126), merged PR #164 (not live); release (live smoke test with 3+ real phones, FU-127) and AR review (FU-121) open |
 | 15 | Rewarded second chance in Streak (US-51) | Planned (later; blocked by FU-23) |
 
 Flow per sprint: game-developer implements -> game-tester tests (max 2 fix loops) -> product-owner accepts -> scrum-master updates status -> commit on branch `sprint-N` + PR to `main`.
@@ -696,7 +696,7 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 - The phone-sprint DoD above, plus: a full game including Golden Goal is played in both Host control and Phone buzzer.
 - Live smoke test on Hostinger with 3 or more real phones after the deploy (observed delay and server errors noted); owner accepts the release.
 
-**Status:** Started on the owner's request 2026-11-27 (FU-117 answered: bet limit = Host control rule, D-48). **Accepted by the PO 2026-11-27, owner's check done (FU-126), committed on `phone-buzzer` 2026-11-27.** Dev note `docs/sprints/phone-sprint-3-dev.md` (fix round 1), test report `docs/sprints/phone-sprint-3-test.md` (first run 27 PASS, 3 FAIL, 5 PENDING; Re-test 1: 12 PASS, 0 FAIL, 2 PENDING; BUG-65-01 to 03 and OBS-65-02 fixed); PO decisions D-80 ar to ba. Branch `phone-buzzer`, uncommitted; local migration run. Next: owner's local check (FU-126, includes the Tournament Golden Goal and the negative-score Arabic offer), commit, PR. The DoD's live smoke test with 3+ real phones and the owner's release acceptance are FU-127 (combined with FU-119, FU-120 and FU-123; the owner is not deploying for now); native Arabic review FU-121.
+**Status:** Started on the owner's request 2026-11-27 (FU-117 answered: bet limit = Host control rule, D-48). **Accepted by the PO 2026-11-27, owner's check done (FU-126), merged in PR #164 on 2026-11-27; not deployed live (the owner deploys after the Phone buzzer helper rules, FU-125, are settled).** Dev note `docs/sprints/phone-sprint-3-dev.md` (fix round 1), test report `docs/sprints/phone-sprint-3-test.md` (first run 27 PASS, 3 FAIL, 5 PENDING; Re-test 1: 12 PASS, 0 FAIL, 2 PENDING; BUG-65-01 to 03 and OBS-65-02 fixed); PO decisions D-80 ar to ba. Branch `phone-buzzer`, uncommitted; local migration run. Next: owner's local check (FU-126, includes the Tournament Golden Goal and the negative-score Arabic offer), commit, PR. The DoD's live smoke test with 3+ real phones and the owner's release acceptance are FU-127 (combined with FU-119, FU-120 and FU-123; the owner is not deploying for now); native Arabic review FU-121.
 
 ---
 
