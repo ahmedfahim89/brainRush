@@ -676,6 +676,7 @@
       'join.endedTitle': 'This game has ended.',
       'join.endedHint': 'Thanks for playing. To play again, join the host\'s new game.',
       'join.again': 'Join another game',
+      'join.home': 'Main Menu',
     },
 
     // Arabic (Modern Standard Arabic), AI-drafted: to be reviewed by an Arabic speaker
@@ -1327,6 +1328,7 @@
       'join.endedTitle': 'انتهت هذه اللعبة.',
       'join.endedHint': 'شكرًا على اللعب. لتلعب من جديد، انضم إلى اللعبة الجديدة لدى المقدّم.',
       'join.again': 'الانضمام إلى لعبة أخرى',
+      'join.home': 'القائمة الرئيسية',
     },
   };
 

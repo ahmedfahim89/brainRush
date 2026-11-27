@@ -172,6 +172,8 @@
 .jover-name { flex: 1 1 auto; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
 .jover-score { flex: none; font-size: 1.15rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 #join-again { margin-top: 0.4rem; }
+#join-ended-screen .btn-home { margin-inline-start: 0.6rem; }
+.btn-home { display: inline-block; margin: 0.4rem 0 0; text-decoration: none; text-align: center; background: var(--blue); color: #fff; border-color: var(--blue); font-weight: 600; }
 
 /* ---------- Phone helpers (US-66, D-81) ---------- */
 .jh-box[hidden], .jh-row[hidden], .jh-chip[hidden], .jh-picker[hidden], .jh-hint[hidden], .jh-frozen[hidden], .jh-on[hidden], .jb-score-helpers[hidden] { display: none; }
