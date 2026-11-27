@@ -1771,6 +1771,13 @@ body[data-screen="crossword"] .site-footer { display: none; }
 .final-wager-row .btn { flex: none; }
 #final-wager-show[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
 .final-ready-text { margin: 0 0 0.6rem; font-size: 1.2rem; font-weight: 700; color: var(--success); }
+/* Phone buzzer (US-65): the host waits for the bets made on the phones (who has bet, never an amount) */
+.final-phone { max-width: 36rem; margin: 0 auto; padding: 0.9rem 1.2rem 1rem; background: var(--panel); border: 1px solid var(--gold-dark); border-radius: var(--radius); }
+.final-phone[hidden] { display: none; }
+.final-phone-count { margin: 0 0 0.3rem; color: var(--text); font-size: 1.25rem; font-weight: 700; }
+.final-phone .hint { margin: 0 0 0.7rem; }
+.final-phone .msg { margin: 0 0 0.7rem; text-align: start; }
+.final-phone-actions { align-items: center; justify-content: center; margin-top: 0; }
 /* Final question scoring: the wager appears (+300 / -300) once the contestant is scored */
 .srow-tally { display: flex; flex: none; align-items: center; gap: 0.35rem; }
 .srow-wager { font-weight: 800; font-variant-numeric: tabular-nums; }

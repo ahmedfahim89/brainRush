@@ -11,10 +11,10 @@
   <link rel="icon" href="img/mokh-favicon.svg" type="image/svg+xml">
   <link rel="icon" href="img/mokh-favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.0ba46723.css">
-  <link rel="stylesheet" href="css/join.9594bd94.css">
+  <link rel="stylesheet" href="css/style.f2b51c93.css">
+  <link rel="stylesheet" href="css/join.912f4120.css">
   <!-- Interface language (US-49): loaded first, so an Arabic page is right to left from its first paint -->
-  <script src="js/i18n.c8f82b64.js"></script>
+  <script src="js/i18n.c2a5d0ae.js"></script>
 </head>
 <body class="join">
   <header class="page-header join-header">
@@ -56,6 +56,7 @@
         <h3 id="jq-head" class="jq-head"></h3>
         <p id="jq-picture" class="hint jq-picture" hidden data-i18n="jq.picture">Look at the host screen for the picture.</p>
         <p id="jq-text" class="jq-text"></p>
+        <p id="jq-bet" class="jq-bet" hidden></p>
         <button type="button" id="jq-lang" class="btn btn-small jq-lang" hidden></button>
         <ol id="jq-choices" class="jq-choices" hidden></ol>
         <div class="jq-timer" role="timer" aria-labelledby="jq-timer-label">
@@ -71,10 +72,41 @@
         </form>
         <p id="jq-msg" class="msg" role="status" hidden></p>
       </section>
+      <!-- Golden Goal (US-65): this phone's private bet (locked once sent), then its result -->
+      <section id="join-bet" class="join-bet" aria-labelledby="jbet-head" hidden>
+        <h3 id="jbet-head" class="jq-head"></h3>
+        <p id="jbet-cat" class="jbet-cat"></p>
+        <p id="jbet-score" class="jbet-score"></p>
+        <form id="jbet-form" class="jq-form" novalidate>
+          <label for="jbet-input" data-i18n="jb.label">Your bet</label>
+          <p id="jbet-range" class="hint jbet-range"></p>
+          <input id="jbet-input" class="jq-input jbet-input" type="text" inputmode="numeric" maxlength="10" autocomplete="off" spellcheck="false" dir="ltr" enterkeyhint="done" aria-describedby="jbet-range jbet-msg">
+          <button type="submit" id="jbet-send" class="btn btn-primary btn-large" data-i18n="jb.lock">Lock in bet</button>
+        </form>
+        <p id="jbet-msg" class="msg" role="status" hidden></p>
+      </section>
+      <!-- Game over (US-65): the final standings once the host shows the results -->
+      <section id="join-over" class="join-over" aria-labelledby="jover-title" hidden>
+        <h3 id="jover-title" class="jover-title" data-i18n="over.title">Game over</h3>
+        <p id="jover-winner" class="jover-winner"></p>
+        <ol id="jover-list" class="jover-list" aria-label="Final standings" data-i18n-attr="aria-label:over.standings"></ol>
+      </section>
       <h3 class="visually-hidden" data-i18n="join.board">Game board</h3>
       <div id="join-board" class="join-board"></div>
-      <h3 class="join-scores-title" data-i18n="join.scores">Scores</h3>
+      <h3 id="join-scores-title" class="join-scores-title" data-i18n="join.scores">Scores</h3>
       <ul id="join-scores" class="join-scores"></ul>
+    </section>
+
+    <!-- The game this phone played has ended (US-65): New Game on the host, or the room closed or expired -->
+    <section id="join-ended-screen" class="join-screen" aria-labelledby="join-ended-title" hidden>
+      <h2 id="join-ended-title" data-i18n="join.endedTitle">This game has ended.</h2>
+      <p class="hint" data-i18n="join.endedHint">Thanks for playing. To play again, join the host's new game.</p>
+      <div id="join-ended-over" class="join-over" hidden>
+        <h3 class="jover-title" data-i18n="over.standings">Final standings</h3>
+        <p id="join-ended-winner" class="jover-winner"></p>
+        <ol id="join-ended-list" class="jover-list" aria-label="Final standings" data-i18n-attr="aria-label:over.standings"></ol>
+      </div>
+      <button type="button" id="join-again" class="btn btn-primary btn-large" data-i18n="join.again">Join another game</button>
     </section>
   </main>
 
@@ -82,6 +114,6 @@
     <nav aria-label="Site" data-i18n-attr="aria-label:nav.site"><a href="how-to-play.html" target="_blank" rel="noopener" data-i18n="nav.howToPlay">How to play</a> &middot; <a href="privacy.html" target="_blank" rel="noopener" data-i18n="nav.privacy">Privacy</a> &middot; <a href="terms.html" target="_blank" rel="noopener" data-i18n="nav.terms">Terms</a></nav>
   </footer>
 
-  <script src="js/join.e7f30eb8.js"></script>
+  <script src="js/join.d0e2bd19.js"></script>
 </body>
 </html>

@@ -247,6 +247,8 @@
   const PHONE_SCREENS = ['board', 'question', 'final', 'results'];
   const ANSWERS_POLL_MS = 1000; // US-64: the host's poll of the open question's answers
   const PHONE_TIMER_MS = 150;   // US-64: timer changes close together go to the phones in one update
+  const BETS_POLL_MS = 1000;    // US-65: the host's poll of who has bet
+  const REVEAL_RETRY_MS = 3000; // US-65: a failed reveal of the bets is tried again after this
   const ANSWERS_MIN_PX = 44;    // owner CR 1: the Answers list never gets lower than about 2 rows
   const ANSWERS_GAP_PX = 6;     // room kept under Back to Board
   // BUG-52-02: this page load's host session. Only the room's current session may change it, so two
@@ -429,6 +431,9 @@
     // US-64: the question calls run one after another (qChain); qTimer debounces timer updates; the
     // answers of the open question (answers = { seq, open, list }) are polled every ANSWERS_POLL_MS.
     qChain: Promise.resolve(), qTimer: null, answersTimer: null, answers: null,
+    // US-65: the Golden Goal bet wait (bets = { seq, players: [{ bet, joined }] | null, failed }) polled every
+    // BETS_POLL_MS, and a failed reveal tried again after REVEAL_RETRY_MS.
+    betsTimer: null, bets: null, revealTimer: null,
   };
 
   // Read aloud (US-48), memory only apart from the on-device choice: the browser's speech module
@@ -690,6 +695,11 @@
     finalWagerError: byId('final-wager-error'),
     finalReady: byId('final-ready'),
     finalOpen: byId('final-open'),
+    finalPhone: byId('final-phone'),                 // US-65: the bet wait in a Phone buzzer game
+    finalPhoneCount: byId('final-phone-count'),
+    finalPhoneMsg: byId('final-phone-msg'),
+    finalPhoneContinue: byId('final-phone-continue'),
+    finalPhoneRoom: byId('final-phone-room'),
     reportBtn: byId('report-btn'),
     reportOverlay: byId('report-overlay'),
     reportAbout: byId('report-about'),
@@ -1325,12 +1335,29 @@
     const markIds = Object.keys(f.marks);
     if (wagerIds.some((id) => ids.indexOf(id) === -1) || markIds.some((id) => ids.indexOf(id) === -1)) return false;
     if (markIds.some((id) => f.marks[id] !== 'correct' && f.marks[id] !== 'wrong')) return false;
+    if (g.control === 'phone') return isValidPhoneFinal(f, ids, wagerIds, markIds); // US-65: the bets come from the phones
     // Wagers are entered in setup order: the ones in are the first contestants.
     if (wagerIds.length > ids.length || !ids.slice(0, wagerIds.length).every((id) => hasOwn(f.wagers, id))) return false;
     const allIn = wagerIds.length === ids.length;
     if (f.stage !== 'wager' && !allIn) return false;
     if (f.stage === 'wager' && (markIds.length || f.answerShown)) return false;
     return g.contestants.every((c) => !hasOwn(f.wagers, String(c.id)) || isValidWager(f, g, c));
+  }
+
+  /**
+   * US-65: Golden Goal in a Phone buzzer game. The bets stay on the server (bet round betSeq) until everyone
+   * is marked: before that, wagers is empty and a mark changes no score; the reveal fills every wager at
+   * once (a missing bet is 0, D-80 k, and the server checked each against its D-48 limit) and applies the
+   * marks. phoneSeq and timedOut belong to the phones' question, as on a board question.
+   */
+  function isValidPhoneFinal(f, ids, wagerIds, markIds) {
+    const optional = (value, test) => value === undefined || test(value);
+    const isBool = (value) => typeof value === 'boolean';
+    if (!optional(f.betSeq, isPosInt) || !optional(f.phoneSeq, isPosInt) || !optional(f.revealed, isBool) ||
+        !optional(f.timedOut, isBool)) return false;
+    if (f.stage === 'wager') return wagerIds.length === 0 && markIds.length === 0 && !f.answerShown && f.revealed !== true;
+    if (f.revealed !== true) return f.stage === 'question' && wagerIds.length === 0;
+    return wagerIds.length === ids.length && wagerIds.every((id) => Number.isInteger(f.wagers[id]) && f.wagers[id] >= 0);
   }
 
   /** Distinct positive integer ids. */
@@ -3434,7 +3461,7 @@
   function onResetClick() {
     if (!state.game) return;
     if (state.game.current) startTimer(state.game.timerSeconds, undefined, onBoardTimeUp); // US-47
-    else if (finalOnScreen()) startTimer(state.game.timerSeconds);
+    else if (finalOnScreen()) startTimer(state.game.timerSeconds, undefined, phoneOn() ? onFinalTimeUp : undefined); // US-65
   }
 
   // ---------- Results (US-15, US-16) ----------
@@ -3519,7 +3546,8 @@
   /** US-16 / D-15: clear the saved game and show an empty Setup with settings reloaded. */
   function newGame() {
     stopTimer();
-    stopPhone(); // US-52: the room is left to expire (6 h)
+    if (phoneOn() && !phone.blocked) closeRoom(state.game); // US-65: the phones show "This game has ended."
+    stopPhone();
     state.game = null;
     clearSavedState();
     tourney = null; // US-61: End tournament / New game
@@ -6854,6 +6882,7 @@
     const offer = f.stage === 'offer';
     dom.finalOffer.hidden = !offer;
     dom.finalWagers.hidden = offer;
+    dom.finalPhone.hidden = true; // US-65: shown by renderPhoneBets in a Phone buzzer game
     if (offer) {
       const top = topContestants(g);
       const tied = joinNames(top.map((c) => c.name));
@@ -6872,6 +6901,10 @@
     }
     setGoalText(dom.finalTitle, '', roundSuffix(f.round));
     dom.finalCategory.textContent = iso(finalCategoryName(f));
+    if (phoneOn()) { // US-65: the bets are made on the phones; the host waits and never sees an amount
+      renderPhoneBets(g);
+      return;
+    }
     placeBotBet(g); // US-62: the bot locks its bet when its turn comes (the caller saves)
     renderWagerList(g);
     renderWagerTurn(g);
@@ -7034,6 +7067,7 @@
     if (drawn.question.image) new Image().src = drawn.question.image;
     renderFinal();
     saveState();
+    if (phoneOn()) phoneStartBets(); // US-65: the bet screen goes to the phones
     dom.finalWagerInput.focus();
   }
 
@@ -7047,6 +7081,10 @@
   /** "Show the question" once every wager is in. */
   function onFinalOpen() {
     const g = state.game;
+    if (phoneOn()) { // US-65: all bets are in on the phones
+      phoneOpenGoal(false);
+      return;
+    }
     if (!g || !g.final || g.final.stage !== 'wager' || state.screen !== 'final' || nextWagerContestant(g)) return;
     g.final.stage = 'question';
     const bot = botOf(g);
@@ -7071,7 +7109,7 @@
     renderFinalRows();
     showScreen('question'); // also saves the state
     updateReportButton();
-    startTimer(g.timerSeconds);
+    startTimer(g.timerSeconds, undefined, phoneOn() ? onFinalTimeUp : undefined); // US-65: timer 0 closes it on the phones
     dom.qHeading.focus();
     onQuestionShown(false); // US-48
     armBotAnswer(); // US-62
@@ -7109,6 +7147,7 @@
     state.game.final.answerShown = true;
     renderAnswerState(true);
     saveState();
+    if (phoneOn()) phoneCloseQuestion(state.game.final); // US-65: no answers once the answer is shown
     dom.answerText.focus();
   }
 
@@ -7163,10 +7202,15 @@
   function updateFinalRows() {
     const g = state.game;
     const f = g.final;
+    const hidden = phoneBetsHidden(f); // US-65: a Phone buzzer game shows no bet before everyone is marked
     scoringRows.forEach((ref) => {
       const key = String(ref.contestant.id);
       const mark = hasOwn(f.marks, key) ? f.marks[key] : null;
       const wager = f.wagers[key];
+      if (hidden) {
+        updateHiddenFinalRow(ref, mark);
+        return;
+      }
       ref.correct.disabled = mark !== null;
       ref.wrong.disabled = mark !== null;
       ref.correct.classList.toggle('is-chosen', mark === 'correct');
@@ -7181,6 +7225,11 @@
       updateBotRow(ref, mark, f);
     });
     const allMarked = g.contestants.every((c) => hasOwn(f.marks, String(c.id)));
+    if (hidden) { // US-65: the bets are revealed once everyone is marked; the button waits for them
+      dom.backBtn.disabled = true;
+      dom.backBtn.textContent = allMarked ? t('final.revealing') : finalDoneText(g);
+      return;
+    }
     dom.backBtn.disabled = !allMarked;
     // D-51: still level at the top -> the next round's offer (FU-34: "Next round"); otherwise the results.
     dom.backBtn.textContent = allMarked && isTiedAtTop(g) ? t('final.nextRound') : finalDoneText(g);
@@ -7198,6 +7247,13 @@
     const key = String(contestant.id);
     if (hasOwn(f.marks, key)) return;
     f.marks[key] = result;
+    if (phoneBetsHidden(f)) { // US-65: the score changes when the bets are revealed, after the last mark
+      updateFinalRows();
+      saveState();
+      focusNextScoringButton();
+      phoneRevealIfMarked();
+      return;
+    }
     contestant.score += result === 'correct' ? f.wagers[key] : -f.wagers[key];
     updateFinalRows();
     saveState();
@@ -7214,6 +7270,7 @@
       return;
     }
     stopTimer();
+    if (phoneOn()) phoneCloseQuestion(state.game.final); // US-65: closing twice is harmless
     state.game.final.stage = 'done';
     showResults();
   }
@@ -7233,6 +7290,7 @@
   function nextFinalRound() {
     const f = state.game.final;
     stopTimer();
+    if (phoneOn()) phoneCloseQuestion(f); // US-65
     openFinalOffer(f.round + 1, f.usedIds.slice());
   }
 
@@ -7253,6 +7311,10 @@
     const unscored = g.contestants.some((c) => !hasOwn(g.final.marks, String(c.id)));
     if (unscored && !window.confirm(t('final.leave.' + MODES[g.mode].key))) return;
     if (!unscored && isTiedAtTop(g) && !window.confirm(t('final.leaveTied'))) return;
+    if (phoneBetsHidden(g.final)) { // US-65: the marked contestants' bets count; the others keep their score
+      phoneRevealBets(finishFinal);
+      return;
+    }
     finishFinal();
   }
 
@@ -7276,6 +7338,7 @@
     }
     if (!window.confirm(t('final.backConfirm'))) return;
     if (state.game !== g || g.final !== f || state.screen !== 'final') return;
+    if (phoneOn()) phoneCloseBets(f); // US-65: no more bets on the phones
     g.final = null;
     showResults();
   }
@@ -7287,6 +7350,8 @@
     dom.finalWagerShow.addEventListener('click', onWagerShowToggle);
     dom.finalWagerInput.addEventListener('input', () => setWagerError(''));
     dom.finalOpen.addEventListener('click', onFinalOpen);
+    dom.finalPhoneContinue.addEventListener('click', onPhoneContinue); // US-65
+    dom.finalPhoneRoom.addEventListener('click', openRoomPanel);
   }
 
   // ---------- Tournament (US-61, D-77) ----------
@@ -8849,6 +8914,7 @@
       setGoalText(dom.qHeading, '', roundSuffix(g.final.round) + ' ' + EN_DASH + ' ' + iso(finalCategoryName(g.final)));
       renderFinalLang();
       renderFinalRows();
+      if (phoneOn()) renderAnswersPanel(); // US-65
     } else if (g && g.current) {
       setScoringPanelTexts(scoringPanelText());
       renderQuestionHeading(activeQuestion(g));
@@ -8871,6 +8937,10 @@
     }
     setGoalText(dom.finalTitle, '', roundSuffix(f.round));
     dom.finalCategory.textContent = iso(finalCategoryName(f));
+    if (phoneOn()) {
+      renderPhoneBets(g); // US-65
+      return;
+    }
     renderWagerList(g);
     const c = nextWagerContestant(g);
     if (c) renderWagerPrompt(g, c);
@@ -8900,6 +8970,7 @@
     return {
       mode: g.mode,
       screen: finalOnScreen() ? 'final' : (PHONE_SCREENS.indexOf(state.screen) === -1 ? 'board' : state.screen),
+      goal: phoneGoalStage(g), // US-65: offer, bets or question while Golden Goal is on; null otherwise
       contestants: g.contestants.map((c) => ({ name: c.name, color: c.color, score: c.score })),
       points: g.points.slice(),
       categories: g.categories.map((c) => (c.hidden || c.id === MIX
@@ -8908,6 +8979,13 @@
       cells: g.points.map((p, i) => g.categories.map((c) => (c.id === MIX
         ? phoneCell(g, c, c.order[i], c.faces[i], index) : phoneCell(g, c, p, null, index)))),
     };
+  }
+
+  /** US-65: where Golden Goal is, for the phones: 'offer', 'bets' (the bet wait) or 'question'; null otherwise. */
+  function phoneGoalStage(g) {
+    if (finalOnScreen()) return 'question';
+    if (state.screen !== 'final' || !g.final) return null;
+    return g.final.stage === 'wager' ? 'bets' : 'offer';
   }
 
   function phoneCell(g, category, points, face, index) {
@@ -8960,6 +9038,8 @@
     phone.gen += 1;
     window.clearTimeout(phone.pushTimer);
     window.clearTimeout(phone.lobbyTimer);
+    window.clearTimeout(phone.betsTimer);
+    window.clearTimeout(phone.revealTimer);
     stopTimer();
     closeRoomPanel();
     dom.roomTaken.hidden = false;
@@ -8978,11 +9058,14 @@
     window.clearTimeout(phone.lobbyTimer);
     window.clearTimeout(phone.qTimer);
     window.clearTimeout(phone.answersTimer);
+    window.clearTimeout(phone.betsTimer);
+    window.clearTimeout(phone.revealTimer);
     dom.answersPanel.hidden = true;
     Object.assign(phone, {
       pushTimer: null, pushing: false, again: false, lastSent: null, lobbyTimer: null, lobby: null,
       shownJoined: null, message: null, renewing: null, qrCode: null, ready: null, claiming: false,
       qChain: Promise.resolve(), qTimer: null, answersTimer: null, answers: null,
+      betsTimer: null, bets: null, revealTimer: null,
     });
     closeRoomPanel();
     dom.roomBtn.hidden = true;
@@ -9143,6 +9226,7 @@
     dom.roomOverlay.hidden = true;
     setPageInert(false);
     if (!dom.roomBtn.hidden && state.screen === 'board') dom.roomBtn.focus();
+    else if (state.screen === 'final' && !dom.finalPhone.hidden) dom.finalPhoneRoom.focus(); // US-65: opened from the bet wait
   }
 
   function renderRoomPanel() {
@@ -9243,12 +9327,20 @@
   // number), its changes follow (3 choices, Pause, Resume, Reset: update_question) and it closes at
   // timer 0, Show Answer, Back to Board and Skip (close_question). The calls run one after another
   // (phone.qChain), so a close never overtakes its open. The host polls the answers and lists them in
-  // the Answers panel; the host still judges with Correct / Wrong. Golden Goal is not sent (phone
-  // Sprint 3): every call here needs an open board question (state.game.current).
+  // the Answers panel; the host still judges with Correct / Wrong. US-65: the Golden Goal question goes
+  // the same way; its number is kept on g.final instead of g.current (phoneHolder()).
 
-  /** A board question of this Phone buzzer game is on the question screen (never Golden Goal). */
+  /** The open phone question's holder: the board question (g.current) or the Golden Goal round (g.final), or null. */
+  function phoneHolder() {
+    const g = state.game;
+    if (!g) return null;
+    if (g.current) return g.current;
+    return finalOnScreen() ? g.final : null;
+  }
+
+  /** A question of this Phone buzzer game (a board one, or Golden Goal's) is on the question screen. */
   function phoneQuestionLive() {
-    return phoneOn() && !phone.blocked && !!state.game.current && state.screen === 'question';
+    return phoneOn() && !phone.blocked && state.screen === 'question' && !!phoneHolder();
   }
 
   /** The countdown as the phones need it; the server stamps it with its own time. */
@@ -9264,6 +9356,7 @@
    * choices or the picture's path (its file name can name the answer: hasImage only).
    */
   function phoneQuestion(g) {
+    if (!g.current) return phoneGoalQuestion(g); // US-65
     const cur = g.current;
     const active = activeQuestion(g);
     const q = active.question;
@@ -9297,6 +9390,30 @@
     };
   }
 
+  /** US-65: the Golden Goal question for the phones: its category and round, no points (each plays for their bet). */
+  function phoneGoalQuestion(g) {
+    const f = g.final;
+    const q = f.question;
+    return {
+      catName: f.category.name,
+      catNameAr: isFilled(f.category.nameAr) ? f.category.nameAr : null,
+      mix: false,
+      subName: null,
+      subNameAr: null,
+      points: null,
+      goal: true,
+      goalRound: f.round,
+      x2: false,
+      text: q.question,
+      textAr: hasArabic(q) ? q.question_ar : null,
+      hasImage: !!q.image,
+      choices: null, // no helpers in Golden Goal
+      by: null,
+      byHelper: null,
+      timer: phoneTimer(),
+    };
+  }
+
   /** Queue a question call; each waits for the claim of a restored room and for the call before it. */
   function phoneQueue(task) {
     const gen = phone.gen;
@@ -9323,16 +9440,16 @@
   /** The question just opened (a cell or a Swap) goes to the phones with a new number. */
   function phoneOpenQuestion() {
     const g = state.game;
-    const cur = g.current;
+    const cur = phoneHolder();
     phone.answers = { seq: null, open: true, list: [] };
     renderAnswersPanel();
     phoneQueue(async () => {
-      if (state.game !== g || g.current !== cur) return; // closed before its turn: nothing to open
+      if (state.game !== g || phoneHolder() !== cur) return; // closed before its turn: nothing to open
       const data = await phoneQuestionCall('open_question', { question: phoneQuestion(g) });
       if (!Number.isInteger(data.seq)) return;
       cur.phoneSeq = data.seq;
       phone.answers = { seq: data.seq, open: true, list: [] };
-      if (g.current === cur) {
+      if (phoneHolder() === cur) {
         saveState();
         pollAnswers();
       }
@@ -9342,9 +9459,9 @@
   /** The open question changed (3 choices, or its countdown): the phones get the new version. */
   function phoneUpdateQuestion() {
     const g = state.game;
-    const cur = g.current;
+    const cur = phoneHolder();
     phoneQueue(async () => {
-      if (state.game !== g || g.current !== cur || !cur.phoneSeq || !phone.answers || !phone.answers.open) return;
+      if (state.game !== g || phoneHolder() !== cur || !cur || !cur.phoneSeq || !phone.answers || !phone.answers.open) return;
       if (state.screen !== 'question') return;
       try {
         await phoneQuestionCall('update_question', { seq: cur.phoneSeq, question: phoneQuestion(g) });
@@ -9374,14 +9491,14 @@
       await phoneQuestionCall('close_question', { seq: cur.phoneSeq });
       if (phone.answers && phone.answers.seq === cur.phoneSeq) {
         phone.answers.open = false;
-        if (state.game && state.game.current === cur) pollAnswers(); // the final list, then the poll stops
+        if (phoneHolder() === cur) pollAnswers(); // the final list, then the poll stops
       }
     });
   }
 
   /** A host refresh on a board question: the phones' countdown restarts with the host's (D-04), the panel comes back. */
   function phoneRestoreQuestion() {
-    const cur = state.game.current;
+    const cur = phoneHolder();
     if (!cur) return;
     if (!cur.phoneSeq) { // the refresh came before the open call answered
       phoneOpenQuestion();
@@ -9401,7 +9518,8 @@
     phone.answersTimer = null;
     const g = state.game;
     const a = phone.answers;
-    if (!phoneOn() || phone.blocked || !g.current || !a || !a.seq || a.seq !== g.current.phoneSeq) return;
+    const cur = phoneHolder();
+    if (!phoneOn() || phone.blocked || !cur || !a || !a.seq || a.seq !== cur.phoneSeq) return;
     const gen = phone.gen;
     try {
       const data = await apiCall(ROOMS_API + '?action=answers&code=' + encodeURIComponent(g.room.code) + '&seq=' + a.seq +
@@ -9419,7 +9537,7 @@
         return;
       }
     }
-    if (gen === phone.gen && phone.answers === a && a.open && state.game === g && g.current) {
+    if (gen === phone.gen && phone.answers === a && a.open && state.game === g && phoneHolder() === cur) {
       phone.answersTimer = window.setTimeout(pollAnswers, ANSWERS_POLL_MS);
     }
   }
@@ -9435,7 +9553,7 @@
    */
   function renderAnswersPanel() {
     const g = state.game;
-    const show = phoneOn() && !!g.current && state.screen === 'question' && !!phone.answers;
+    const show = phoneOn() && !!phoneHolder() && state.screen === 'question' && !!phone.answers;
     dom.answersPanel.hidden = !show;
     dom.scoringHint.hidden = show; // the panel takes the hint's room: Back to Board stays on screen (D-30)
     if (!show) return;
@@ -9473,6 +9591,299 @@
     // A layout that scrolls anyway (narrow, stacked) keeps the whole list; only a one-screen layout is capped.
     if (list.scrollHeight + spare < ANSWERS_MIN_PX) return;
     list.style.maxHeight = (list.scrollHeight + spare) + 'px';
+  }
+
+  // ---------- Phone buzzer: Golden Goal bets (US-65, D-80 h, j, k) ----------
+  // In a Phone buzzer game every contestant bets privately on their phone. "Go for goal" opens a bet
+  // round on the server (start_bets, with the scores; the server works out each D-48 limit) and the host
+  // waits: "Waiting for players to bet (n/N)" with each name bet / waiting, never an amount. When all
+  // bets are in, the question opens by itself; "Continue without missing bets" opens it earlier (a
+  // missing bet is 0, D-80 k). The question then goes the US-64 way (open, answers, close). A mark
+  // changes no score yet: after the last mark the host asks for the amounts (reveal_bets) and scores
+  // everyone at once (US-44), so no amount can be read from a score before then. Host control and
+  // tournament matches never get here (phoneOn() is false).
+
+  /** The Golden Goal question of a Phone buzzer game whose bets are not revealed yet. */
+  function phoneBetsHidden(f) {
+    return phoneOn() && !!f && f.stage === 'question' && f.revealed !== true;
+  }
+
+  /** A scoring row before the reveal: the mark shows, the score and the bet do not change. */
+  function updateHiddenFinalRow(ref, mark) {
+    ref.correct.disabled = mark !== null;
+    ref.wrong.disabled = mark !== null;
+    ref.correct.classList.toggle('is-chosen', mark === 'correct');
+    ref.wrong.classList.toggle('is-chosen', mark === 'wrong');
+    ref.row.classList.toggle('is-scored', mark !== null);
+    ref.score.textContent = formatScore(ref.contestant.score);
+    ref.wager.textContent = '';
+    ref.wager.className = 'srow-wager';
+    ref.status.textContent = mark === null ? ''
+      : t(mark === 'correct' ? 'final.markedCorrect' : 'final.markedWrong', { name: iso(ref.contestant.name) });
+  }
+
+  /** The bet wait of this Golden Goal round is on screen. */
+  function phoneWaitingBets(f) {
+    return phoneOn() && !phone.blocked && !!f && state.game.final === f && f.stage === 'wager' && state.screen === 'final';
+  }
+
+  /** The bet wait starts (Go for goal) or resumes (a host refresh): the round is opened once, then polled. */
+  function phoneStartBets() {
+    phone.bets = null;
+    pollBets();
+  }
+
+  /** "Contestant i has bet", from the last poll of this round. */
+  function phoneBetSent(i) {
+    const b = phone.bets;
+    return !!b && Array.isArray(b.players) && !!b.players[i] && b.players[i].bet === true;
+  }
+
+  /** Opens the bet round when it has no number yet, then asks who has bet, every BETS_POLL_MS. */
+  async function pollBets() {
+    window.clearTimeout(phone.betsTimer);
+    phone.betsTimer = null;
+    const g = state.game;
+    const f = g && g.final;
+    if (!phoneWaitingBets(f)) return;
+    if (!phone.bets || phone.bets.f !== f) phone.bets = { f: f, players: null, failed: null };
+    const b = phone.bets;
+    const gen = phone.gen;
+    try {
+      if (phone.ready) await phone.ready;
+      if (gen !== phone.gen || !phoneWaitingBets(f)) return;
+      if (!f.betSeq) {
+        const data = await phoneQuestionCall('start_bets', { bet: {
+          round: f.round,
+          catName: f.category.name,
+          catNameAr: isFilled(f.category.nameAr) ? f.category.nameAr : null,
+          scores: g.contestants.map((c) => c.score),
+        } });
+        if (gen !== phone.gen || g.final !== f) return;
+        if (!isPlainObject(data) || !isPosInt(data.seq)) throw textError('err.response');
+        f.betSeq = data.seq;
+        saveState();
+      }
+      if (!document.hidden) {
+        await fetchBetsStatus(g, f);
+        if (gen !== phone.gen || g.final !== f) return;
+      }
+      b.failed = null;
+    } catch (err) {
+      if (gen !== phone.gen) return;
+      if (err.status === 409 && err.data && err.data.other_tab === true) {
+        blockPhone();
+        return;
+      }
+      if (err.status === 404) { // the room expired: a new room gets a new bet round
+        delete f.betSeq;
+        b.players = null;
+        renewRoom(g);
+      }
+      b.failed = () => t('final.phoneFailed', { reason: sentence(errorText(err)) });
+    }
+    if (gen !== phone.gen || !phoneWaitingBets(f)) return;
+    renderPhoneBets(g);
+    if (g.contestants.every((c, i) => phoneBetSent(i))) { // US-65: all bets are in, so the question opens
+      phoneOpenGoal(false);
+      return;
+    }
+    phone.betsTimer = window.setTimeout(pollBets, BETS_POLL_MS);
+  }
+
+  /** "Waiting for players to bet (n/N)", each name bet / waiting (no phone), and the ways on. */
+  function renderPhoneBets(g) {
+    const f = g.final;
+    const lobby = lobbyJoined();
+    const b = phone.bets && phone.bets.f === f ? phone.bets : null;
+    const total = g.contestants.length;
+    const n = g.contestants.filter((c, i) => phoneBetSent(i)).length;
+    const allIn = n === total;
+    const wasAllIn = !dom.finalReady.hidden;
+    dom.finalWagerForm.hidden = true;
+    dom.finalReady.hidden = !allIn;
+    dom.finalPhone.hidden = allIn;
+    dom.finalPhoneCount.textContent = t('final.phoneWaiting', { count: ltr(n + '/' + total) });
+    dom.finalPhoneContinue.disabled = !f.betSeq;
+    const joinedCount = lobby.filter(Boolean).length;
+    dom.finalPhoneRoom.textContent = t('room.btn', { joined: joinedCount, total: total });
+    dom.finalPhoneRoom.setAttribute('aria-label', t('room.btnLabel', { joined: joinedCount, total: total }));
+    if (b && b.failed) showMessage(dom.finalPhoneMsg, b.failed, 'warning');
+    else clearMessage(dom.finalPhoneMsg);
+    clear(dom.finalWagerList);
+    g.contestants.forEach((c, i) => {
+      const sent = phoneBetSent(i);
+      const joined = b && Array.isArray(b.players) ? b.players[i].joined : lobby[i];
+      const color = paletteEntry(c.color);
+      const swatch = h('span', { className: 'result-swatch', 'aria-hidden': 'true' });
+      swatch.style.backgroundColor = color.value;
+      const item = h('li', { className: 'final-wager-item' + (sent ? ' is-locked' : '') }, [
+        swatch,
+        h('span', { className: 'final-wager-name', text: iso(c.name) }),
+        h('span', { className: 'final-wager-score' }, [
+          h('span', { className: 'visually-hidden', text: t('final.scoreLabel') }),
+          document.createTextNode(formatScore(c.score)),
+        ]),
+        h('span', {
+          className: 'final-wager-state',
+          text: sent ? t('final.phoneBetSent') : t(joined ? 'final.waiting' : 'final.phoneNoPhone'),
+        }),
+      ]);
+      item.style.borderInlineStartColor = color.value; // the left edge; the right one in Arabic
+      dom.finalWagerList.appendChild(item);
+    });
+    if (allIn && !wasAllIn) dom.finalOpen.focus();
+  }
+
+  /** "Continue without missing bets" (D-80 k): after a confirm naming them, each missing bet counts as 0. */
+  async function onPhoneContinue() {
+    const g = state.game;
+    const f = g && g.final;
+    if (!phoneWaitingBets(f) || !f.betSeq) return;
+    // OBS-65-02: ask who has bet right now, so the confirm names who is really missing
+    dom.finalPhoneContinue.disabled = true;
+    try {
+      await fetchBetsStatus(g, f);
+    } catch (err) {
+      // the last poll's list stands; the notice after the close shows what is scored
+    }
+    dom.finalPhoneContinue.disabled = false;
+    if (!phoneWaitingBets(f)) return;
+    renderPhoneBets(g);
+    const missing = g.contestants.filter((c, i) => !phoneBetSent(i));
+    if (missing.length && !window.confirm(t('final.phoneContinueConfirm', { names: joinNames(missing.map((c) => c.name)) }))) return;
+    if (!phoneWaitingBets(f)) return;
+    phoneOpenGoal(true);
+  }
+
+  /** One bets_status call for this round: who has bet (and has a phone), into phone.bets. */
+  async function fetchBetsStatus(g, f) {
+    const data = await apiCall(ROOMS_API + '?action=bets_status&code=' + encodeURIComponent(g.room.code) +
+      '&seq=' + f.betSeq + '&session=' + HOST_SESSION,
+      { headers: { Accept: 'application/json', 'X-Host-Token': g.room.hostToken }, cache: 'no-store' });
+    if (g.final !== f || !phone.bets || phone.bets.f !== f) return;
+    if (isPlainObject(data) && Array.isArray(data.players) && data.players.length === g.contestants.length) {
+      phone.bets.players = data.players.map((p) => ({ bet: isPlainObject(p) && p.bet === true, joined: isPlainObject(p) && p.joined === true }));
+    }
+  }
+
+  /** The bets close and the Golden Goal question opens, on the host and on the phones. */
+  function phoneOpenGoal(force) {
+    const g = state.game;
+    const f = g && g.final;
+    if (!phoneWaitingBets(f) || !f.betSeq) return;
+    if (!force && !g.contestants.every((c, i) => phoneBetSent(i))) return;
+    window.clearTimeout(phone.betsTimer);
+    phoneCloseBets(f, true);
+    f.stage = 'question';
+    markSeen(f.question.id); // opened = played, as on the board
+    showFinalQuestion();
+    phoneOpenQuestion(); // queued after the close of the bets
+  }
+
+  /** No more bets in this round (a bet still in flight gets "Too late"); closing twice is harmless. */
+  function phoneCloseBets(f, notice) {
+    const seq = f.betSeq;
+    if (!seq) return;
+    phoneQueue(async () => {
+      const data = await phoneQuestionCall('close_bets', { seq: seq });
+      if (notice) showZeroBets(f, data);
+    });
+  }
+
+  /**
+   * OBS-65-02: after the close, the server's final list of who has bet. Those without a bet play for 0;
+   * the host sees their names, which are exactly the ones scored with 0 at the reveal.
+   */
+  function showZeroBets(f, data) {
+    const g = state.game;
+    if (!g || g.final !== f || !isPlainObject(data) || !Array.isArray(data.bets) || data.bets.length !== g.contestants.length) return;
+    const zero = g.contestants.filter((c, i) => data.bets[i] !== true);
+    if (!zero.length || !finalOnScreen()) return;
+    showMessage(dom.helperMsg, () => t('final.phoneZero', { names: joinNames(zero.map((c) => c.name)) }), 'warning');
+  }
+
+  /** Timer 0 on the Golden Goal question of a Phone buzzer game: later answers are late (as US-64). */
+  function onFinalTimeUp() {
+    const f = state.game && state.game.final;
+    if (!finalOnScreen() || !phoneOn() || f.timedOut === true) return;
+    f.timedOut = true;
+    saveState();
+    phoneCloseQuestion(f);
+  }
+
+  /** Everyone is marked: reveal the bets (also after a refresh that came between the last mark and the reveal). */
+  function phoneRevealIfMarked() {
+    const g = state.game;
+    const f = g && g.final;
+    if (phoneBetsHidden(f) && g.contestants.every((c) => hasOwn(f.marks, String(c.id)))) phoneRevealBets(null);
+  }
+
+  /**
+   * Ask the server for the amounts (host token only), then score every marked contestant (Correct adds,
+   * Wrong subtracts the bet, US-44). `after` runs once they are applied. A failure is tried again.
+   */
+  function phoneRevealBets(after) {
+    const g = state.game;
+    const f = g.final;
+    window.clearTimeout(phone.revealTimer);
+    const gen = phone.gen;
+    phoneQueue(async () => {
+      if (state.game !== g || g.final !== f || f.revealed === true) return;
+      let amounts = null;
+      try {
+        const data = await phoneQuestionCall('reveal_bets', { seq: f.betSeq });
+        if (!isPlainObject(data) || !Array.isArray(data.amounts) || data.amounts.length !== g.contestants.length) {
+          throw textError('err.response');
+        }
+        amounts = data.amounts;
+      } catch (err) {
+        if (gen !== phone.gen || phone.blocked || state.game !== g || g.final !== f) return;
+        if (err.status === 404) { // the room is gone with its bets: they count as 0
+          amounts = [];
+          showMessage(dom.helperMsg, () => t('final.revealLost'), 'warning');
+        } else {
+          showMessage(dom.helperMsg, () => t('final.revealFailed', { reason: sentence(errorText(err)) }), 'error');
+          phone.revealTimer = window.setTimeout(() => phoneRevealBets(after), REVEAL_RETRY_MS);
+          return;
+        }
+      }
+      if (state.game !== g || g.final !== f || f.revealed === true) return;
+      if (amounts.length) clearMessage(dom.helperMsg);
+      applyRevealedBets(g, f, amounts);
+      if (after) after();
+    });
+  }
+
+  /** The amounts are in: every wager is filled (a missing one is 0) and the marks are scored. */
+  function applyRevealedBets(g, f, amounts) {
+    g.contestants.forEach((c, i) => {
+      const key = String(c.id);
+      const amount = Number.isInteger(amounts[i]) && amounts[i] >= 0 ? amounts[i] : 0; // D-80 k
+      f.wagers[key] = amount;
+      const mark = hasOwn(f.marks, key) ? f.marks[key] : null;
+      if (mark !== null) c.score += mark === 'correct' ? amount : -amount;
+    });
+    f.revealed = true;
+    saveState();
+    if (finalOnScreen()) {
+      updateFinalRows();
+      if (!dom.backBtn.disabled) dom.backBtn.focus();
+    }
+  }
+
+  /** A host refresh on the Golden Goal question: the bets stay closed, the phones' question comes back. */
+  function phoneRestoreGoal() {
+    const f = state.game.final;
+    phoneCloseBets(f); // in case the close was lost with the refresh
+    phoneRestoreQuestion();
+    phoneRevealIfMarked();
+  }
+
+  /** New Game: the room is closed, so the phones show "This game has ended." (if it fails, it expires in 6 h). */
+  function closeRoom(g) {
+    apiPost(ROOMS_API + '?action=close', { code: g.room.code, host_token: g.room.hostToken, session: HOST_SESSION })
+      .catch(() => {});
   }
 
   // ---------- Startup ----------
@@ -9566,8 +9977,10 @@
       if (f.question && f.question.image) new Image().src = f.question.image;
       renderFinal();
       showScreen('final');
+      if (phoneOn() && f.stage === 'wager') phoneStartBets(); // US-65: the wait resumes; sent bets stay on the server
     } else if (saved.screen === 'question' && f) {
       showFinalQuestion(); // its timer restarts at full length, like a board question (D-04)
+      if (phoneOn()) phoneRestoreGoal(); // US-65
     } else if (saved.screen === 'question') {
       showQuestion();
       if (phoneOn()) phoneRestoreQuestion(); // US-64: the phones' question and the Answers panel come back

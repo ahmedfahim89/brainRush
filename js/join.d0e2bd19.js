@@ -9,6 +9,10 @@
 // US-64: while the host has a question open, the phone shows it (category, points, text, countdown) with
 // a text box and Send; the first answer sent is locked; when it closes the phone goes straight back to
 // the board (US-64: within about 1 s), whose status line says the question is closed for a moment. The countdown follows the host's (server time plus this phone's clock offset).
+// US-65: in Golden Goal the phone shows a private bet screen (category, own score, allowed range), locked
+// once sent; then the question as above; then its own result. Only this phone's own amount ever reaches
+// it. When the host shows the results the phone shows the final standings; when the room is closed (New
+// Game) or has expired, "This game has ended." with the standings it last had.
 'use strict';
 
 (function () {
@@ -37,11 +41,16 @@
   const CLOSED_NOTE_MS = 3000;   // after a question closes, the board's status line says so this long
   const TICK_MS = 250;           // the countdown on the phone
   const CHOICE_LETTERS = ['A', 'B', 'C'];
+  const GOAL_BALL = String.fromCodePoint(0x26bd); // US-65: Golden Goal's ball, as on the host (decorative)
+  const BET_PATTERN = /^\d{1,10}$/;               // a whole number typed as a bet
 
   const byId = (id) => document.getElementById(id);
   const dom = {
     net: byId('join-net'),
-    screens: { code: byId('join-code-screen'), pick: byId('join-pick-screen'), board: byId('join-board-screen') },
+    screens: {
+      code: byId('join-code-screen'), pick: byId('join-pick-screen'), board: byId('join-board-screen'),
+      ended: byId('join-ended-screen'), // US-65
+    },
     ended: byId('join-ended'),
     codeForm: byId('join-code-form'),
     codeInput: byId('join-code'),
@@ -67,9 +76,27 @@
     qInput: byId('jq-input'),
     qSend: byId('jq-send'),
     qMsg: byId('jq-msg'),
+    qBet: byId('jq-bet'),              // US-65
+    bet: byId('join-bet'),
+    betHead: byId('jbet-head'),
+    betCat: byId('jbet-cat'),
+    betScore: byId('jbet-score'),
+    betForm: byId('jbet-form'),
+    betRange: byId('jbet-range'),
+    betInput: byId('jbet-input'),
+    betSend: byId('jbet-send'),
+    betMsg: byId('jbet-msg'),
+    over: byId('join-over'),
+    overWinner: byId('jover-winner'),
+    overList: byId('jover-list'),
+    scoresTitle: byId('join-scores-title'),
+    endedOver: byId('join-ended-over'),
+    endedWinner: byId('join-ended-winner'),
+    endedList: byId('join-ended-list'),
+    again: byId('join-again'),
   };
 
-  // view: 'code' | 'pick' | 'board'. players = [{name, color, joined}] from the last poll; game = the
+  // view: 'code' | 'pick' | 'board' | 'ended' (US-65). players = [{name, color, joined}] from the last poll; game = the
   // board state (api/rooms.php room_state) and you = this phone's index once joined.
   const app = {
     view: 'code',
@@ -91,6 +118,9 @@
     offset: 0,       // server time minus this phone's clock (ms), for the countdown
     q: null,         // the question on screen: { seq, data, lang, sent, late, locked, sending, msg, wasOpen, closedUntil, choicesKey }
     ticker: null,
+    bet: null,       // US-65: this contestant's last Golden Goal bet round, from the state poll (own amount only)
+    bv: null,        // the bet screen: { seq, sent, sending, late, msg } (the typed text survives updates)
+    over: null,      // the standings kept for "This game has ended.": { game, you }, or null
   };
 
   // ---------- Helpers ----------
@@ -112,6 +142,27 @@
 
   function formatScore(score) {
     return ltr(score < 0 ? MINUS + Math.abs(score) : String(score));
+  }
+
+  /** "X and Y" / "X, Y and Z" (D-10, as on the host); each name keeps its own direction in Arabic. */
+  function joinNames(names) {
+    const list = names.map(iso);
+    if (list.length <= 1) return list.join('');
+    return list.slice(0, -1).join(t('list.sep')) + t('list.and') + list[list.length - 1];
+  }
+
+  /** Arabic-Indic and Persian digits as 0-9, so a bet typed on an Arabic keyboard counts too (as on the host). */
+  function westernDigits(text) {
+    return text.replace(/[\u0660-\u0669\u06f0-\u06f9]/g, (d) => String(d.charCodeAt(0) & 0xf));
+  }
+
+  /** "Golden Goal ⚽ – round 2 – History" in `node`; the ball is decorative, so screen readers skip it. */
+  function setGoalHead(node, round, catName) {
+    clear(node);
+    node.appendChild(document.createTextNode(t('final.name') + ' '));
+    node.appendChild(h('span', { text: GOAL_BALL, 'aria-hidden': 'true' }));
+    const roundText = round > 1 ? t('final.round', { n: round }) : '';
+    node.appendChild(document.createTextNode(roundText + (catName ? ' ' + EN_DASH + ' ' + iso(catName) : '')));
   }
 
   function localName(name, nameAr) {
@@ -235,7 +286,7 @@
   function schedule(ms) {
     window.clearTimeout(app.timer);
     app.timer = null;
-    if (app.view === 'code' || document.hidden) return; // nothing to follow, or the phone is not looking
+    if (app.view === 'code' || app.view === 'ended' || document.hidden) return; // nothing to follow, or not looking
     app.timer = window.setTimeout(poll, ms);
   }
 
@@ -291,6 +342,7 @@
     app.mode = data.state.mode === 'teams' ? 'teams' : 'players';
     app.question = isValidQuestion(data.question) ? data.question : null;
     app.mine = typeof data.mine === 'string' ? data.mine : null;
+    app.bet = isValidBet(data.bet) ? data.bet : null;
     renderBoard();
   }
 
@@ -311,14 +363,43 @@
     app.question = null;
     app.mine = null;
     app.q = null;
+    app.bet = null;
+    app.bv = null;
     savePlace(app.code, null);
   }
 
+  /**
+   * The room answered 404. A phone that was in this game (US-65: New Game closed it, or it expired) shows
+   * "This game has ended." with the standings it had on the results; a code that never worked keeps the
+   * code screen with "This game has ended or the code is wrong."
+   */
   function gameEnded() {
+    const joined = app.token !== null || app.game !== null;
+    const last = app.game && app.game.screen === 'results' ? { game: app.game, you: app.you } : null;
     forgetToken();
-    app.ended = true;
     dom.net.hidden = true;
+    if (joined) {
+      app.over = last;
+      setView('ended');
+      return;
+    }
+    app.ended = true;
     setView('code');
+  }
+
+  /** "Join another game": the code screen, empty. */
+  function onAgain() {
+    app.over = null;
+    app.ended = false;
+    app.code = null;
+    dom.codeInput.value = '';
+    try {
+      window.history.replaceState(null, '', window.location.pathname);
+    } catch (err) {
+      // the address keeps the old code; the page works the same
+    }
+    setView('code');
+    dom.codeInput.focus();
   }
 
   // ---------- Joining ----------
@@ -387,6 +468,7 @@
     applyStaticTexts();
     if (app.view === 'code') renderCode();
     else if (app.view === 'pick') renderPick();
+    else if (app.view === 'ended') renderEnded();
     else renderBoard();
   }
 
@@ -439,8 +521,21 @@
     }
     const me = g.contestants[app.you];
     dom.you.textContent = t('join.you', { name: iso(me.name) });
-    const asking = renderQuestionView();
-    dom.status.textContent = asking ? '' : (closedNote() || boardStatus(g));
+    // US-65: the game over screen first, then the open question, then the Golden Goal bet card, then the board
+    const over = g.screen === 'results';
+    const asking = !over && renderQuestionView();
+    if (over) {
+      dom.question.hidden = true;
+      stopTicker();
+    }
+    const betting = !over && !asking && renderBetView(g);
+    if (over || asking) dom.bet.hidden = true;
+    dom.over.hidden = !over;
+    if (over) renderStandings(g, app.you, dom.overWinner, dom.overList);
+    dom.board.hidden = over || asking || betting;
+    dom.scoresTitle.hidden = over;
+    dom.scores.hidden = over;
+    dom.status.textContent = over || asking || betting ? '' : (closedNote() || boardStatus(g));
     renderGrid(g);
     renderScores(g);
   }
@@ -450,7 +545,7 @@
   function isValidQuestion(q) {
     const tm = q && q.timer;
     return !!q && typeof q === 'object' && Number.isInteger(q.seq) && typeof q.open === 'boolean' &&
-      typeof q.text === 'string' && Number.isInteger(q.points) && !!tm && typeof tm === 'object' &&
+      typeof q.text === 'string' && (q.goal === true ? q.points === null : Number.isInteger(q.points)) && !!tm && typeof tm === 'object' &&
       Number.isInteger(tm.totalMs) && tm.totalMs > 0 && Number.isInteger(tm.remainingMs) && Number.isFinite(tm.atMs) &&
       typeof tm.running === 'boolean' &&
       (q.choices === null || (Array.isArray(q.choices) && q.choices.length === 3 && q.choices.every((c) => c && typeof c.text === 'string')));
@@ -463,6 +558,7 @@
   function boardStatus(g) {
     const screen = SCREENS.indexOf(g.screen) === -1 ? 'board' : g.screen;
     const q = app.question;
+    if (screen === 'final' && g.goal === 'offer') return t('join.status.goalOffer'); // US-65
     if (screen === 'question' && q && !q.open) {
       return t(app.q && app.q.seq === q.seq && app.q.late ? 'jq.late' : 'jq.closed');
     }
@@ -490,7 +586,6 @@
     }
     const show = questionShown();
     dom.question.hidden = !show;
-    dom.board.hidden = show;
     if (!show) {
       stopTicker();
       return false;
@@ -530,9 +625,16 @@
     const cat = q.mix
       ? t('cat.mixName') + (q.subName ? ': ' + localName(q.subName, q.subNameAr) : '')
       : localName(q.catName, q.catNameAr);
-    clear(dom.qHead);
-    dom.qHead.appendChild(document.createTextNode(iso(cat) + ' ' + EN_DASH + ' ' + q.points));
+    if (q.goal) { // US-65: Golden Goal has no points; this phone plays for its own bet
+      setGoalHead(dom.qHead, q.goalRound, localName(q.catName, q.catNameAr));
+    } else {
+      clear(dom.qHead);
+      dom.qHead.appendChild(document.createTextNode(iso(cat) + ' ' + EN_DASH + ' ' + q.points));
+    }
     if (q.x2) dom.qHead.appendChild(h('span', { className: 'jq-double', text: t('jq.double') }));
+    const bet = q.goal && app.bet ? myBet(app.bet) : null;
+    dom.qBet.hidden = !q.goal || !app.bet;
+    dom.qBet.textContent = dom.qBet.hidden ? '' : t('jq.yourBet', { amount: ltr(String(bet === null ? 0 : bet)) });
     dom.qPicture.hidden = !q.hasImage;
     const arabic = app.q.lang === 'ar' && !!q.textAr;
     dom.qText.textContent = arabic ? q.textAr : q.text;
@@ -666,6 +768,175 @@
     renderAnswerState();
   }
 
+  // ---------- Golden Goal bets (US-65) ----------
+
+  function isValidBet(b) {
+    return !!b && typeof b === 'object' && Number.isInteger(b.seq) && b.seq > 0 && typeof b.open === 'boolean' &&
+      typeof b.revealed === 'boolean' && Number.isInteger(b.round) && b.round > 0 && typeof b.catName === 'string' &&
+      Number.isInteger(b.score) && Number.isInteger(b.limit) && b.limit >= 0 &&
+      (b.mine === null || (Number.isInteger(b.mine) && b.mine >= 0));
+  }
+
+  /** This phone's bet in the round: the server's copy, or the one just sent (a poll may be older than the send). */
+  function myBet(b) {
+    if (b.mine !== null) return b.mine;
+    return app.bv && app.bv.seq === b.seq && app.bv.sent !== null ? app.bv.sent : null;
+  }
+
+  /**
+   * The Golden Goal card (US-65), shown while the host waits for the bets ('bets') and after the question
+   * closed ('question'): the bet form, the locked bet, "closed", or this phone's result. Returns true when shown.
+   */
+  function renderBetView(g) {
+    const stage = g.screen === 'final' ? g.goal : null;
+    const b = app.bet;
+    const show = stage === 'bets' || (stage === 'question' && !!b);
+    dom.bet.hidden = !show;
+    if (!show) return false;
+    const current = !!b && !(stage === 'bets' && b.revealed); // while the host waits, a revealed round is the last one
+    if (current && (!app.bv || app.bv.seq !== b.seq)) { // a new round: an empty box
+      app.bv = { seq: b.seq, sent: null, sending: false, late: false, msg: null };
+      dom.betInput.value = '';
+    }
+    setGoalHead(dom.betHead, current ? b.round : 0, '');
+    dom.betCat.hidden = !current;
+    dom.betScore.hidden = !current;
+    if (!current) {
+      dom.betForm.hidden = true;
+      showMsg(dom.betMsg, t('jb.waitRound'), 'warning');
+      return true;
+    }
+    dom.betCat.textContent = t('jb.category', { name: iso(localName(b.catName, b.catNameAr)) });
+    // BUG-65-02: the score the bet was based on until the reveal, then the current score (as on the board)
+    const score = b.revealed ? g.contestants[app.you].score : b.score;
+    dom.betScore.textContent = t('jb.score', { score: formatScore(score) });
+    const mine = myBet(b);
+    const bv = app.bv;
+    const canBet = stage === 'bets' && b.open && mine === null && !bv.late;
+    dom.betForm.hidden = !canBet;
+    dom.betRange.textContent = t('jb.range', { limit: ltr(String(b.limit)) });
+    dom.betInput.disabled = bv.sending;
+    dom.betSend.disabled = bv.sending;
+    renderBetMessage(g, b, stage, mine);
+    return true;
+  }
+
+  function renderBetMessage(g, b, stage, mine) {
+    const bv = app.bv;
+    const amount = ltr(String(mine === null ? 0 : mine));
+    if (bv.sending) showMsg(dom.betMsg, t('jb.sending'), 'warning');
+    else if (stage === 'question' && goalQuestionSeen(b)) showBetResult(g, b, mine);
+    else if (bv.late && mine === null) showMsg(dom.betMsg, t('jb.late'), 'error');
+    else if (mine !== null && b.open) showMsg(dom.betMsg, t('jb.locked', { amount: amount }), 'success');
+    else if (!b.open) showMsg(dom.betMsg, t(mine === null ? 'jb.closedNone' : 'jb.closedMine', { amount: amount }), 'warning');
+    else if (bv.msg) showMsg(dom.betMsg, bv.msg === 'jb.error' ? t('jb.error', { limit: ltr(String(b.limit)) }) : t(bv.msg), 'error');
+    else dom.betMsg.hidden = true;
+  }
+
+  /** This round's Golden Goal question has reached the phone (before that, the bets are just closed). */
+  function goalQuestionSeen(b) {
+    const q = app.question;
+    return !!q && q.goal === true && q.goalRound === b.round;
+  }
+
+  /** After the question: "wait for the marks", then this phone's own result once the host revealed the bets. */
+  function showBetResult(g, b, mine) {
+    const bet = mine === null ? 0 : mine;
+    if (!b.revealed) {
+      showMsg(dom.betMsg, t('jb.marking', { amount: ltr(String(bet)) }), 'warning');
+      return;
+    }
+    if (bet === 0) {
+      showMsg(dom.betMsg, t('jb.zero'), 'success');
+      return;
+    }
+    // The score after the reveal tells the result: + the bet (Correct) or - the bet (Wrong).
+    const delta = g.contestants[app.you].score - b.score;
+    if (delta === bet) showMsg(dom.betMsg, t('jb.right', { delta: ltr('+' + bet) }), 'success');
+    else if (delta === -bet) showMsg(dom.betMsg, t('jb.wrong', { delta: ltr(MINUS + bet) }), 'error');
+    else showMsg(dom.betMsg, t('jb.marking', { amount: ltr(String(bet)) }), 'warning'); // the scores are on their way
+  }
+
+  /** Lock in the bet once: a whole number from 0 to this phone's limit; the server checks it again. */
+  async function onBetSend(event) {
+    event.preventDefault();
+    const b = app.bet;
+    const bv = app.bv;
+    if (!b || !bv || bv.seq !== b.seq || !b.open || myBet(b) !== null || bv.sending || bv.late) return;
+    const raw = westernDigits(dom.betInput.value.trim());
+    if (!BET_PATTERN.test(raw) || Number(raw) > b.limit) {
+      bv.msg = 'jb.error'; // never repeats what was typed
+      renderBoard();
+      dom.betInput.focus();
+      return;
+    }
+    bv.msg = null;
+    bv.sending = true;
+    renderBoard();
+    try {
+      const data = await call('action=bet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ code: app.code, device_token: app.token, seq: b.seq, amount: Number(raw) }),
+      });
+      if (app.bv !== bv) return;
+      bv.sent = Number.isInteger(data.amount) ? data.amount : Number(raw);
+    } catch (err) {
+      if (app.bv !== bv) return;
+      bv.sending = false;
+      const reason = err.data && err.data.reason;
+      if (err.status === 409 && reason === 'closed') {
+        bv.late = true;
+      } else if (err.status === 409) { // sent already (another tab or a lost reply): the server's copy comes next poll
+        app.version = null;
+        schedule(0);
+      } else if (err.status === 404) {
+        gameEnded();
+        return;
+      } else if (err.status === 401 || err.status === 403) {
+        onPollError(err, true);
+        return;
+      } else {
+        bv.msg = err.status === 400 ? 'jb.error' : 'jb.failed';
+      }
+    } finally {
+      bv.sending = false;
+    }
+    if (app.view === 'board') renderBoard();
+  }
+
+  // ---------- Game over and the end of the game (US-65) ----------
+
+  /** The final standings: "X wins!" or the D-10 tie line, then everyone by score (shared scores share a rank). */
+  function renderStandings(g, you, winnerNode, listNode) {
+    const ranked = g.contestants.map((c, i) => ({ c: c, i: i })).sort((a, b) => (b.c.score - a.c.score) || (a.i - b.i));
+    const top = ranked[0].c.score;
+    const winners = ranked.filter((x) => x.c.score === top);
+    winnerNode.textContent = winners.length === 1
+      ? t('over.wins', { name: iso(winners[0].c.name) })
+      : t('over.tie', { names: joinNames(winners.map((x) => x.c.name)) });
+    clear(listNode);
+    ranked.forEach((x) => {
+      const rank = ranked.findIndex((o) => o.c.score === x.c.score) + 1;
+      const row = h('li', { className: 'jover-row' + (x.i === you ? ' is-me' : '') + (x.c.score === top ? ' is-winner' : '') }, [
+        h('span', { className: 'jover-rank', text: rank + '.' }),
+        h('span', { className: 'jover-name', text: x.c.name, dir: 'auto' }),
+        x.i === you ? h('span', { className: 'jb-score-tag', text: t('join.youTag') }) : null,
+        h('span', { className: 'jover-score', text: formatScore(x.c.score) }),
+      ]);
+      const color = safeColor(x.c.color);
+      if (color) row.style.borderInlineStartColor = color;
+      listNode.appendChild(row);
+    });
+  }
+
+  /** "This game has ended.", with the standings when the phone had them. */
+  function renderEnded() {
+    const over = app.over;
+    dom.endedOver.hidden = !over;
+    if (over) renderStandings(over.game, over.you, dom.endedWinner, dom.endedList);
+  }
+
   function columnName(c) {
     if (c.hidden) return '?';
     if (c.mix) return t('cat.mixName');
@@ -763,6 +1034,14 @@
   function init() {
     dom.codeForm.addEventListener('submit', onCodeSubmit);
     dom.qForm.addEventListener('submit', onSend);
+    dom.betForm.addEventListener('submit', onBetSend); // US-65
+    dom.betInput.addEventListener('input', () => {
+      if (app.bv && app.bv.msg) {
+        app.bv.msg = null;
+        renderBoard();
+      }
+    });
+    dom.again.addEventListener('click', onAgain);
     dom.qLang.addEventListener('click', onQuestionLang);
     dom.qInput.addEventListener('input', () => {
       if (app.q && app.q.msg) {

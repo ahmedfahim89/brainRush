@@ -217,6 +217,10 @@ CREATE TABLE IF NOT EXISTS game_rooms (
   q_open     TINYINT(1)   NOT NULL DEFAULT 0,
   q_opened_ms BIGINT UNSIGNED NOT NULL DEFAULT 0,
   question   MEDIUMTEXT   NULL,
+  b_seq      INT UNSIGNED NOT NULL DEFAULT 0,
+  b_open     TINYINT(1)   NOT NULL DEFAULT 0,
+  b_revealed TINYINT(1)   NOT NULL DEFAULT 0,
+  bet        MEDIUMTEXT   NULL,
   created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   seen_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -245,6 +249,19 @@ CREATE TABLE IF NOT EXISTS room_answers (
   PRIMARY KEY (room_id, seq, contestant),
   KEY idx_room_answers_order (room_id, seq, received_ms),
   CONSTRAINT fk_room_answers_room FOREIGN KEY (room_id) REFERENCES game_rooms (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
+-- Phone buzzer Golden Goal bets (US-65): one bet per contestant per bet round (bet_seq), accepted only
+-- while that round is open; the room keeps the round (b_seq, b_open, b_revealed, bet: the category and
+-- each contestant's score and limit). Same as sql/migrate-add-rooms.sql.
+CREATE TABLE IF NOT EXISTS room_bets (
+  room_id     INT UNSIGNED     NOT NULL,
+  bet_seq     INT UNSIGNED     NOT NULL,
+  contestant  TINYINT UNSIGNED NOT NULL,
+  amount      INT UNSIGNED     NOT NULL,
+  received_ms BIGINT UNSIGNED  NOT NULL,
+  PRIMARY KEY (room_id, bet_seq, contestant),
+  CONSTRAINT fk_room_bets_room FOREIGN KEY (room_id) REFERENCES game_rooms (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
 -- ---------------------------------------------------------------------------

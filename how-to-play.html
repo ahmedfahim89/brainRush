@@ -17,7 +17,7 @@
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0b1026">
-  <link rel="stylesheet" href="css/style.0ba46723.css">
+  <link rel="stylesheet" href="css/style.f2b51c93.css">
   <link rel="stylesheet" href="css/guide.70c9a392.css">
 </head>
 <body class="guide">
@@ -43,6 +43,7 @@
         <li><a href="#double">&times;2 Double score</a></li>
         <li><a href="#ending">Ending the game</a></li>
         <li><a href="#golden-goal">Golden Goal <span aria-hidden="true">&#9917;</span></a></li>
+        <li><a href="#phones">Playing with phones (Phone buzzer)</a></li>
         <li><a href="#tournament">Tournament</a></li>
         <li><a href="#streak">💀 Sudden Death Streak (solo)</a></li>
         <li><a href="#daily">📅 Daily Challenge</a></li>
@@ -55,7 +56,7 @@
     <section id="what" class="guide-section">
       <h2>What is Mokh Rush?</h2>
       <p>Mokh Rush is a trivia game for a group around one shared screen. Players or teams pick questions from a board of categories and point values. Harder questions are worth more points.</p>
-      <p>One person is the <strong>host</strong>. The host runs the game on the computer, reads each question out, listens to the answers and marks them right or wrong. Players answer <strong>out loud</strong>: nobody types an answer.</p>
+      <p>One person is the <strong>host</strong>. The host runs the game on the computer, reads each question out, listens to the answers and marks them right or wrong. Players answer <strong>out loud</strong>, or, with <a href="#phones">Phone buzzer</a>, type their answers on their own phones.</p>
     </section>
 
     <section id="quick-start" class="guide-section">
@@ -232,6 +233,19 @@
     </section>
 
     <!-- US-61 / D-77: Tournament mode -->
+    <section id="phones" class="guide-section">
+      <h2>Playing with phones (Phone buzzer)</h2>
+      <p>In <strong>Players</strong> and <strong>Teams</strong> games the host can choose <strong>Game control: Phone buzzer</strong> on the setup screen. The host screen still runs the game and the host still marks every answer; the players follow on their own phones. <strong>Host control</strong> (the default) is the game as described above.</p>
+      <ul>
+        <li><strong>Joining.</strong> After <strong>Start Game</strong> the host screen shows a QR code, a 6-character room code and a link. Each player scans it or opens the link, then taps their own name (in Teams mode, one phone per team). A name already taken on another phone is greyed out. <strong>Phones n/N</strong> on the board shows the code again, who has joined, and <strong>Release</strong> to free a name.</li>
+        <li><strong>The board.</strong> Phones show the board and the scores live. Only the host picks a question.</li>
+        <li><strong>Questions.</strong> When the host opens a question, every phone shows it with the countdown and a box. Each player sends <strong>one answer</strong>; it is locked once sent. Answers count only while the question is open: after the timer ends or the host shows the answer, a late answer gets <strong>Too late</strong>. The host sees the answers in the order they arrived and marks them as usual. The answer is never sent to the phones, and a picture stays on the host screen.</li>
+        <li><strong>Golden Goal.</strong> Each player or team bets <strong>privately on their phone</strong>: the phone shows the category, their score and the range they can bet (from 0 up to their score or the board's largest point value, whichever is higher). A bet is locked once sent. The host screen shows <strong>Waiting for players to bet (n/N)</strong> with each name marked bet or waiting, never the amounts. When all bets are in, the question opens by itself, on the host screen and the phones. If someone has no phone, or lost it, <strong>Continue without missing bets</strong> goes on: a missing bet counts as 0. The host marks everyone; the bets and the new scores show once everyone is marked, and each phone shows its own result. A repeat round asks for new bets the same way.</li>
+        <li><strong>The end.</strong> When the host shows the results, the phones show the final standings. After <strong>New Game</strong> the phones say <strong>This game has ended.</strong></li>
+        <li>Refreshing the host screen or a phone keeps everything: a phone comes back as the same name, with its answer or bet still locked.</li>
+      </ul>
+    </section>
+
     <section id="tournament" class="guide-section">
       <h2>Tournament</h2>
       <p>A knockout for a bigger group: <strong>3 to 8</strong> players or teams, two at a time on a short board, until one champion is left.</p>

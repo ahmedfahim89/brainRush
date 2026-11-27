@@ -16,6 +16,7 @@
   const FSI = String.fromCharCode(0x2068); // first strong isolate: a name or category keeps its own direction
   const LRI = String.fromCharCode(0x2066); // left-to-right isolate: signed numbers such as -200 or +400
   const PDI = String.fromCharCode(0x2069); // pop directional isolate
+  const LRM = String.fromCharCode(0x200e); // left-to-right mark: keeps a leading sign on its number's left
 
   // A plural entry is an object of Intl.PluralRules categories (Arabic: zero, one, two, few, many,
   // other); {n} is the count. A missing Arabic string or form falls back to English.
@@ -491,6 +492,20 @@
       'score.waiting': 'Waiting',
       'score.botQuestion': "{name}'s question",
       'final.botBetLocked': 'Bet locked by the bot',
+      // Phone buzzer Golden Goal (US-65): the host waits for the bets made on the phones, never sees an amount
+      'final.phoneWaiting': 'Waiting for players to bet ({count})',
+      'final.phoneHint': 'Each one bets privately on their phone. The bets show here once everyone is marked.',
+      'final.phoneBetSent': '✓ Bet sent',
+      'final.phoneNoPhone': 'Waiting (no phone)',
+      'final.phoneContinue': 'Continue without missing bets',
+      'final.phoneContinueConfirm': 'Continue without the missing bets? Not in yet: {names}. Anyone whose bet is not in when you continue plays for a bet of 0.',
+      'final.phoneZero': 'Playing for a bet of 0 (no bet sent): {names}.',
+      'final.phoneFailed': 'The phones are not getting the bet screen: {reason} Trying again...',
+      'final.markedCorrect': '{name} marked correct. The bets show once everyone is marked.',
+      'final.markedWrong': '{name} marked wrong. The bets show once everyone is marked.',
+      'final.revealing': 'Revealing the bets...',
+      'final.revealFailed': 'Could not get the bets: {reason} Trying again...',
+      'final.revealLost': 'The phone room has expired, so its bets are lost: they count as 0.',
       'helper.notBot': 'the bot never uses helpers',
 
       // Report a question (US-42)
@@ -592,6 +607,33 @@
       'jq.choices': 'Choices',
       'jq.double': 'Double score',
       'jq.secondsLeft': 'Seconds left',
+      // Phone buzzer Golden Goal and game end on the phone (US-65)
+      'join.status.goalOffer': 'Golden Goal: there is a tie at the top. Wait for the host.',
+      'jb.category': 'Category: {name}',
+      'jb.score': 'Your score: {score}',
+      'jb.label': 'Your bet',
+      'jb.range': 'A whole number from 0 to {limit}. Only you see it.',
+      'jb.lock': 'Lock in bet',
+      'jb.sending': 'Sending...',
+      'jb.locked': 'Bet locked: {amount}. Wait for the others.',
+      'jb.error': 'Enter a whole number from 0 to {limit}.',
+      'jb.late': 'Too late: the bets are closed, so your bet is 0.',
+      'jb.failed': 'Not sent. Check the connection and try again.',
+      'jb.waitRound': 'Get ready: the bet screen is on its way.',
+      'jb.closedMine': 'The bets are closed. Your bet: {amount}.',
+      'jb.closedNone': 'The bets are closed. You did not bet, so you play for 0.',
+      'jb.marking': 'Wait while the host marks the answers. Your bet: {amount}.',
+      'jb.right': 'Correct! You won your bet: {delta}.',
+      'jb.wrong': 'Wrong: you lost your bet: {delta}.',
+      'jb.zero': 'Your bet was 0, so your score stays.',
+      'jq.yourBet': 'Your bet: {amount}',
+      'over.title': 'Game over',
+      'over.wins': '{name} wins!',
+      'over.tie': "It's a tie between {names}",
+      'over.standings': 'Final standings',
+      'join.endedTitle': 'This game has ended.',
+      'join.endedHint': 'Thanks for playing. To play again, join the host\'s new game.',
+      'join.again': 'Join another game',
     },
 
     // Arabic (Modern Standard Arabic), AI-drafted: to be reviewed by an Arabic speaker
@@ -1062,6 +1104,19 @@
       'score.waiting': 'في الانتظار',
       'score.botQuestion': 'سؤال {name}',
       'final.botBetLocked': 'ثبّت البوت رهانه',
+      'final.phoneWaiting': 'بانتظار رهانات اللاعبين ({count})',
+      'final.phoneHint': 'يراهن كل واحد سرًّا على هاتفه. تظهر الرهانات هنا بعد تصحيح إجابات الجميع.',
+      'final.phoneBetSent': '✓ أُرسل الرهان',
+      'final.phoneNoPhone': 'في الانتظار (بلا هاتف)',
+      'final.phoneContinue': 'تابِع دون الرهانات الناقصة',
+      'final.phoneContinueConfirm': 'المتابعة دون الرهانات الناقصة؟ لم يصل بعد رهان: {names}. من لم يصل رهانه عند المتابعة يلعب برهان 0.',
+      'final.phoneZero': 'يلعب برهان 0 (لم يُرسل رهانًا): {names}.',
+      'final.phoneFailed': 'شاشة الرهان لا تصل إلى الهواتف: {reason} نحاول من جديد...',
+      'final.markedCorrect': 'احتُسبت إجابة {name} صحيحة. تظهر الرهانات بعد تصحيح إجابات الجميع.',
+      'final.markedWrong': 'احتُسبت إجابة {name} خاطئة. تظهر الرهانات بعد تصحيح إجابات الجميع.',
+      'final.revealing': 'جارٍ كشف الرهانات...',
+      'final.revealFailed': 'تعذّر جلب الرهانات: {reason} نحاول من جديد...',
+      'final.revealLost': 'انتهت صلاحية غرفة الهواتف وضاعت رهاناتها، فتُحسب 0.',
       'helper.notBot': 'البوت لا يستخدم المساعدات',
 
       'report.title': 'الإبلاغ عن هذا السؤال',
@@ -1162,6 +1217,32 @@
       'jq.choices': 'الخيارات',
       'jq.double': 'نقاط مضاعفة',
       'jq.secondsLeft': 'الثواني المتبقية',
+      'join.status.goalOffer': 'الهدف الذهبي: تعادل في الصدارة. انتظر المقدّم.',
+      'jb.category': 'الفئة: {name}',
+      'jb.score': 'رصيدك: {score}',
+      'jb.label': 'رهانك',
+      'jb.range': 'عدد صحيح من 0 إلى {limit}. لا يراه أحد غيرك.',
+      'jb.lock': 'ثبِّت الرهان',
+      'jb.sending': 'جارٍ الإرسال...',
+      'jb.locked': 'ثُبّت رهانك: {amount}. انتظر الآخرين.',
+      'jb.error': 'أدخل عددًا صحيحًا من 0 إلى {limit}.',
+      'jb.late': 'متأخر: أُغلقت الرهانات، فرهانك 0.',
+      'jb.failed': 'لم يُرسل. تحقق من الاتصال وحاول مرة أخرى.',
+      'jb.waitRound': 'استعد: شاشة الرهان في الطريق.',
+      'jb.closedMine': 'أُغلقت الرهانات. رهانك: {amount}.',
+      'jb.closedNone': 'أُغلقت الرهانات. لم تراهن، فتلعب برهان 0.',
+      'jb.marking': 'انتظر حتى يصحح المقدّم الإجابات. رهانك: {amount}.',
+      'jb.right': 'إجابة صحيحة! ربحت رهانك: {delta}.',
+      'jb.wrong': 'إجابة خاطئة: خسرت رهانك: {delta}.',
+      'jb.zero': 'كان رهانك 0، فبقي رصيدك كما هو.',
+      'jq.yourBet': 'رهانك: {amount}',
+      'over.title': 'انتهت اللعبة',
+      'over.wins': 'الفوز لـ{name}!',
+      'over.tie': 'تعادل بين {names}',
+      'over.standings': 'الترتيب النهائي',
+      'join.endedTitle': 'انتهت هذه اللعبة.',
+      'join.endedHint': 'شكرًا على اللعب. لتلعب من جديد، انضم إلى اللعبة الجديدة لدى المقدّم.',
+      'join.again': 'الانضمام إلى لعبة أخرى',
     },
   };
 
@@ -1246,7 +1327,11 @@
 
   /** A number with a sign (-200, +400) reads left to right inside Arabic text (Arabic only). */
   function ltr(text) {
-    return lang === 'ar' ? LRI + text + PDI : String(text);
+    if (lang !== 'ar') return String(text);
+    // BUG-65-03: a leading sign also gets a left-to-right mark, so it stays on the number's left even
+    // where the isolate is not honoured (it would otherwise read "100−" at the end of an Arabic sentence).
+    const value = String(text);
+    return LRI + (/^[−+-]/.test(value) ? LRM : '') + value + PDI;
   }
 
   /** Static texts of the page: data-i18n="key" sets the text, data-i18n-attr="attr:key;..." attributes. */
