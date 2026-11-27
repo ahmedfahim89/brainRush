@@ -60,6 +60,14 @@
     skip: { chip: String.fromCharCode(0x00bd) },          // one half
   };
   const helperName = (key) => t('helper.' + key);
+  // Phone helpers (US-66, D-81): Phone buzzer games only, used from the players' phones; the host shows
+  // which are used, left or armed (×2). ABC, Swap and ½ above stay Host control only.
+  const PHONE_HELPER_KEYS = ['freeze', 'hint', 'double'];
+  const PHONE_HELPERS = {
+    freeze: { chip: String.fromCodePoint(0x2744) },  // snowflake (D-81)
+    hint: { chip: String.fromCodePoint(0x1f4a1) },   // light bulb (D-81)
+    double: { chip: String.fromCharCode(0x00d7) + '2' },
+  };
   const CHOICE_LETTERS = ['A', 'B', 'C'];
   const CHOICES_SHORT_CHARS = 24; // text question: 3 choices this short sit side by side
   const WRONG_FIELDS = ['wrong_1', 'wrong_2', 'wrong_1_ar', 'wrong_2_ar'];
@@ -273,6 +281,8 @@
   //     control?: 'host' | 'phone' (US-52: missing in tournament matches; saves before v5 become 'host'),
   //     room?: { code, hostToken } (Phone buzzer only: the room made at Start; the host token never
   //       leaves this browser except to api/rooms.php),
+  //     phoneHelpers?: [{ contestant, kind, seq, target }] (US-66, Phone buzzer only: the phone helper uses
+  //       the server reported; contestant / target are indexes; seq null = ×2 armed, 0 = spent by Golden Goal),
   //     current: null | { catId, points, marks: { "<contestantId>": "correct" | "wrong" }, answerShown,
   //                       lang, by?, choiceOrder?, swap?, timedOut?, phoneSeq? } }
   // phoneSeq (US-64): the room's question number of the open question in a Phone buzzer game.
@@ -603,6 +613,7 @@
     langBtn: byId('lang-btn'),
     answerBtn: byId('answer-btn'),
     answerText: byId('answer-text'),
+    answerHideBtn: byId('answer-hide-btn'),
     answerValue: byId('answer-value'),
     helperMsg: byId('helper-msg'),
     scoringTitle: byId('scoring-title'),
@@ -966,6 +977,11 @@
     return isDoubleCurrent(g) ? points * DOUBLE_FACTOR : points;
   }
 
+  /** US-66: what a Correct earns this contestant: doubled again when their phone ×2 is on this question. */
+  function correctPointsFor(g, contestant) {
+    return correctPoints(g) * (phoneDoubleOn(g, contestant) ? DOUBLE_FACTOR : 1);
+  }
+
   // ---------- Persistence (saveState / loadState, US-17) ----------
   // Only a started game is stored (D-24), together with the screen it is on.
 
@@ -1239,10 +1255,13 @@
   function isValidHelperUse(current, g) {
     const hasChoices = current.choiceOrder !== undefined;
     const hasSwap = current.swap !== undefined;
-    if (current.by === undefined) return !hasChoices && !hasSwap;
-    if (!hasChoices && !hasSwap) return false; // Skip closes the question, so it is never saved open
+    const skipped = current.skipped !== undefined; // owner change 2026-11-27: Skip keeps the question open
+    if (skipped && current.skipped !== true) return false;
+    if (current.by === undefined) return !hasChoices && !hasSwap && !skipped;
+    if (!hasChoices && !hasSwap && !skipped) return false;
     const user = Number.isInteger(current.by) ? findContestant(g, current.by) : null;
     if (user === null) return false;
+    if (skipped && (user.helpers.skip || current.marks[String(user.id)] !== 'wrong')) return false;
     if (helperLimitsScoring(g) && Object.keys(current.marks).some((id) => Number(id) !== user.id)) return false;
     if (hasChoices && (user.helpers.choices || !isValidChoiceOrder(current.choiceOrder))) return false;
     if (hasSwap && (user.helpers.swap || !isValidSwap(current.swap))) return false;
@@ -1294,6 +1313,7 @@
       (g.coinShown === undefined || typeof g.coinShown === 'boolean') &&
       (g.botTickets === undefined || isValidBotTickets(g.botTickets)) && // US-63
       isValidControl(g) && // US-52
+      (g.phoneHelpers === undefined || (g.control === 'phone' && isValidPhoneHelpers(g.phoneHelpers, g))) && // US-66
       isValidUsed(g.used, g) && isValidCurrent(g.current, g);
   }
 
@@ -1306,6 +1326,25 @@
     return g.control === 'phone' && (g.mode === 'players' || g.mode === 'teams') && isPlainObject(g.room) &&
       Object.keys(g.room).length === 2 && typeof g.room.code === 'string' && ROOM_CODE_PATTERN.test(g.room.code) &&
       typeof g.room.hostToken === 'string' && ROOM_TOKEN_PATTERN.test(g.room.hostToken);
+  }
+
+  /**
+   * US-66: the phone helper uses the server reported, [{ contestant, kind, seq, target }]: contestant an
+   * index, at most one row per contestant and kind; seq null (×2 armed), 0 (×2 spent by Golden Goal) or the
+   * question number; target the frozen contestant's index (Freeze only).
+   */
+  function isValidPhoneHelpers(rows, g) {
+    const n = g.contestants.length;
+    const seen = {};
+    const isIndex = (v) => Number.isInteger(v) && v >= 0 && v < n;
+    return Array.isArray(rows) && rows.every((r) => {
+      const key = isPlainObject(r) ? r.contestant + ':' + r.kind : '';
+      const ok = isPlainObject(r) && isIndex(r.contestant) && PHONE_HELPER_KEYS.indexOf(r.kind) !== -1 && !seen[key] &&
+        (r.seq === null || (Number.isInteger(r.seq) && r.seq >= 0)) &&
+        (r.kind === 'freeze' ? isIndex(r.target) : r.target === null);
+      seen[key] = true;
+      return ok;
+    });
   }
 
   /** US-47: the ids whose outcome was sent; missing in a save from before US-47 (then none are sent). */
@@ -2352,7 +2391,9 @@
       const game = newBoardGame(board, timer);
       if (game.control === 'phone') {
         try {
-          game.room = await createRoom(game); // US-52: the phones' room first, so the share panel has its code
+          const made = await createRoom(game); // US-52: the phones' room first, so the share panel has its code
+          game.room = made.room;
+          game.helpersOff = !made.helpers; // US-66: the server's switch, read with the room, is the one that counts
         } catch (err) {
           // US-06: stay on setup with every input intact; Host control still plays without a room.
           showMessage(dom.startMsg, () => t('start.roomFailed', { reason: sentence(errorText(err)) }), 'error');
@@ -2715,6 +2756,7 @@
 
   /** Scoreboard card line with the helpers a contestant has left; used ones are dimmed (US-32). */
   function renderHelpersLeft(contestant) {
+    if (state.game.control === 'phone') return renderPhoneHelpersLeft(contestant); // US-66
     const left = HELPER_KEYS.filter((key) => contestant.helpers[key]).map(helperName);
     const text = left.length ? t('helpers.left', { list: left.join(t('list.sep')) }) : t('helpers.none');
     return h('span', { className: 'score-helpers', title: text, hidden: state.game.helpersOff === true || isBot(contestant) }, [ // US-62
@@ -2722,6 +2764,23 @@
     ].concat(HELPER_KEYS.map((key) => h('span', {
       className: 'score-helper' + (contestant.helpers[key] ? '' : ' is-used'),
       text: HELPERS[key].chip,
+      'aria-hidden': 'true',
+    }))));
+  }
+
+  /** US-66: the phone helpers line of a scoreboard card: ❄ 💡 ×2, used ones dimmed, an armed ×2 highlighted. */
+  function renderPhoneHelpersLeft(contestant) {
+    const g = state.game;
+    const index = g.contestants.indexOf(contestant);
+    const status = (key) => phoneHelperStatus(g, index, key);
+    const left = PHONE_HELPER_KEYS.filter((key) => status(key) === 'left').map((key) => t('phoneHelper.' + key));
+    let text = left.length ? t('helpers.left', { list: left.join(t('list.sep')) }) : t('helpers.none');
+    if (status('double') === 'armed') text += ' ' + t('phoneHelper.armedNote');
+    return h('span', { className: 'score-helpers', title: text, hidden: g.helpersOff === true }, [
+      h('span', { className: 'visually-hidden', text: text }),
+    ].concat(PHONE_HELPER_KEYS.map((key) => h('span', {
+      className: 'score-helper' + (status(key) === 'used' ? ' is-used' : '') + (status(key) === 'armed' ? ' is-armed' : ''),
+      text: PHONE_HELPERS[key].chip,
       'aria-hidden': 'true',
     }))));
   }
@@ -2836,7 +2895,8 @@
    */
   function boardOutcome(cur) {
     if (correctContestantId(cur) !== null) return STAT.correct;
-    if (Object.keys(cur.marks).some((id) => cur.marks[id] === 'wrong')) return STAT.wrong;
+    // A Skip's own Wrong mark is not a wrong answer (the stats stay as before the owner change of 2026-11-27)
+    if (Object.keys(cur.marks).some((id) => cur.marks[id] === 'wrong' && !(cur.skipped === true && Number(id) === cur.by))) return STAT.wrong;
     return cur.timedOut === true ? STAT.timeout : STAT.nobody;
   }
 
@@ -3031,10 +3091,19 @@
     return Math.max(QUESTION_MIN_SCALE, Math.sqrt(QUESTION_FULL_SIZE_CHARS / length));
   }
 
-  function renderAnswerState(shown) {
-    dom.answerBtn.hidden = shown;
-    dom.answerText.hidden = !shown;
-    dom.qChoices.classList.toggle('is-revealed', shown); // the right choice turns green
+  /** Owner change 2026-11-27: `hidden` hides a shown answer again (view only, not saved). */
+  function renderAnswerState(shown, hidden) {
+    const visible = shown && !hidden;
+    dom.answerBtn.hidden = visible;
+    dom.answerText.hidden = !visible;
+    dom.answerHideBtn.hidden = !visible;
+    dom.qChoices.classList.toggle('is-revealed', visible); // the right choice turns green
+  }
+
+  /** Hide the shown answer from the screen; the question stays answered (no helpers, phones stay closed). */
+  function hideAnswer() {
+    renderAnswerState(true, true);
+    dom.answerBtn.focus();
   }
 
   function showAnswer() {
@@ -3044,6 +3113,11 @@
     }
     const cur = state.game && state.game.current;
     if (!cur) return;
+    if (cur.answerShown) { // shown before and hidden again: just show it
+      renderAnswerState(true);
+      dom.answerText.focus();
+      return;
+    }
     cur.answerShown = true;
     renderAnswerState(true);
     updateScoringRows(); // no helpers once the answer is shown
@@ -3064,7 +3138,8 @@
       name.style.backgroundColor = color.value;
       name.style.color = color.ink;
       const helperBtns = {};
-      HELPER_KEYS.forEach((key) => {
+      // BUG-66-01: a Phone buzzer game has no ABC / Swap / ½ buttons at all (the phones have their own helpers)
+      if (g.control !== 'phone') HELPER_KEYS.forEach((key) => {
         helperBtns[key] = h('button', {
           type: 'button',
           className: 'helper-chip',
@@ -3093,10 +3168,12 @@
         }),
       };
       const bot = isBot(c);
-      const chips = h('span', { className: 'srow-helpers', hidden: g.helpersOff === true || bot }, // US-62: no helpers for the bot
+      // US-62: no helpers for the bot; US-66: none on the host in a Phone buzzer game (the phones have their own)
+      const chips = g.control === 'phone' ? null : h('span', { className: 'srow-helpers', hidden: g.helpersOff === true || bot },
         HELPER_KEYS.map((key) => helperBtns[key]));
       ref.note = h('span', { className: 'srow-note', 'aria-live': 'polite' }); // US-62: bot match only
-      ref.row = h('li', { className: 'srow' + (bot ? ' is-bot' : '') }, [name, chips, ref.score, ref.status, ref.correct, ref.wrong, ref.note]);
+      ref.double = h('span', { className: 'srow-x2', text: PHONE_HELPERS.double.chip, title: t('phoneHelper.double'), hidden: true }); // US-66
+      ref.row = h('li', { className: 'srow' + (bot ? ' is-bot' : '') }, [name, chips, ref.double, ref.score, ref.status, ref.correct, ref.wrong, ref.note]);
       ref.row.style.borderInlineStartColor = color.value; // the left edge; the right one in Arabic
       dom.scoreRows.appendChild(ref.row);
       return ref;
@@ -3125,10 +3202,31 @@
       const who = { name: iso(ref.contestant.name) };
       ref.status.textContent = mark === 'correct' ? t('score.markedCorrect', who)
         : mark === 'wrong' ? t('score.markedWrong', who) : '';
-      HELPER_KEYS.forEach((helper) => updateHelperChip(ref, helper));
+      // Owner change 2026-11-27: the Skip user's Wrong button shows the half they lost
+      const lose = cur.skipped === true && cur.by === ref.contestant.id ? skipLoss(state.game) : activeQuestion(state.game).points;
+      ref.wrong.textContent = t('score.wrongBtn', { amount: signed(MINUS, lose) });
+      ref.wrong.setAttribute('aria-label', t('score.wrongLabel', { name: who.name, n: lose }));
+      Object.keys(ref.helpers).forEach((helper) => updateHelperChip(ref, helper)); // none in a Phone buzzer game
+      updatePhoneDoubleRow(ref);
       updateBotRow(ref, mark, cur);
     });
     dom.backBtn.disabled = botAnswerPending(state.game); // US-62: the bot's question closes once it is scored
+  }
+
+  /**
+   * US-66: a contestant with ×2 on this question: the ×2 tag shows on their row and their Correct button
+   * shows the doubled points (x4 on the double-score cell). Wrong stays at the normal points.
+   */
+  function updatePhoneDoubleRow(ref) {
+    const g = state.game;
+    const on = phoneDoubleOn(g, ref.contestant);
+    const win = correctPointsFor(g, ref.contestant);
+    const p = activeQuestion(g).points;
+    ref.double.hidden = !on;
+    ref.correct.textContent = t('score.correctBtn', { amount: signed('+', win) });
+    ref.correct.classList.toggle('is-double', win !== p);
+    ref.correct.setAttribute('aria-label', t('score.correctLabel', { name: iso(ref.contestant.name), n: win }) +
+      (isDoubleCurrent(g) ? t('score.doubleNote') : '') + (on ? t('phoneHelper.doubleNote') : ''));
   }
 
   /** Enable a helper chip only when its contestant may use it now; the tooltip says why not. */
@@ -3180,9 +3278,10 @@
     if (result === 'correct' && correctContestantId(cur) !== null) return;
     if (cur.by !== undefined && cur.by !== contestant.id && helperLimitsScoring(state.game)) return; // the helper made it their question
     // D-40: only a Correct is doubled on the double-score cell; a Wrong costs the normal points.
+    // US-66: the same for a phone ×2, which stacks with the double cell (x4).
     const points = activeQuestion(state.game).points;
     cur.marks[key] = result;
-    contestant.score += result === 'correct' ? correctPoints(state.game) : -points;
+    contestant.score += result === 'correct' ? correctPointsFor(state.game, contestant) : -points;
     updateScoringRows();
     saveState();
     const ref = scoringRows.find((r) => r.contestant === contestant);
@@ -3204,7 +3303,7 @@
   /** A helper click: check it is allowed, confirm it (no undo, D-06), then apply it. */
   function useHelper(contestant, key) {
     const g = state.game;
-    if (!g || !g.current || helperBlockReason(contestant, key)) return;
+    if (!g || !g.current || g.control === 'phone' || helperBlockReason(contestant, key)) return; // US-66: Host control only
     if (!window.confirm(helperConfirmText(contestant, key))) return;
     clearMessage(dom.helperMsg);
     if (key === 'choices') useChoices(contestant);
@@ -3232,17 +3331,31 @@
     cur.choiceOrder = shuffled([0, 1, 2]);
     renderQuestionLang(activeQuestion(g).question);
     updateScoringRows();
-    saveState();
-    if (phoneOn()) phoneUpdateQuestion(); // US-64: the 3 options show on the phones
+    saveState(); // US-66: never in a Phone buzzer game (ABC, Swap and ½ are Host control only)
   }
 
   /** Skip: lose half the points (of the Swap question after a Swap); the cell closes grey. */
+  /**
+   * Owner change 2026-11-27: Skip no longer closes the question. The user is marked Wrong at once for
+   * half the points (their Wrong button shows the half; Correct is off), and the host stays on the
+   * question to Show Answer and go Back to Board when ready.
+   */
   function useSkip(contestant) {
     const cur = state.game.current;
     contestant.helpers.skip = false;
     cur.by = contestant.id;
-    contestant.score -= Math.round(activeQuestion(state.game).points / 2);
-    backToBoard(); // nobody is marked Correct, so the cell turns grey
+    cur.skipped = true;
+    cur.marks[String(contestant.id)] = 'wrong';
+    contestant.score -= skipLoss(state.game);
+    updateScoringRows();
+    saveState();
+    const ref = scoringRows.find((r) => r.contestant === contestant);
+    if (ref) playResultFx(ref.wrong, 'wrong');
+  }
+
+  /** What a Skip costs: half the open question's points (a Swap's points after a Swap), rounded. */
+  function skipLoss(g) {
+    return Math.round(activeQuestion(g).points / 2);
   }
 
   /**
@@ -3282,7 +3395,6 @@
     delete cur.timedOut; // US-47: the swapped-away question is not counted; the new one has its own timer
     markSeen(swap.question.id);
     showQuestion(); // new heading, picture and points, timer from the start; also saves
-    if (phoneOn()) phoneOpenQuestion(); // US-64: a new question number; answers to the old one are late
   }
 
   /** Ids of every question on this board, so the Swap never brings one of them. */
@@ -7144,6 +7256,11 @@
   }
 
   function showFinalAnswer() {
+    if (state.game.final.answerShown) { // shown before and hidden again: just show it
+      renderAnswerState(true);
+      dom.answerText.focus();
+      return;
+    }
     state.game.final.answerShown = true;
     renderAnswerState(true);
     saveState();
@@ -9002,12 +9119,15 @@
     return face ? { face: face, open: open, x2: open && double } : { p: points, open: open, x2: open && double };
   }
 
-  /** Make the game's room (api/rooms.php create); resolves to { code, hostToken }. */
+  /**
+   * Make the game's room (api/rooms.php create); resolves to { room: { code, hostToken }, helpers }, where
+   * helpers is the Admin phone helper switch the server read for this game (US-66).
+   */
   async function createRoom(g) {
     const data = await apiPost(ROOMS_API + '?action=create', { state: phonePayload(g), session: HOST_SESSION });
     if (!isPlainObject(data) || typeof data.code !== 'string' || !ROOM_CODE_PATTERN.test(data.code) ||
         typeof data.host_token !== 'string' || !ROOM_TOKEN_PATTERN.test(data.host_token)) throw textError('err.response');
-    return { code: data.code, hostToken: data.host_token };
+    return { room: { code: data.code, hostToken: data.host_token }, helpers: data.helpers === true };
   }
 
   /** The phones follow this game from now on (a new game, or a restored one). */
@@ -9125,9 +9245,13 @@
     if (phone.renewing) return;
     const gen = phone.gen;
     phone.renewing = createRoom(g)
-      .then((room) => {
+      .then((made) => {
         if (gen !== phone.gen || state.game !== g) return;
-        g.room = room;
+        g.room = made.room;
+        g.helpersOff = !made.helpers; // US-66: a new room starts its helpers afresh (the old uses went with it)
+        delete g.phoneHelpers;
+        if (g.current) renderScoringRows();
+        renderScoreboard();
         phone.lobby = null;
         phone.shownJoined = null;
         phone.lastSent = null;
@@ -9161,6 +9285,7 @@
         }
         if (isPlainObject(data) && Array.isArray(data.players)) phone.lobby = data;
         renderLobby();
+        if (isPlainObject(data) && Array.isArray(data.helpers)) mergePhoneHelpers(data.helpers, null); // US-66
       } catch (err) {
         if (gen !== phone.gen) return;
         if (err.status === 404) renewRoom(g);
@@ -9263,9 +9388,11 @@
     g.contestants.forEach((c, i) => {
       const dot = h('span', { className: 'room-player-dot', 'aria-hidden': 'true' });
       dot.style.backgroundColor = paletteEntry(c.color).value;
+      const armed = !g.helpersOff && phoneHelperStatus(g, i, 'double') === 'armed'; // US-66
       dom.roomPlayers.appendChild(h('li', { className: 'room-player' + (joined[i] ? ' is-joined' : '') }, [
         dot,
         ownDirection(h('span', { className: 'room-player-name', text: c.name })),
+        armed ? h('span', { className: 'room-player-x2', text: t('phoneHelper.armed') }) : null,
         h('span', { className: 'room-player-state', text: t(joined[i] ? 'room.joined' : 'room.waiting') }),
         joined[i] ? h('button', {
           type: 'button',
@@ -9323,9 +9450,9 @@
   }
 
   // ---------- Phone buzzer: questions and answers (US-64, D-80 e to g, m) ----------
-  // A board question in a Phone buzzer game goes to the phones (open_question; a Swap opens a new
-  // number), its changes follow (3 choices, Pause, Resume, Reset: update_question) and it closes at
-  // timer 0, Show Answer, Back to Board and Skip (close_question). The calls run one after another
+  // A board question in a Phone buzzer game goes to the phones (open_question, with the hint patterns
+  // of US-66), its countdown changes follow (Pause, Resume, Reset: update_question) and it closes at
+  // timer 0, Show Answer and Back to Board (close_question). The calls run one after another
   // (phone.qChain), so a close never overtakes its open. The host polls the answers and lists them in
   // the Answers panel; the host still judges with Correct / Wrong. US-65: the Golden Goal question goes
   // the same way; its number is kept on g.final instead of g.current (phoneHolder()).
@@ -9350,10 +9477,9 @@
   }
 
   /**
-   * The open question as the phones may see it: the category, points, the ×2, the texts and the 3 choices
-   * in the host's order once the helper is used (the server gives them only to the phone of the contestant in by,
-   * owner CR 3). Never the answer, the answer's position among the
-   * choices or the picture's path (its file name can name the answer: hasImage only).
+   * The open question as the phones may see it: the category, points, the ×2 cell mark and the texts.
+   * Never the answer or the picture's path (its file name can name the answer: hasImage only).
+   * US-66: no 3 choices in a Phone buzzer game (ABC, Swap and ½ are Host control only).
    */
   function phoneQuestion(g) {
     if (!g.current) return phoneGoalQuestion(g); // US-65
@@ -9362,16 +9488,7 @@
     const q = active.question;
     const category = findCategory(g, cur.catId);
     const mix = !cur.swap && category.id === MIX;
-    // Owner CR 3: the 3 choices go only to the phone of the contestant who used them (the server filters them);
-    // nobody is locked out, and Swap goes to every phone.
-    const by = cur.by === undefined || cur.choiceOrder === undefined ? -1 : g.contestants.findIndex((c) => c.id === cur.by);
     const cat = cur.swap ? { name: cur.swap.catName, nameAr: cur.swap.catNameAr } : { name: category.name, nameAr: category.nameAr };
-    let choices = null;
-    if (cur.choiceOrder !== undefined && hasChoices(q)) {
-      const en = choiceTexts(q, false).options;
-      const ar = choiceTexts(q, true);
-      choices = cur.choiceOrder.map((i) => ({ text: en[i], textAr: ar.arabic ? ar.options[i] : null }));
-    }
     return {
       catName: mix ? null : cat.name,
       catNameAr: mix || !isFilled(cat.nameAr) ? null : cat.nameAr,
@@ -9383,11 +9500,34 @@
       text: q.question,
       textAr: hasArabic(q) ? q.question_ar : null,
       hasImage: !!q.image,
-      choices: choices,
-      by: by === -1 ? null : by,                  // owner CR 3: the choices' owner only
-      byHelper: by === -1 ? null : 'choices',
       timer: phoneTimer(),
     };
+  }
+
+  /**
+   * US-66: the hint patterns of the open board question, built here from its main answers (as on the 3
+   * choices: without the part in brackets), so the answer itself never leaves this browser. null when
+   * the game has no helpers, or on Golden Goal.
+   */
+  function phoneHint(g) {
+    if (!g.current || g.helpersOff) return null;
+    const q = activeQuestion(g).question;
+    const hint = {
+      en: hintPattern(choiceText(q.answer, false)),
+      ar: hasArabic(q) ? hintPattern(choiceText(q.answer_ar, true)) : null,
+    };
+    return hint.en === null && hint.ar === null ? null : hint;
+  }
+
+  /**
+   * "Paris" -> "P _ _ _ _", "New York" -> "N _ _   _ _ _ _": the first character, then one "_" for every
+   * other character, spaces kept as gaps. Marks such as Arabic short vowels are left out (they are not
+   * letters); null for an empty answer. api/rooms.php accepts nothing but this shape.
+   */
+  function hintPattern(answer) {
+    const chars = Array.from(String(answer).replace(/\p{M}/gu, '').replace(/\s+/g, ' ').trim());
+    if (!chars.length || chars[0] === '_') return null;
+    return [chars[0]].concat(chars.slice(1).map((ch) => (ch === ' ' ? ' ' : '_'))).join(' ');
   }
 
   /** US-65: the Golden Goal question for the phones: its category and round, no points (each plays for their bet). */
@@ -9407,10 +9547,7 @@
       text: q.question,
       textAr: hasArabic(q) ? q.question_ar : null,
       hasImage: !!q.image,
-      choices: null, // no helpers in Golden Goal
-      by: null,
-      byHelper: null,
-      timer: phoneTimer(),
+      timer: phoneTimer(), // no helpers in Golden Goal (US-66: no hint is sent with it)
     };
   }
 
@@ -9437,7 +9574,7 @@
     }
   }
 
-  /** The question just opened (a cell or a Swap) goes to the phones with a new number. */
+  /** The question just opened goes to the phones with a new number (and its hint patterns, US-66). */
   function phoneOpenQuestion() {
     const g = state.game;
     const cur = phoneHolder();
@@ -9445,10 +9582,13 @@
     renderAnswersPanel();
     phoneQueue(async () => {
       if (state.game !== g || phoneHolder() !== cur) return; // closed before its turn: nothing to open
-      const data = await phoneQuestionCall('open_question', { question: phoneQuestion(g) });
+      const data = await phoneQuestionCall('open_question', { question: phoneQuestion(g), hint: phoneHint(g) });
       if (!Number.isInteger(data.seq)) return;
       cur.phoneSeq = data.seq;
       phone.answers = { seq: data.seq, open: true, list: [] };
+      if (Array.isArray(data.doubles)) { // US-66: the armed ×2s now on this question, before the first poll
+        mergePhoneHelpers(data.doubles.map((i) => ({ contestant: i, kind: 'double', target: null })), data.seq);
+      }
       if (phoneHolder() === cur) {
         saveState();
         pollAnswers();
@@ -9456,7 +9596,7 @@
     });
   }
 
-  /** The open question changed (3 choices, or its countdown): the phones get the new version. */
+  /** The open question's countdown changed: the phones get the new version. */
   function phoneUpdateQuestion() {
     const g = state.game;
     const cur = phoneHolder();
@@ -9528,6 +9668,7 @@
       if (isPlainObject(data) && Array.isArray(data.answers)) {
         a.list = data.answers.filter((x) => isPlainObject(x) && Number.isInteger(x.contestant) && typeof x.text === 'string');
         if (data.open === false) a.open = false;
+        if (Array.isArray(data.helpers)) mergePhoneHelpers(data.helpers, a.seq); // US-66: saved, for the tags and ×2
         renderAnswersPanel();
       }
     } catch (err) {
@@ -9562,20 +9703,113 @@
     a.list.forEach((x) => {
       const c = g.contestants[x.contestant];
       if (!c) return;
-      const color = paletteEntry(c.color);
-      const name = h('span', { className: 'answer-name', text: iso(c.name) });
-      name.style.backgroundColor = color.value;
-      name.style.color = color.ink;
       dom.answersList.appendChild(h('li', { className: 'answer-row' }, [
-        name,
+        answerName(c),
         ownDirection(h('span', { className: 'answer-said', text: x.text, title: x.text, dir: 'auto' })),
+        answerTags(g, x.contestant, a.seq),
         h('span', { className: 'answer-time', text: answerTime(x.ms) }),
+      ]));
+    });
+    // US-66: a contestant who used or got a helper but has not answered yet gets a row for the tags
+    g.contestants.forEach((c, i) => {
+      if (a.list.some((x) => x.contestant === i) || !phoneHelperRows(g, a.seq).some((r) => r.contestant === i || r.target === i)) return;
+      dom.answersList.appendChild(h('li', { className: 'answer-row is-pending' }, [
+        answerName(c),
+        h('span', { className: 'answer-said', text: t('answers.noAnswer') }),
+        answerTags(g, i, a.seq),
+        h('span', { className: 'answer-time' }),
       ]));
     });
     const key = a.list.length ? (a.open ? '' : 'answers.closed') : (a.open ? 'answers.waiting' : 'answers.none');
     dom.answersHint.textContent = key ? t(key) : '';
     dom.answersHint.hidden = !key;
     fitAnswersList();
+  }
+
+  /** A name in the contestant's colour, for the Answers panel. */
+  function answerName(c) {
+    const color = paletteEntry(c.color);
+    const name = h('span', { className: 'answer-name', text: iso(c.name) });
+    name.style.backgroundColor = color.value;
+    name.style.color = color.ink;
+    return name;
+  }
+
+  /** US-66: the helper tags of a contestant on question seq: "❄ froze X", "❄ frozen by X", "💡", "×2". */
+  function answerTags(g, index, seq) {
+    const tags = [];
+    const name = (i) => (g.contestants[i] ? iso(g.contestants[i].name) : '?');
+    phoneHelperRows(g, seq).forEach((r) => {
+      if (r.kind === 'freeze' && r.contestant === index) tags.push(t('answers.froze', { icon: PHONE_HELPERS.freeze.chip, name: name(r.target) }));
+      if (r.kind === 'freeze' && r.target === index) tags.push(t('answers.frozenBy', { icon: PHONE_HELPERS.freeze.chip, name: name(r.contestant) }));
+      if (r.kind === 'hint' && r.contestant === index) tags.push(PHONE_HELPERS.hint.chip + ' ' + t('phoneHelper.hint'));
+      if (r.kind === 'double' && r.contestant === index) tags.push(PHONE_HELPERS.double.chip);
+    });
+    return h('span', { className: 'answer-tags' }, tags.map((text) => h('span', { className: 'answer-tag', text: text })));
+  }
+
+  // ---------- Phone helpers on the host (US-66, D-81) ----------
+  // The phones use the helpers; the server checks every rule. The host keeps the uses it hears of (the
+  // lobby poll: the whole game; open_question: the ×2s on the new question; the answers poll: the uses on
+  // the open question) in g.phoneHelpers, shows them on the scoreboard, the lobby panel and the Answers
+  // panel, and doubles a Correct for a contestant with ×2 on the question.
+
+  /** The saved uses on question seq (null: none). */
+  function phoneHelperRows(g, seq) {
+    if (!Array.isArray(g.phoneHelpers) || !Number.isInteger(seq)) return [];
+    return g.phoneHelpers.filter((r) => r.seq === seq);
+  }
+
+  /** A contestant's helper `key`: 'left', 'used', or 'armed' (a ×2 waiting for the next question). */
+  function phoneHelperStatus(g, index, key) {
+    const row = (g.phoneHelpers || []).find((r) => r.contestant === index && r.kind === key);
+    if (!row) return 'left';
+    return key === 'double' && row.seq === null ? 'armed' : 'used';
+  }
+
+  /** The contestant's ×2 is on the open board question (an armed one counts until the open call answers). */
+  function phoneDoubleOn(g, contestant) {
+    if (g.control !== 'phone' || g.helpersOff || !g.current) return false;
+    const index = g.contestants.indexOf(contestant);
+    const row = (g.phoneHelpers || []).find((r) => r.contestant === index && r.kind === 'double');
+    if (!row) return false;
+    return g.current.phoneSeq ? row.seq === g.current.phoneSeq : row.seq === null;
+  }
+
+  /**
+   * Add the uses the server reported (rows of the lobby with their seq, or rows of one question: seq given).
+   * A use is never removed, and an older reply never turns a ×2 on a question back into an armed one.
+   */
+  function mergePhoneHelpers(rows, seq) {
+    const g = state.game;
+    if (!g || g.control !== 'phone') return;
+    const list = Array.isArray(g.phoneHelpers) ? g.phoneHelpers.slice() : [];
+    let changed = false;
+    rows.forEach((r) => {
+      if (!isPlainObject(r)) return;
+      const row = {
+        contestant: r.contestant,
+        kind: r.kind,
+        seq: seq !== null ? seq : (r.seq === undefined ? null : r.seq),
+        target: r.kind === 'freeze' ? r.target : null,
+      };
+      if (!isValidPhoneHelpers([row], g)) return;
+      const i = list.findIndex((x) => x.contestant === row.contestant && x.kind === row.kind);
+      if (i === -1) {
+        list.push(row);
+        changed = true;
+      } else if (!(row.seq === null && list[i].seq !== null) && (list[i].seq !== row.seq || list[i].target !== row.target)) {
+        list[i] = row;
+        changed = true;
+      }
+    });
+    if (!changed) return;
+    g.phoneHelpers = list;
+    saveState();
+    renderScoreboard();
+    if (g.current && state.screen === 'question' && scoringRows.length) updateScoringRows();
+    renderAnswersPanel();
+    if (isRoomPanelOpen()) renderRoomPlayers();
   }
 
   /**
@@ -9943,6 +10177,7 @@
     dom.endBtn.addEventListener('click', endGame);
     dom.boardDoneBtn.addEventListener('click', endGame);
     dom.answerBtn.addEventListener('click', showAnswer);
+    dom.answerHideBtn.addEventListener('click', hideAnswer);
     dom.langBtn.addEventListener('click', toggleLang);
     dom.timerPause.addEventListener('click', onPauseClick);
     dom.timerReset.addEventListener('click', onResetClick);

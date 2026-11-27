@@ -13,6 +13,10 @@
 // once sent; then the question as above; then its own result. Only this phone's own amount ever reaches
 // it. When the host shows the results the phone shows the final standings; when the room is closed (New
 // Game) or has expired, "This game has ended." with the standings it last had.
+// US-66 (D-81): when the game has phone helpers, the question screen has ❄ Freeze (pick an opponent: their
+// Send is locked for a quarter of the timer) and 💡 Hint (the first letter and one _ per other letter), and
+// the board has ×2 Double down for the next question; each once per game, after a confirm. The server
+// checks every rule; the phone shows its refusal reason. ABC, Swap and ½ are Host control only.
 'use strict';
 
 (function () {
@@ -40,7 +44,10 @@
   const ANSWER_MAX = 200;        // ROOM_ANSWER_MAX in api/rooms.php
   const CLOSED_NOTE_MS = 3000;   // after a question closes, the board's status line says so this long
   const TICK_MS = 250;           // the countdown on the phone
-  const CHOICE_LETTERS = ['A', 'B', 'C'];
+  const FREEZE_ICON = String.fromCodePoint(0x2744);  // US-66 (D-81): the Freeze banner
+  const HELPER_REASONS = ['off', 'used', 'goal', 'closed', 'open', 'sent', 'nohint', 'self', 'not_in_room',
+    'target_sent', 'already_frozen', 'immune']; // the 409 reasons of api/rooms.php helper
+  const ARABIC_START = /^[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff\ufb50-\ufdff\ufe70-\ufeff]/;
   const GOAL_BALL = String.fromCodePoint(0x26bd); // US-65: Golden Goal's ball, as on the host (decorative)
   const BET_PATTERN = /^\d{1,10}$/;               // a whole number typed as a bet
 
@@ -68,7 +75,6 @@
     qPicture: byId('jq-picture'),
     qText: byId('jq-text'),
     qLang: byId('jq-lang'),
-    qChoices: byId('jq-choices'),
     qTimerValue: byId('jq-timer-value'),
     qBar: byId('jq-bar'),
     qTimerNote: byId('jq-timer-note'),
@@ -94,6 +100,21 @@
     endedWinner: byId('join-ended-winner'),
     endedList: byId('join-ended-list'),
     again: byId('join-again'),
+    jhBoard: byId('jh-board'),         // US-66
+    jhDouble: byId('jh-double'),
+    jhArmed: byId('jh-armed'),
+    jhBoardMsg: byId('jh-board-msg'),
+    jhRow: byId('jh-row'),
+    jhFreeze: byId('jh-freeze'),
+    jhHint: byId('jh-hint'),
+    jhOn: byId('jh-on'),
+    jhPicker: byId('jh-picker'),
+    jhTargets: byId('jh-targets'),
+    jhCancel: byId('jh-cancel'),
+    jhMsg: byId('jh-msg'),
+    jhHintLine: byId('jh-hint-line'),
+    jhPattern: byId('jh-pattern'),
+    jhFrozen: byId('jh-frozen'),
   };
 
   // view: 'code' | 'pick' | 'board' | 'ended' (US-65). players = [{name, color, joined}] from the last poll; game = the
@@ -116,11 +137,13 @@
     question: null,  // US-64: the room's open (or last closed) question, from the state poll
     mine: null,      // this contestant's answer to it, from the server (a refreshed phone stays locked)
     offset: 0,       // server time minus this phone's clock (ms), for the countdown
-    q: null,         // the question on screen: { seq, data, lang, sent, late, locked, sending, msg, wasOpen, closedUntil, choicesKey }
+    q: null,         // the question on screen: { seq, data, lang, sent, late, locked, sending, msg, wasOpen, closedUntil }
     ticker: null,
     bet: null,       // US-65: this contestant's last Golden Goal bet round, from the state poll (own amount only)
     bv: null,        // the bet screen: { seq, sent, sending, late, msg } (the typed text survives updates)
     over: null,      // the standings kept for "This game has ended.": { game, you }, or null
+    helpers: null,   // US-66: this contestant's helpers from the state poll (null: the game has none)
+    hv: { busy: false, msg: null, picking: false, pickerKey: null }, // the helper call, its message and the Freeze picker
   };
 
   // ---------- Helpers ----------
@@ -343,6 +366,7 @@
     app.question = isValidQuestion(data.question) ? data.question : null;
     app.mine = typeof data.mine === 'string' ? data.mine : null;
     app.bet = isValidBet(data.bet) ? data.bet : null;
+    app.helpers = isValidHelpers(data.helpers) ? data.helpers : null; // US-66
     renderBoard();
   }
 
@@ -365,6 +389,8 @@
     app.q = null;
     app.bet = null;
     app.bv = null;
+    app.helpers = null;
+    app.hv = { busy: false, msg: null, picking: false, pickerKey: null };
     savePlace(app.code, null);
   }
 
@@ -536,6 +562,7 @@
     dom.scoresTitle.hidden = over;
     dom.scores.hidden = over;
     dom.status.textContent = over || asking || betting ? '' : (closedNote() || boardStatus(g));
+    renderBoardHelpers(g, !over && !asking && !betting); // US-66: ×2 on the board
     renderGrid(g);
     renderScores(g);
   }
@@ -547,8 +574,7 @@
     return !!q && typeof q === 'object' && Number.isInteger(q.seq) && typeof q.open === 'boolean' &&
       typeof q.text === 'string' && (q.goal === true ? q.points === null : Number.isInteger(q.points)) && !!tm && typeof tm === 'object' &&
       Number.isInteger(tm.totalMs) && tm.totalMs > 0 && Number.isInteger(tm.remainingMs) && Number.isFinite(tm.atMs) &&
-      typeof tm.running === 'boolean' &&
-      (q.choices === null || (Array.isArray(q.choices) && q.choices.length === 3 && q.choices.every((c) => c && typeof c.text === 'string')));
+      typeof tm.running === 'boolean';
   }
 
   /**
@@ -596,17 +622,20 @@
     if (app.mine !== null && app.q.sent === null) app.q.sent = app.mine; // sent from this name before a refresh
     fillQuestion();
     renderAnswerState();
+    renderQuestionHelpers(); // US-66
     renderTimer();
     if (app.ticker === null) app.ticker = window.setInterval(renderTimer, TICK_MS);
     return true;
   }
 
-  /** A new question number (a new cell, or a Swap): an empty box; Arabic first when it has Arabic (US-49). */
+  /** A new question number: an empty box; Arabic first when it has Arabic (US-49). */
   function startQuestion(q) {
     app.q = {
       seq: q.seq, data: q, lang: q.textAr ? 'ar' : 'en', sent: null, late: false, locked: false,
-      sending: false, msg: null, wasOpen: q.open, closedUntil: 0, choicesKey: null,
+      sending: false, msg: null, wasOpen: q.open, closedUntil: 0,
     };
+    app.hv.msg = null; // US-66: a helper message or picker of the last question goes
+    app.hv.picking = false;
     dom.qInput.value = '';
   }
 
@@ -619,7 +648,7 @@
     return app.q.lang === 'ar' && typeof textAr === 'string' && textAr !== '' ? textAr : text;
   }
 
-  /** Heading, picture note, text, language button and the 3 choices; the typed text is never touched. */
+  /** Heading, picture note, text and language button; the typed text is never touched. */
   function fillQuestion() {
     const q = app.q.data;
     const cat = q.mix
@@ -643,35 +672,6 @@
     dom.qLang.hidden = !q.textAr;
     dom.qLang.textContent = arabic ? 'English' : 'العربية';
     dom.qLang.setAttribute('aria-label', arabic ? t('lang.showEnglish') : t('lang.showArabic'));
-    renderChoices(q, arabic);
-  }
-
-  /** The 3 choices (once the host used the helper), as buttons that fill the box; Send still sends. */
-  function renderChoices(q, arabic) {
-    const key = JSON.stringify([q.seq, q.choices, arabic]);
-    dom.qChoices.hidden = !q.choices;
-    if (key === app.q.choicesKey) return;
-    app.q.choicesKey = key;
-    clear(dom.qChoices);
-    if (!q.choices) return;
-    dom.qChoices.setAttribute('aria-label', t('jq.choices'));
-    q.choices.forEach((c, i) => {
-      const text = arabic && c.textAr ? c.textAr : c.text;
-      const btn = h('button', { type: 'button', className: 'jq-choice', onclick: () => onChoice(btn, text) }, [
-        h('span', { className: 'jq-choice-letter', text: CHOICE_LETTERS[i], 'aria-hidden': 'true' }),
-        h('span', { className: 'jq-choice-text', text: text, dir: 'auto' }),
-      ]);
-      dom.qChoices.appendChild(h('li', {}, [btn]));
-    });
-  }
-
-  function onChoice(btn, text) {
-    if (!app.q || answerLocked()) return;
-    dom.qInput.value = text;
-    Array.prototype.forEach.call(dom.qChoices.querySelectorAll('.jq-choice'), (b) => b.classList.toggle('is-picked', b === btn));
-    if (app.q.msg) app.q.msg = null;
-    renderAnswerState();
-    dom.qSend.focus(); // the player still taps Send (US-64)
   }
 
   function onQuestionLang() {
@@ -685,13 +685,15 @@
     return a.sent !== null || a.late || a.locked || a.sending || !a.data.open;
   }
 
-  /** The box, Send, the choices and the message: sending, sent (locked), too late, closed or an error. */
+  /**
+   * The box, Send and the message: sending, sent (locked), too late, closed or an error. US-66: while a
+   * Freeze runs the box stays open but Send is locked (the banner above says until when).
+   */
   function renderAnswerState() {
     const a = app.q;
     const locked = answerLocked();
     dom.qInput.disabled = locked;
-    dom.qSend.disabled = locked;
-    Array.prototype.forEach.call(dom.qChoices.querySelectorAll('.jq-choice'), (b) => { b.disabled = locked; });
+    dom.qSend.disabled = locked || frozenMs() > 0;
     if (a.sending) showMsg(dom.qMsg, t('jq.sending'), 'warning');
     else if (a.sent !== null) showMsg(dom.qMsg, t('jq.sent', { text: iso(a.sent) }), 'success');
     else if (a.late) showMsg(dom.qMsg, t('jq.late'), 'error');
@@ -716,13 +718,14 @@
     if (q.open && !tm.running) note = t('jq.paused');
     else if (q.open && left === 0) note = t('jq.timeUp');
     dom.qTimerNote.textContent = note;
+    renderFrozen(); // US-66: the Freeze countdown runs on server time, Pause or not
   }
 
   /** Send the answer once: locked after; "Too late" once the host closed the question. */
   async function onSend(event) {
     event.preventDefault();
     const a = app.q;
-    if (!a || answerLocked()) return;
+    if (!a || answerLocked() || frozenMs() > 0) return;
     const text = dom.qInput.value.replace(/[\u0000-\u001f\u007f]+/g, ' ').trim();
     if (!text) a.msg = 'jq.empty';
     else if (Array.from(text).length > ANSWER_MAX) a.msg = 'jq.tooLong';
@@ -747,6 +750,10 @@
       const reason = err.data && err.data.reason;
       if (err.status === 409 && reason === 'late') {
         a.late = true;
+      } else if (err.status === 409 && reason === 'frozen') { // US-66: frozen meanwhile; the banner comes with the next poll
+        a.msg = 'jq.frozen';
+        app.version = null;
+        schedule(0);
       } else if (err.status === 409) { // sent already (another tab or a lost reply): the server's copy shows next poll
         a.locked = true;
         app.version = null;
@@ -766,6 +773,244 @@
       a.sending = false;
     }
     renderAnswerState();
+    if (app.q === a) renderQuestionHelpers(); // US-66: no ❄ or 💡 once the answer is sent
+  }
+
+  // ---------- Phone helpers: ❄ Freeze, 💡 Hint, ×2 Double down (US-66, D-81) ----------
+
+  function isValidHelpers(x) {
+    const isIndex = (v) => Number.isInteger(v) && v >= 0;
+    return !!x && typeof x === 'object' && !!x.left && typeof x.left === 'object' &&
+      ['freeze', 'hint', 'double'].every((k) => typeof x.left[k] === 'boolean') &&
+      (x.double === null || x.double === 'armed' || x.double === 'on') &&
+      (x.frozen === null || (!!x.frozen && isIndex(x.frozen.by) && Number.isFinite(x.frozen.untilMs))) &&
+      (x.hint === null || (!!x.hint && typeof x.hint === 'object')) &&
+      Array.isArray(x.targets) && x.targets.every(isIndex);
+  }
+
+  /** The ms left of a Freeze on this phone (server time), 0 when there is none. */
+  function frozenMs() {
+    const f = app.helpers && app.helpers.frozen;
+    return f && app.q && app.q.data.open ? Math.max(0, f.untilMs - (Date.now() + app.offset)) : 0;
+  }
+
+  function playerName(index) {
+    const c = app.game && app.game.contestants[index];
+    return c ? String(c.name) : '?';
+  }
+
+  /** A Freeze lasts a quarter of the question's timer, rounded (as api/rooms.php works it out). */
+  function freezeSeconds(q) {
+    return Math.max(1, Math.round(q.timer.totalMs / 4000));
+  }
+
+  /** The 💡 pattern in this phone's language, or in the other one when the question has none in it. */
+  function hintText() {
+    const hint = app.helpers && app.helpers.hint;
+    if (!hint) return null;
+    const ok = (p) => typeof p === 'string' && p !== '';
+    const mine = i18n.isArabic() ? hint.ar : hint.en;
+    const other = i18n.isArabic() ? hint.en : hint.ar;
+    return ok(mine) ? mine : (ok(other) ? other : null);
+  }
+
+  /** A helper chip: available, or dimmed when used (or not allowed now, or while a helper call runs). */
+  function setChip(btn, left, allowed, key) {
+    btn.disabled = !left || !allowed || app.hv.busy;
+    btn.classList.toggle('is-used', !left);
+    btn.setAttribute('aria-label', t(left ? 'jh.chipLabel' : 'jh.chipUsed', { name: t('jh.' + key) }));
+  }
+
+  function renderHelperMsg(node, where) {
+    const m = app.hv.msg;
+    if (m && m.where === where) showMsg(node, t(m.key, m.params || {}), m.kind);
+    else node.hidden = true;
+  }
+
+  /** The chips on the open question, the Freeze picker, the hint line and the Freeze banner. */
+  function renderQuestionHelpers() {
+    const hs = app.helpers;
+    const q = app.q.data;
+    const on = !!hs && q.open && q.goal !== true; // no helpers in Golden Goal
+    const sent = app.q.sent !== null || app.q.late || app.q.locked;
+    dom.jhRow.hidden = !on;
+    if (on) {
+      setChip(dom.jhFreeze, hs.left.freeze, !sent, 'freeze');
+      setChip(dom.jhHint, hs.left.hint, !sent, 'hint');
+      dom.jhOn.hidden = hs.double !== 'on';
+      dom.jhOn.textContent = t('jh.doubleOn');
+    }
+    if (!on || !hs.left.freeze || sent) app.hv.picking = false;
+    renderPicker();
+    const pattern = on ? hintText() : null;
+    dom.jhHintLine.hidden = pattern === null;
+    if (pattern !== null) {
+      clear(dom.jhPattern); // one box per word, so a line breaks between words ("N _ _   _ _ _ _")
+      pattern.split('   ').forEach((word, i) => {
+        if (i) dom.jhPattern.appendChild(document.createTextNode('   '));
+        dom.jhPattern.appendChild(h('span', { className: 'jh-word', text: word }));
+      });
+      dom.jhPattern.dir = ARABIC_START.test(pattern) ? 'rtl' : 'ltr'; // a Latin or digit pattern reads left to right in Arabic too (D-60)
+    }
+    renderHelperMsg(dom.jhMsg, 'q');
+    renderFrozen();
+  }
+
+  /** "❄ Frozen by Sara: 5 s" while a Freeze runs; Send unlocks by itself at 0 (the ticker calls this). */
+  function renderFrozen() {
+    if (!app.q) return;
+    const ms = frozenMs();
+    const wasFrozen = !dom.jhFrozen.hidden;
+    dom.jhFrozen.hidden = ms === 0;
+    if (ms > 0) {
+      dom.jhFrozen.textContent = FREEZE_ICON + ' ' +
+        t('jh.frozen', { name: iso(playerName(app.helpers.frozen.by)), s: ltr(String(Math.ceil(ms / 1000))) });
+    }
+    if (wasFrozen !== ms > 0) renderAnswerState();
+  }
+
+  /** The opponents this phone can freeze now (the server's list), as buttons. */
+  function renderPicker() {
+    const show = app.hv.picking && !!app.helpers;
+    dom.jhPicker.hidden = !show;
+    if (!show) return;
+    const key = JSON.stringify([app.helpers.targets, app.hv.busy, i18n.lang()]);
+    if (key === app.hv.pickerKey) return;
+    app.hv.pickerKey = key;
+    clear(dom.jhTargets);
+    if (!app.helpers.targets.length) {
+      dom.jhTargets.appendChild(h('li', { className: 'hint', text: t('jh.pickNone') }));
+      return;
+    }
+    app.helpers.targets.forEach((i) => {
+      const c = app.game.contestants[i];
+      if (!c) return;
+      const btn = h('button', { type: 'button', className: 'jh-target', disabled: app.hv.busy, onclick: () => useFreeze(i) }, [
+        h('span', { className: 'jh-target-dot', 'aria-hidden': 'true' }),
+        h('span', { className: 'jh-target-name', text: String(c.name), dir: 'auto' }),
+      ]);
+      const color = safeColor(c.color);
+      if (color) btn.firstChild.style.backgroundColor = color;
+      dom.jhTargets.appendChild(h('li', {}, [btn]));
+    });
+  }
+
+  /** The board's ×2 chip, or "×2 armed for the next question" once armed. shown: the board is on screen. */
+  function renderBoardHelpers(g, shown) {
+    const hs = app.helpers;
+    const show = shown && !!hs && (g.screen === 'board' || g.screen === 'question') && !g.goal;
+    dom.jhBoard.hidden = !show;
+    if (!show) return;
+    const armed = hs.double === 'armed';
+    dom.jhDouble.hidden = armed;
+    setChip(dom.jhDouble, hs.left.double, true, 'double');
+    dom.jhArmed.hidden = !armed;
+    if (armed) dom.jhArmed.textContent = t('jh.armed');
+    renderHelperMsg(dom.jhBoardMsg, 'board');
+  }
+
+  /** The player card's helpers line: ❄ 💡 ×2, used ones struck through, an armed ×2 highlighted. */
+  function renderHelpersLeft(hs) {
+    const icons = { freeze: FREEZE_ICON, hint: String.fromCodePoint(0x1f4a1), double: TIMES + '2' };
+    const keys = ['freeze', 'hint', 'double'];
+    const left = keys.filter((k) => hs.left[k]).map((k) => t('jh.' + k));
+    let text = left.length ? t('jh.left', { list: left.join(t('list.sep')) }) : t('jh.none');
+    if (hs.double === 'armed') text += ' ' + t('jh.armed');
+    return h('span', { className: 'jb-score-helpers', title: text }, [h('span', { className: 'visually-hidden', text: text })]
+      .concat(keys.map((k) => h('span', {
+        className: 'jb-score-helper' + (!hs.left[k] && !(k === 'double' && hs.double === 'armed') ? ' is-used' : '') +
+          (k === 'double' && hs.double === 'armed' ? ' is-armed' : ''),
+        text: icons[k],
+        'aria-hidden': 'true',
+      }))));
+  }
+
+  /** Use a helper on the server; true when it was accepted. The new state comes with an immediate poll. */
+  async function postHelper(body, where) {
+    if (app.hv.busy) return false;
+    app.hv.busy = true;
+    app.hv.msg = null;
+    renderBoard();
+    let ok = false;
+    try {
+      await call('action=helper', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(Object.assign({ code: app.code, device_token: app.token }, body)),
+      });
+      ok = true;
+      if (app.helpers) { // until the poll brings the server's copy
+        app.helpers.left[body.kind] = false;
+        if (body.kind === 'double') app.helpers.double = 'armed';
+      }
+    } catch (err) {
+      app.hv.busy = false;
+      if (err.status === 404) {
+        gameEnded();
+        return false;
+      }
+      if (err.status === 401 || err.status === 403) {
+        onPollError(err, true);
+        return false;
+      }
+      const reason = err.data && typeof err.data.reason === 'string' ? err.data.reason : '';
+      app.hv.msg = { key: HELPER_REASONS.indexOf(reason) === -1 ? 'jh.err.failed' : 'jh.err.' + reason, kind: 'error', where: where };
+    } finally {
+      app.hv.busy = false;
+    }
+    app.version = null;
+    schedule(0);
+    return ok;
+  }
+
+  /** May this phone use `kind` on the open question now? */
+  function canUseOnQuestion(kind) {
+    const hs = app.helpers;
+    return !!hs && !!app.q && app.q.data.open && app.q.data.goal !== true && hs.left[kind] && !app.hv.busy &&
+      app.q.sent === null && !app.q.late && !app.q.locked;
+  }
+
+  /** ❄: confirm, then the picker of whom to freeze (a fresh poll brings the newest list). */
+  function onFreeze() {
+    if (!canUseOnQuestion('freeze')) return;
+    if (!window.confirm(t('jh.askFreeze', { s: ltr(String(freezeSeconds(app.q.data))) }))) return;
+    app.hv.msg = null;
+    app.hv.picking = true;
+    app.hv.pickerKey = null;
+    renderBoard();
+    app.version = null; // answers do not change the version: ask for the whole state now
+    schedule(0);
+  }
+
+  async function useFreeze(target) {
+    if (!canUseOnQuestion('freeze')) return;
+    const name = playerName(target);
+    if (await postHelper({ kind: 'freeze', seq: app.q.seq, target: target }, 'q')) {
+      app.hv.picking = false;
+      app.hv.msg = { key: 'jh.froze', params: { name: iso(name) }, kind: 'success', where: 'q' };
+    }
+    if (app.view === 'board') renderBoard();
+  }
+
+  async function onHint() {
+    if (!canUseOnQuestion('hint')) return;
+    if (!window.confirm(t('jh.askHint'))) return;
+    await postHelper({ kind: 'hint', seq: app.q.seq }, 'q');
+    if (app.view === 'board') renderBoard();
+  }
+
+  async function onDouble() {
+    const hs = app.helpers;
+    if (!hs || !hs.left.double || app.hv.busy || questionShown()) return;
+    if (!window.confirm(t('jh.askDouble'))) return;
+    await postHelper({ kind: 'double' }, 'board');
+    if (app.view === 'board') renderBoard();
+  }
+
+  function onPickerCancel() {
+    app.hv.picking = false;
+    renderBoard();
+    dom.jhFreeze.focus();
   }
 
   // ---------- Golden Goal bets (US-65) ----------
@@ -1001,6 +1246,7 @@
         h('span', { className: 'jb-score-name', text: c.name, dir: 'auto' }),
         mine ? h('span', { className: 'jb-score-tag', text: t('join.youTag') }) : null,
         h('span', { className: 'jb-score-value', text: formatScore(c.score) }),
+        mine && app.helpers ? renderHelpersLeft(app.helpers) : null, // US-66
       ]);
       const color = safeColor(c.color);
       if (color) {
@@ -1043,6 +1289,10 @@
     });
     dom.again.addEventListener('click', onAgain);
     dom.qLang.addEventListener('click', onQuestionLang);
+    dom.jhFreeze.addEventListener('click', onFreeze); // US-66
+    dom.jhHint.addEventListener('click', onHint);
+    dom.jhDouble.addEventListener('click', onDouble);
+    dom.jhCancel.addEventListener('click', onPickerCancel);
     dom.qInput.addEventListener('input', () => {
       if (app.q && app.q.msg) {
         app.q.msg = null;

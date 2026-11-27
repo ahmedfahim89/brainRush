@@ -11,10 +11,10 @@
   <link rel="icon" href="img/mokh-favicon.svg" type="image/svg+xml">
   <link rel="icon" href="img/mokh-favicon-32.png" type="image/png" sizes="32x32">
   <link rel="apple-touch-icon" href="img/mokh-apple-touch-icon.png">
-  <link rel="stylesheet" href="css/style.f2b51c93.css">
-  <link rel="stylesheet" href="css/join.912f4120.css">
+  <link rel="stylesheet" href="css/style.f07c5a24.css">
+  <link rel="stylesheet" href="css/join.88096d59.css">
   <!-- Interface language (US-49): loaded first, so an Arabic page is right to left from its first paint -->
-  <script src="js/i18n.c2a5d0ae.js"></script>
+  <script src="js/i18n.239b2ddf.js"></script>
 </head>
 <body class="join">
   <header class="page-header join-header">
@@ -51,6 +51,12 @@
     <section id="join-board-screen" class="join-screen" aria-labelledby="join-you" hidden>
       <h2 id="join-you" class="join-you"></h2>
       <p id="join-status" class="join-status" role="status"></p>
+      <!-- US-66 (D-81): x2 Double down, armed on the board for the next question -->
+      <div id="jh-board" class="jh-box" hidden>
+        <button type="button" id="jh-double" class="jh-chip"><span class="jh-icon" aria-hidden="true">&times;2</span> <span data-i18n="jh.double">Double down</span></button>
+        <p id="jh-armed" class="msg msg-success" role="status" hidden></p>
+        <p id="jh-board-msg" class="msg" role="alert" hidden></p>
+      </div>
       <!-- The open question (US-64): the answer is never on the phone; the picture stays on the host screen -->
       <section id="join-question" class="join-question" aria-labelledby="jq-head" hidden>
         <h3 id="jq-head" class="jq-head"></h3>
@@ -58,13 +64,26 @@
         <p id="jq-text" class="jq-text"></p>
         <p id="jq-bet" class="jq-bet" hidden></p>
         <button type="button" id="jq-lang" class="btn btn-small jq-lang" hidden></button>
-        <ol id="jq-choices" class="jq-choices" hidden></ol>
+        <!-- US-66 (D-81): the phone helpers on the open question, each after a confirm -->
+        <div id="jh-row" class="jh-row" hidden>
+          <button type="button" id="jh-freeze" class="jh-chip"><span class="jh-icon" aria-hidden="true">&#x2744;</span> <span data-i18n="jh.freeze">Freeze</span></button>
+          <button type="button" id="jh-hint" class="jh-chip"><span class="jh-icon" aria-hidden="true">&#x1F4A1;</span> <span data-i18n="jh.hint">Hint</span></button>
+          <span id="jh-on" class="jh-on" hidden></span>
+        </div>
+        <div id="jh-picker" class="jh-picker" role="group" aria-labelledby="jh-picker-title" hidden>
+          <p id="jh-picker-title" class="jh-picker-title" data-i18n="jh.pickTitle">Who do you freeze?</p>
+          <ul id="jh-targets" class="jh-targets"></ul>
+          <button type="button" id="jh-cancel" class="btn btn-small" data-i18n="jh.cancel">Cancel</button>
+        </div>
+        <p id="jh-msg" class="msg" role="alert" hidden></p>
         <div class="jq-timer" role="timer" aria-labelledby="jq-timer-label">
           <span id="jq-timer-label" class="visually-hidden" data-i18n="jq.secondsLeft">Seconds left</span>
           <span id="jq-timer-value" class="jq-timer-value"></span>
           <div class="jq-track" aria-hidden="true"><div id="jq-bar" class="jq-bar"></div></div>
           <span id="jq-timer-note" class="jq-timer-note"></span>
         </div>
+        <p id="jh-hint-line" class="jh-hint" hidden><span data-i18n="jh.hintLabel">Hint:</span> <span id="jh-pattern" class="jh-pattern"></span></p>
+        <p id="jh-frozen" class="jh-frozen" role="status" hidden></p>
         <form id="jq-form" class="jq-form" novalidate>
           <label for="jq-input" data-i18n="jq.label">Your answer</label>
           <input id="jq-input" class="jq-input" type="text" maxlength="200" autocomplete="off" autocapitalize="sentences" dir="auto" enterkeyhint="send" aria-describedby="jq-msg">
@@ -114,6 +133,6 @@
     <nav aria-label="Site" data-i18n-attr="aria-label:nav.site"><a href="how-to-play.html" target="_blank" rel="noopener" data-i18n="nav.howToPlay">How to play</a> &middot; <a href="privacy.html" target="_blank" rel="noopener" data-i18n="nav.privacy">Privacy</a> &middot; <a href="terms.html" target="_blank" rel="noopener" data-i18n="nav.terms">Terms</a></nav>
   </footer>
 
-  <script src="js/join.d0e2bd19.js"></script>
+  <script src="js/join.d099aa0d.js"></script>
 </body>
 </html>

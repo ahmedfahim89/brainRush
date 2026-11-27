@@ -698,6 +698,55 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 
 **Status:** Started on the owner's request 2026-11-27 (FU-117 answered: bet limit = Host control rule, D-48). **Accepted by the PO 2026-11-27, owner's check done (FU-126), merged in PR #164 on 2026-11-27; not deployed live (the owner deploys after the Phone buzzer helper rules, FU-125, are settled).** Dev note `docs/sprints/phone-sprint-3-dev.md` (fix round 1), test report `docs/sprints/phone-sprint-3-test.md` (first run 27 PASS, 3 FAIL, 5 PENDING; Re-test 1: 12 PASS, 0 FAIL, 2 PENDING; BUG-65-01 to 03 and OBS-65-02 fixed); PO decisions D-80 ar to ba. Branch `phone-buzzer`, uncommitted; local migration run. Next: owner's local check (FU-126, includes the Tournament Golden Goal and the negative-score Arabic offer), commit, PR. The DoD's live smoke test with 3+ real phones and the owner's release acceptance are FU-127 (combined with FU-119, FU-120 and FU-123; the owner is not deploying for now); native Arabic review FU-121.
 
+### Phone Sprint 4 — Phone-only helpers: ❄ Freeze, 💡 Hint, ×2 Double down (US-66)
+
+**Goal:** Replace the Host control helpers (ABC, Swap, ½) in Phone buzzer games with three helpers used only from the player's own phone, so helpers work while everyone answers at once. Closes FU-125 (D-81).
+**Stories:** US-66
+**Dependencies:** Phone Sprints 1 to 3 merged (PRs #162 to #164); helpers (US-32, Host control stays unchanged); Admin `phone_helpers_enabled` (D-80 ap, default 0); Golden Goal (US-65); i18n and RTL (D-58, D-60).
+**Owner questions needed before development:** none (rules fixed by the owner 2026-11-27, D-81). The developer confirms that New Game creates a new room; if not, add a game number to the `room_helpers` unique key.
+
+**Developer tasks**
+1. `sql/migrate-add-rooms.sql` + `sql/schema.sql` + `sql/schema-hosted.sql` — `room_helpers` (room, contestant, kind `freeze` / `hint` / `double`, seq, target, until_ms, used_at; unique key on (room, contestant, kind)). Re-runnable; bodies identical in both schema files. **Run the migration on the local DB, twice.**
+2. `api/rooms.php`, server side:
+   - read `phone_helpers_enabled` once at `create` and keep it with the room; off = every helper use gets 409;
+   - new player action `helper` (device token, kind, seq, target): 401/403, 400 on bad input, 409 with a reason code for each rule break (`immune`, `frozen`, already used, already sent, no open question, Golden Goal, and so on); all SQL prepared;
+   - `answer` returns 409 `frozen` with the remaining ms while a freeze on that contestant is active (server real time, not paused with the timer; ends when the question closes);
+   - `open_question` accepts `hint: {en, ar}` (patterns only, never the full answer), stores them with the question, and binds armed `double` rows to the new seq; `phoneGoalQuestion` sends no hint and binds no doubles;
+   - `room_question_view` and the phone `state` return the pattern only to a contestant with a `hint` row for that seq, plus: own helpers left, own armed or active ×2, any freeze on the player (who and time left), the list of freezable opponents (never the user, a player who has sent, one already frozen on this question, or one with ×2 on it);
+   - the host `answers` poll returns `helpers: [{contestant, kind, target}]` for the current seq, and armed ×2 is available to the host while the board shows;
+   - remove the old CR 3 path (`update_question` with `by` / `byHelper:'choices'`, stripping choices per phone).
+3. `js/game.*.js` (+ `index.html` / CSS if needed), host:
+   - Phone games: no ABC, Swap or ½ chips and no host helper chips; `renderHelpersLeft` shows ❄ 💡 ×2 used / left from a phone helper map in the game state (Host control keeps `HELPER_KEYS`; `helpersOff` gating stays);
+   - `phoneQuestion` builds the EN and AR hint patterns from the main answers (first character, then `_` per character, spaces kept);
+   - `pollAnswers` records helper uses (`saveState`); `renderAnswersPanel` tags rows with ❄ (froze X or frozen by X), 💡, ×2;
+   - `markContestant` in phone games: ×2 on this seq gives Correct = `correctPoints` × 2 (x4 on the double cell), Wrong unchanged; Golden Goal never applies ×2;
+   - show armed ×2 in the lobby panel and on the board / scoreboard; host refresh restores it all.
+4. `join.html` + `js/join.*.js` + `css/join.*.css`, phone:
+   - question screen chip row ❄ and 💡, each with a confirm; ❄ opens the opponent picker; 💡 shows the pattern above the answer box (letter-spaced, LTR inside AR text);
+   - frozen state: Send disabled, "❄ Frozen by …" banner with countdown, typing still allowed;
+   - board screen ×2 chip with an "armed for the next question" state; player card shows helpers left; short messages for every refusal code; no chips when the Admin switch is off or in Golden Goal;
+   - state survives a phone refresh; remove the old phone ABC `renderChoices` path if no longer used.
+5. `js/i18n.*.js` — EN and AR strings (chips, picker, banner, hint, ×2, refusals); RTL layout; `sw.js` and content-hashed assets rebuilt.
+6. `how-to-play.html` (#phones: the three helpers, once each, Freeze length and ×2 immunity, Hint pattern, ×2 scoring, no helpers in Golden Goal, Admin switch, ABC / Swap / ½ for Host control only), `README.md`, `docs/deploy-hostinger.md` (migrate before code), `docs/sprints/phone-sprint-4-dev.md`.
+
+**Tester focus (local Chrome, host + 3 join tabs, one in a mobile viewport, setting on):**
+- **Freeze:** A freezes B, B's Send locked for timer ÷ 4 (timer 30 s = 8 s, off = 10 s) with the banner and countdown; direct API answer from B gets 409 `frozen` then is accepted after; not freezable: self, a player who has sent, one already frozen on this question, one with ×2 (missing from the picker, API 409 `immune`); pausing the timer does not pause the freeze; question close ends it; freeze does not carry over.
+- **Hint:** right pattern in EN and AR, multi-word answers (`Paris` = `P _ _ _ _`, `UK` = `U _`); fallback to the other language; other phones and network payloads never contain the pattern or the answer; second use and use after sending refused.
+- **Double down:** armed from the board, binds to the next question, spent whether or not the player answers; Correct x2, x4 on the double cell, Wrong loses normal points, no change if unmarked; re-arm and arm during a question refused; armed shown on host lobby and scoreboard; armed ×2 at Golden Goal start is spent, not applied.
+- **All helpers:** once each per game and chip disabled after use; phone and host refresh keep helpers, freeze, ×2, hint and Answers panel tags; no ABC, Swap or ½ anywhere in phone games; no helpers in Golden Goal.
+- **Setting off:** no chips, server refuses (409).
+- **Regressions:** Host control full game (ABC, Swap, ½ unchanged, no ❄ 💡 ×2), Tournament and Mokh Bot unchanged, Phone Sprints 1 to 3 flows (answers, Golden Goal bets).
+- **Other:** AR / RTL on chips, picker, banner, hint (375x812 and 320 px); migration run twice; XSS names in the picker and tags; prepared statements; no console errors.
+
+**Definition of Done (phone Sprint 4)**
+- The phone-sprint DoD above, plus: `room_helpers` in the migrate SQL and both schema files, migration run on the local DB.
+- Game-tester report from local Chrome with the host and 3 join tabs (one mobile viewport), no open Critical or Major bugs.
+- Product Owner acceptance of US-66; `how-to-play.html` updated; FU-125 closed.
+- Owner's local check on port 8007, then one PR on branch `phone-buzzer`, merged by the owner.
+- The live release is **FU-127** (migration first, then code, 3+ real phones smoke test); not part of this sprint.
+
+**Status:** Accepted by the PO with follow-ups 2026-11-27 (FU-128 Could; owner local check FU-129 before the commit). Release follows in FU-127.
+
 ---
 
 ## Sprint 15 — Rewarded second chance in Streak (US-51) — later, blocked
@@ -748,6 +797,7 @@ The story sentence now states the tiebreaker purpose (D-52 d). PO decisions on t
 | Phone 1 | US-52 (accepted 2026-11-27, merged, PR #162; not deployed live) |
 | Phone 2 | US-64 (accepted by the PO 2026-11-27, waiting for the owner's check FU-122; branch `phone-buzzer`) |
 | Phone 3 | US-65 (deferred by the owner 2026-11-27 until they ask; FU-117 first) |
+| Phone 4 | US-66 (in progress 2026-11-27; D-81, closes FU-125; branch `phone-buzzer`) |
 | 15 | US-51 (planned, later; blocked by FU-23) |
 
 Epic E17 (US-42..US-53): all 12 stories appear in exactly one sprint: Sprints 7-15, except US-52, which moved to Phone Sprint 1 on 2026-11-27 (US-42..US-52 were approved on 2026-11-02; US-53 was added on 2026-11-03). US-64 (Phone Sprint 2) and US-65 (Phone Sprint 3) were added on 2026-11-27 (D-80), each in exactly one phone sprint. Stories US-31..US-41 were delivered outside the sprint cycle (see the status paragraphs at the top) and have no sprint here.
