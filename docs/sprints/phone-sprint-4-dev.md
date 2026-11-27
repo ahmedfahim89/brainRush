@@ -335,3 +335,7 @@ All runs were against `php -S localhost:8007` on the local MariaDB, with headles
 - **Tournament and Mokh Bot:** a level match goes to Golden Goal, the masked entry, no Answers panel, 0 rooms calls, and the bot tournament restores.
 - `node --check js/game.*.js` passes.
 - OBS-66-02 (×2 can be armed on the screen of a closed question) is left as it is, for the PO.
+
+## Test script update (2026-11-27)
+
+`hc-helpers.js` (developer scratchpad `s4`) now checks the owner changes D-81 t and u: Skip marks the user Wrong for half at once and stays on the question (Wrong shows the half, Correct off, others out), Show Answer and Hide Answer work after a Skip, a reload keeps the skipped question, and Back to Board takes nothing more. Result: **18/18**, 0 rooms calls, no console errors.

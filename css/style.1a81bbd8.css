@@ -206,7 +206,7 @@ label { display: block; margin: 0.4rem 0 0.2rem; color: var(--muted); font-size:
 /* ---------- Admin layout ---------- */
 .admin-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); /* FU-114: one column that fits a 320 px screen */
   gap: 1.25rem;
   padding: 1.25rem 1.5rem 2rem;
 }
