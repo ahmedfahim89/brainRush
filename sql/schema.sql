@@ -221,6 +221,8 @@ CREATE TABLE IF NOT EXISTS game_rooms (
   b_open     TINYINT(1)   NOT NULL DEFAULT 0,
   b_revealed TINYINT(1)   NOT NULL DEFAULT 0,
   bet        MEDIUMTEXT   NULL,
+  helpers    TINYINT(1)   NOT NULL DEFAULT 0,
+  q_hint     TEXT         NULL,
   created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   seen_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -262,6 +264,25 @@ CREATE TABLE IF NOT EXISTS room_bets (
   received_ms BIGINT UNSIGNED  NOT NULL,
   PRIMARY KEY (room_id, bet_seq, contestant),
   CONSTRAINT fk_room_bets_room FOREIGN KEY (room_id) REFERENCES game_rooms (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
+-- Phone Sprint 4 (US-66, D-81): the phone-only helpers. One row per contestant and kind (freeze, hint,
+-- double), so each helper is used once per game (a room is one game). seq: the question it was used on;
+-- for a double, NULL while armed, the question it applies to once opened, 0 when Golden Goal spent it.
+-- target and until_ms: the frozen contestant and the server time (ms) the freeze ends (freeze only).
+-- game_rooms.helpers is the Admin switch read when the room was made; game_rooms.q_hint holds the hint
+-- patterns of the open question (first character and underscores only, never the answer).
+CREATE TABLE IF NOT EXISTS room_helpers (
+  room_id     INT UNSIGNED     NOT NULL,
+  contestant  TINYINT UNSIGNED NOT NULL,
+  kind        VARCHAR(8)       NOT NULL,
+  seq         INT UNSIGNED     NULL,
+  target      TINYINT UNSIGNED NULL,
+  until_ms    BIGINT UNSIGNED  NULL,
+  used_ms     BIGINT UNSIGNED  NOT NULL,
+  PRIMARY KEY (room_id, contestant, kind),
+  KEY idx_room_helpers_seq (room_id, seq, target),
+  CONSTRAINT fk_room_helpers_room FOREIGN KEY (room_id) REFERENCES game_rooms (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
 -- ---------------------------------------------------------------------------

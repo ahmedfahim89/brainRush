@@ -17,7 +17,7 @@
   <!-- Web app manifest for the Android app (US-40, D-43) -->
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0b1026">
-  <link rel="stylesheet" href="css/style.f2b51c93.css">
+  <link rel="stylesheet" href="css/style.f07c5a24.css">
   <link rel="stylesheet" href="css/guide.70c9a392.css">
 </head>
 <body class="guide">
@@ -157,7 +157,7 @@
         <tbody>
           <tr><td><strong>ABC</strong> 3 choices</td><td>Shows 3 possible answers, A, B and C. One of them is right.</td></tr>
           <tr><td><strong>&#8644;</strong> Swap</td><td>Replaces the question with a random one from any category, at a random point value. It could be worth more or less! The timer starts again, and the new question's points count.</td></tr>
-          <tr><td><strong>&frac12;</strong> Skip</td><td>Gives up on the question and loses only <strong>half</strong> its points instead of risking all of them. The question closes and its cell turns grey.</td></tr>
+          <tr><td><strong>&frac12;</strong> Skip</td><td>Gives up on the question and loses only <strong>half</strong> its points instead of risking all of them. They are marked Wrong for that half straight away; the host can still show the answer before going back to the board.</td></tr>
         </tbody>
       </table>
       <ul>
@@ -240,6 +240,14 @@
         <li><strong>Joining.</strong> After <strong>Start Game</strong> the host screen shows a QR code, a 6-character room code and a link. Each player scans it or opens the link, then taps their own name (in Teams mode, one phone per team). A name already taken on another phone is greyed out. <strong>Phones n/N</strong> on the board shows the code again, who has joined, and <strong>Release</strong> to free a name.</li>
         <li><strong>The board.</strong> Phones show the board and the scores live. Only the host picks a question.</li>
         <li><strong>Questions.</strong> When the host opens a question, every phone shows it with the countdown and a box. Each player sends <strong>one answer</strong>; it is locked once sent. Answers count only while the question is open: after the timer ends or the host shows the answer, a late answer gets <strong>Too late</strong>. The host sees the answers in the order they arrived and marks them as usual. The answer is never sent to the phones, and a picture stays on the host screen.</li>
+        <li><strong>Helpers on the phones.</strong> A Phone buzzer game has its own three helpers instead of the 3 choices, Swap and Skip helpers (those are for <strong>Host control</strong> only). Each player or team can use each one <strong>once per game</strong>, from their own phone only, after a confirm. The host screen shows on the scoreboard which helpers each player has used and which are left. The site's admin can turn phone helpers on or off in Admin; the setting is read when the host starts the game, and with it off the phones show no helpers.
+          <ul>
+            <li><strong>Freeze:</strong> while a question is open and before you send your answer, pick an opponent who has not answered yet. Their phone cannot send for a quarter of the question timer (30 s gives 8 s, 20 s gives 5 s) and shows <strong>Frozen by</strong> your name with a countdown; they can keep typing. The freeze runs even when the host pauses the timer, and it ends when the question closes. A player can be frozen only once per question, and a player with &times;2 on the question cannot be frozen.</li>
+            <li><strong>Hint:</strong> while a question is open and before you send, your phone shows the first letter of the answer and one <strong>_</strong> for every other letter, with the gaps between words: <strong>Paris</strong> shows <strong>P _ _ _ _</strong>, <strong>UK</strong> shows <strong>U _</strong>. A phone in English gets the English answer, a phone in Arabic the Arabic one (or the other language when the question has none). Only you see it, and you can still type any answer.</li>
+            <li><strong>&times;2 Double down:</strong> on the board, while no question is open, tap &times;2. It is armed for the <strong>next question</strong> the host opens and cannot be cancelled; the host screen shows it, so you can tell the host which question you want. Marked Correct, you win double the points (four times on the hidden double score box); marked Wrong, you lose the normal points, as without &times;2.</li>
+            <li>No helpers in <strong>Golden Goal</strong>. A &times;2 still armed when Golden Goal starts is used up.</li>
+          </ul>
+        </li>
         <li><strong>Golden Goal.</strong> Each player or team bets <strong>privately on their phone</strong>: the phone shows the category, their score and the range they can bet (from 0 up to their score or the board's largest point value, whichever is higher). A bet is locked once sent. The host screen shows <strong>Waiting for players to bet (n/N)</strong> with each name marked bet or waiting, never the amounts. When all bets are in, the question opens by itself, on the host screen and the phones. If someone has no phone, or lost it, <strong>Continue without missing bets</strong> goes on: a missing bet counts as 0. The host marks everyone; the bets and the new scores show once everyone is marked, and each phone shows its own result. A repeat round asks for new bets the same way.</li>
         <li><strong>The end.</strong> When the host shows the results, the phones show the final standings. After <strong>New Game</strong> the phones say <strong>This game has ended.</strong></li>
         <li>Refreshing the host screen or a phone keeps everything: a phone comes back as the same name, with its answer or bet still locked.</li>

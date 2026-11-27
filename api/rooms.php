@@ -3,15 +3,19 @@
 // the board live. Hostinger has no WebSockets and no cron, so phones poll about once a second.
 //
 // Host calls (the host token from `create` is the only key; it is never sent to phones):
-//   POST /api/rooms.php?action=create   body { state, session }                         -> 201 { code, host_token, version }
+//   POST /api/rooms.php?action=create   body { state, session }                -> 201 { code, host_token, version, helpers }
+//        helpers = the Admin switch for phone helpers, read now for the whole game (US-66)
 //   POST /api/rooms.php?action=claim    body { code, host_token, session }              -> 200 { version }
 //   POST /api/rooms.php?action=push     body { code, host_token, session, state }       -> 200 { version }
 //   POST /api/rooms.php?action=release  body { code, host_token, session, contestant }  -> 200 { released, version }
-//   POST /api/rooms.php?action=open_question   body { code, host_token, session, question } -> 200 { seq, version }
+//   POST /api/rooms.php?action=open_question   body { code, host_token, session, question, hint? }
+//        -> 200 { seq, version, doubles } (hint = { en, ar } patterns such as "P _ _ _ _", never the answer;
+//        doubles = the contestants whose armed ×2 now applies to this question, US-66)
 //   POST /api/rooms.php?action=update_question body { code, host_token, session, seq, question } -> 200 { version }
 //   POST /api/rooms.php?action=close_question  body { code, host_token, session, seq }         -> 200 { closed, version }
 //   GET  /api/rooms.php?action=answers&code=&seq=&session=  header X-Host-Token
-//        -> 200 { seq, open, answers: [{ contestant, text, ms }] } in arrival order (ms since the question opened)
+//        -> 200 { seq, open, answers: [{ contestant, text, ms }], helpers: [{ contestant, kind, target }] }
+//        answers in arrival order (ms since the question opened); helpers = the uses on that question (US-66)
 //   POST /api/rooms.php?action=start_bets  body { code, host_token, session, bet: { round, catName, catNameAr, scores } }
 //        -> 200 { seq, version } (US-65: a Golden Goal bet round; the same open round again gives its seq back)
 //   GET  /api/rooms.php?action=bets_status&code=&seq=&session=  header X-Host-Token
@@ -24,10 +28,17 @@
 //   push, release, the question and bet calls and close from a host session that is not the room's
 //   current one -> 409 { error, other_tab: true }
 // Player calls (the room code is public: it is in the link and the QR code):
-//   GET  /api/rooms.php?action=lobby&code=ABC234[&session=<host session>]       -> 200 { version, mode, players[, other_tab] }
+//   GET  /api/rooms.php?action=lobby&code=ABC234[&session=<host session>]
+//        -> 200 { version, mode, players[, other_tab, helpers] }; helpers (the current host tab only, US-66):
+//        null when they are off, else every use in the game [{ contestant, kind, seq, target }]
 //   POST /api/rooms.php?action=join     body { code, contestant, device_token? } -> 200 { device_token, you, version }
 //   POST /api/rooms.php?action=answer   body { code, device_token, seq, text }      -> 201 { seq, text }
-//        409 { reason: 'duplicate' } for a second answer, 409 { reason: 'late' } once that question is closed
+//        409 { reason: 'duplicate' } for a second answer, 409 { reason: 'late' } once that question is closed,
+//        409 { reason: 'frozen', remaining_ms } while a Freeze on this contestant runs (US-66)
+//   POST /api/rooms.php?action=helper   body { code, device_token, kind, seq?, target? } -> 201 { kind, seq, target, until_ms, now }
+//        US-66 (D-81): kind freeze (seq, target), hint (seq) or double (armed for the next question). 400 for
+//        bad input; 409 { reason } for a rule break: off, used, goal, closed, open, sent, nohint, self,
+//        not_in_room, target_sent, already_frozen, immune
 //   POST /api/rooms.php?action=bet      body { code, device_token, seq, amount }    -> 201 { seq, amount }
 //        400 outside 0 .. this contestant's limit; 409 { reason: 'duplicate' } for a second bet,
 //        409 { reason: 'closed' } once the round is closed
@@ -38,6 +49,8 @@
 //        contestant's answer to it, or null; now = server time in ms (phones work out the countdown).
 //        bet = the last Golden Goal bet round for this contestant only (category, own score, own limit,
 //        own bet or null), or null: never another contestant's amount (US-65).
+//        helpers = null when off, else { left: { freeze, hint, double }, double: null | 'armed' | 'on',
+//        frozen: null | { by, untilMs }, hint: null | { en, ar }, targets: [index] } for this contestant (US-66)
 // players = [{ name, color, joined }] in the host's order; `contestant` / `you` is an index in it.
 //
 // Rules:
@@ -54,14 +67,17 @@
 //   newest tab that loaded (or tapped "Use this tab") wins. The host's lobby poll sends its session and
 //   gets other_tab: true when another tab has taken over.
 // - Replies carry the version stored by their own update (LAST_INSERT_ID(expr), per connection).
-// - Questions (US-64): the host opens a question (a new seq), may update it (3 choices, pause, reset)
-//   and closes it (timer 0, answer shown, Back, Skip; a Swap opens a new seq). The question payload is
+// - Questions (US-64): the host opens a question (a new seq), may update it (pause, resume, reset)
+//   and closes it (timer 0, answer shown, Back). The question payload is
 //   rebuilt from known fields only (room_question()): never the answer, never the picture path (a
 //   picture's file name can name the answer: hasImage only). One answer per contestant per seq, accepted
 //   only while that seq is open (one atomic INSERT ... SELECT), stamped with server time in ms.
-// - Owner CR 2 / CR 3 (US-64): the 3 choices go only to the phone of the contestant who used them: the
-//   question carries by (their index) and room_question_view strips the choices for every other phone.
-//   Nobody is locked out: every phone can still answer (CR 3 reverses CR 2's lock).
+// - Phone helpers (US-66, D-81; ABC, Swap and ½ are Host control only): ❄ Freeze, 💡 Hint and ×2, each
+//   once per contestant per game (the room_helpers key), only when the room was made with the Admin
+//   switch on. A helper call locks the room row (SELECT ... FOR UPDATE), so it is checked against the
+//   open question, other helpers and open_question one at a time. A Freeze runs on server time (Pause does
+//   not stop it) and ends with its question. The hint patterns come from the host (q_hint, never in the
+//   question JSON) and reach only the phone that used 💡. Every use bumps the version, so the phones see it.
 // - Golden Goal bets (US-65, D-80 h, j, k): the host opens a bet round (b_seq) with the category and
 //   the scores; the server works out each limit (D-48: score or the largest point value of the board,
 //   whichever is higher) and accepts one whole-number bet per contestant while the round is open (one
@@ -90,9 +106,12 @@ const ROOM_LABEL_MAX = 100;        // category names: VARCHAR(100) name and name
 const ROOM_FACE_MAX = 8;           // characters of a Kilo Meshakkal emoji
 const ROOM_SCORE_MAX = 1000000000;
 const ROOM_TEXT_MAX = 2000;        // question text (the questions are far shorter)
-const ROOM_CHOICE_MAX = 255;       // one of the 3 choices (VARCHAR(255) wrong options)
 const ROOM_ANSWER_MAX = 200;       // a typed answer (VARCHAR(200) in room_answers)
 const ROOM_TIMER_MAX_MS = 600000;  // the timer input allows 5 to 600 seconds
+const ROOM_HELPER_KINDS = ['freeze', 'hint', 'double']; // US-66 (D-81): the phone-only helpers
+const ROOM_FREEZE_NO_TIMER_S = 10; // a Freeze on a question without a timer (the game has none today)
+const ROOM_HINT_MAX = 600;         // characters of a hint pattern (an answer of 255 characters gives 509)
+const ROOM_HINT_PATTERN = '/^[^\s_\x00-\x1F\x7F](?: [_ ])*$/u'; // "P _ _ _ _": one character, then only _ and gaps
 
 /** Run the request; a database without the room tables gives a clear 503. */
 function rooms_main(): void
@@ -133,6 +152,7 @@ function route_room_request(PDO $pdo): void
         'close_bets' => ['POST', 'room_close_bets'],
         'reveal_bets' => ['POST', 'room_reveal_bets'],
         'bet' => ['POST', 'room_bet'],
+        'helper' => ['POST', 'room_helper'],
         'close' => ['POST', 'room_close'],
     ];
     if (!is_string($action) || !isset($routes[$action])) {
@@ -209,7 +229,7 @@ function require_room_code($value): string
 function find_room(PDO $pdo, string $code): array
 {
     $stmt = $pdo->prepare(
-        'SELECT id, host_hash, host_session, names, version, q_seq, q_open, q_opened_ms, b_seq, b_open, b_revealed,
+        'SELECT id, host_hash, host_session, names, version, q_seq, q_open, q_opened_ms, b_seq, b_open, b_revealed, helpers,
                 TIMESTAMPDIFF(SECOND, seen_at, NOW()) AS idle
            FROM game_rooms
           WHERE code = ? AND seen_at >= NOW() - INTERVAL ' . ROOM_IDLE_HOURS . ' HOUR'
@@ -228,6 +248,7 @@ function find_room(PDO $pdo, string $code): array
     $room['b_seq'] = (int) $room['b_seq'];
     $room['b_open'] = (int) $room['b_open'] === 1;
     $room['b_revealed'] = (int) $room['b_revealed'] === 1;
+    $room['helpers'] = (int) $room['helpers'] === 1;
     if ((int) $room['idle'] >= ROOM_TOUCH_SECONDS) {
         $pdo->prepare('UPDATE game_rooms SET seen_at = NOW() WHERE id = ?')->execute([$room['id']]);
     }
@@ -321,12 +342,13 @@ function room_create(PDO $pdo, array $body): void
     $names = count($state['contestants']);
     $json = encode_state($state);
     $token = new_token();
-    $insert = $pdo->prepare('INSERT INTO game_rooms (code, host_hash, host_session, names, state) VALUES (?, ?, ?, ?, ?)');
+    $helpers = phone_helpers_setting($pdo);
+    $insert = $pdo->prepare('INSERT INTO game_rooms (code, host_hash, host_session, names, state, helpers) VALUES (?, ?, ?, ?, ?, ?)');
     for ($attempt = 0; $attempt < 5; $attempt++) {
         $code = new_room_code();
         try {
-            $insert->execute([$code, token_hash($token), $session, $names, $json]);
-            json_response(['code' => $code, 'host_token' => $token, 'version' => 1], 201);
+            $insert->execute([$code, token_hash($token), $session, $names, $json, $helpers ? 1 : 0]);
+            json_response(['code' => $code, 'host_token' => $token, 'version' => 1, 'helpers' => $helpers], 201);
         } catch (PDOException $e) {
             if (!is_duplicate_key($e)) {
                 throw $e;
@@ -335,6 +357,20 @@ function room_create(PDO $pdo, array $body): void
         }
     }
     json_response(['error' => 'Could not make a free room code. Please try again.'], 503);
+}
+
+/**
+ * US-66: helpers in this Phone buzzer game, read once when its room is made. The same rule as the host's
+ * helpersOff: helpers_enabled on (a missing row is on) and phone_helpers_enabled on (a missing row is off).
+ */
+function phone_helpers_setting(PDO $pdo): bool
+{
+    $stmt = $pdo->query("SELECT name, value FROM settings WHERE name IN ('helpers_enabled', 'phone_helpers_enabled')");
+    $values = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $values[$row['name']] = (int) $row['value'];
+    }
+    return ($values['helpers_enabled'] ?? 1) !== 0 && ($values['phone_helpers_enabled'] ?? 0) === 1;
 }
 
 /** This host tab takes over the room (a host page that loaded a saved Phone buzzer game, or "Use this tab"). */
@@ -391,6 +427,9 @@ function room_lobby(PDO $pdo): void
     $session = $_GET['session'] ?? null; // the host's poll: has another tab taken over?
     if (is_string($session) && preg_match('/^[0-9a-f]{32}$/', $session)) {
         $reply['other_tab'] = $room['host_session'] !== $session;
+        if (!$reply['other_tab']) { // US-66: the host's scoreboard (used, left and armed helpers)
+            $reply['helpers'] = $room['helpers'] ? helper_rows($pdo, $room['id'], null) : null;
+        }
     }
     json_response($reply);
 }
@@ -457,16 +496,18 @@ function room_poll(PDO $pdo): void
     }
     [$state, $players] = room_view($pdo, $room);
     [$question, $mine] = room_question_view($pdo, $room, (int) $you);
+    $now = now_ms();
     json_response([
         'changed' => true,
         'version' => $room['version'],
-        'now' => now_ms(),
+        'now' => $now,
         'you' => (int) $you,
         'players' => $players,
         'state' => $state,
         'question' => $question,
         'mine' => $mine,
         'bet' => room_bet_view($pdo, $room, (int) $you),
+        'helpers' => room_helper_view($pdo, $room, (int) $you, $question, $now),
     ]);
 }
 
@@ -484,7 +525,6 @@ function require_question_host(PDO $pdo, array $body): array
 }
 
 /** The question the phones see (or null) and this contestant's answer to it (or null). */
-/** The question for one contestant's phone: the 3 choices only for the contestant who used them (owner CR 2). */
 function room_question_view(PDO $pdo, array $room, int $contestant): array
 {
     if ($room['q_seq'] === 0) {
@@ -498,36 +538,81 @@ function room_question_view(PDO $pdo, array $room, int $contestant): array
     }
     $question['seq'] = $room['q_seq'];
     $question['open'] = $room['q_open'];
-    $by = $question['by'] ?? null;
-    if ($by !== null && $by !== $contestant) {
-        $question['choices'] = null; // never sent to the other phones
-    }
     $mine = $pdo->prepare('SELECT text FROM room_answers WHERE room_id = ? AND seq = ? AND contestant = ?');
     $mine->execute([$room['id'], $room['q_seq'], $contestant]);
     $text = $mine->fetchColumn();
     return [$question, $text === false ? null : (string) $text];
 }
 
-/** A new question number (also a Swap): the earlier one is closed by it, its late answers are refused. */
+/**
+ * A new question number: the earlier one is closed by it, its late answers are refused. US-66: the hint
+ * patterns are kept beside it (q_hint), and every armed ×2 now applies to it (Golden Goal: spent, seq 0).
+ */
 function room_open_question(PDO $pdo, array $body): void
 {
     $room = require_question_host($pdo, $body);
     $now = now_ms();
-    $question = room_question($body['question'] ?? null, $now, $room['names']);
-    $update = $pdo->prepare(
-        'UPDATE game_rooms SET q_seq = LAST_INSERT_ID(q_seq + 1), q_open = 1, q_opened_ms = ?, question = ?,
-                version = version + 1, seen_at = NOW()
-          WHERE id = ? AND host_session = ?'
-    );
-    $update->execute([$now, encode_question($question), $room['id'], $body['session']]);
-    if ($update->rowCount() === 0) {
-        json_response(['error' => 'This game is open in another tab.', 'other_tab' => true], 409);
+    $question = room_question($body['question'] ?? null, $now);
+    $hint = $question['goal'] ? null : hint_patterns($body['hint'] ?? null);
+    $pdo->beginTransaction();
+    try {
+        $update = $pdo->prepare(
+            'UPDATE game_rooms SET q_seq = LAST_INSERT_ID(q_seq + 1), q_open = 1, q_opened_ms = ?, question = ?, q_hint = ?,
+                    version = version + 1, seen_at = NOW()
+              WHERE id = ? AND host_session = ?'
+        );
+        $update->execute([$now, encode_question($question), $hint, $room['id'], $body['session']]);
+        if ($update->rowCount() === 0) {
+            $pdo->rollBack();
+            json_response(['error' => 'This game is open in another tab.', 'other_tab' => true], 409);
+        }
+        $seq = stored_version($pdo);
+        $doubles = bind_doubles($pdo, $room['id'], $question['goal'] ? 0 : $seq);
+        $pdo->commit();
+    } catch (PDOException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
     }
-    $seq = stored_version($pdo);
-    json_response(['seq' => $seq, 'version' => current_version($pdo, $room['id'])]);
+    json_response(['seq' => $seq, 'version' => current_version($pdo, $room['id']), 'doubles' => $doubles]);
 }
 
-/** 3 choices, pause, resume or reset on the open question: same seq, its answers stay. */
+/** US-66: every armed ×2 applies to question $seq (0: spent by Golden Goal); returns the contestants on it. */
+function bind_doubles(PDO $pdo, int $roomId, int $seq): array
+{
+    $pdo->prepare("UPDATE room_helpers SET seq = ? WHERE room_id = ? AND kind = 'double' AND seq IS NULL")
+        ->execute([$seq, $roomId]);
+    if ($seq === 0) {
+        return [];
+    }
+    $stmt = $pdo->prepare("SELECT contestant FROM room_helpers WHERE room_id = ? AND kind = 'double' AND seq = ? ORDER BY contestant");
+    $stmt->execute([$roomId, $seq]);
+    return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+}
+
+/**
+ * US-66: the host's hint patterns { en, ar } as stored JSON, or null. Each is null or "P _ _ _ _": one
+ * character, then only "_" and gaps, so the server never holds more than the first character of an answer.
+ */
+function hint_patterns($input): ?string
+{
+    if ($input === null) {
+        return null;
+    }
+    $hint = state_object($input, 'hint');
+    $out = [];
+    foreach (['en', 'ar'] as $lang) {
+        $value = $hint[$lang] ?? null;
+        if ($value !== null && (!is_string($value) || text_length($value) > ROOM_HINT_MAX || !preg_match(ROOM_HINT_PATTERN, $value))) {
+            bad_request("hint.$lang must be a pattern such as \"P _ _ _ _\"");
+        }
+        $out[$lang] = $value;
+    }
+    return $out['en'] === null && $out['ar'] === null ? null : json_encode($out, JSON_UNESCAPED_UNICODE);
+}
+
+/** Pause, resume or reset on the open question: same seq, its answers, helpers and hint stay. */
 function room_update_question(PDO $pdo, array $body): void
 {
     $room = require_question_host($pdo, $body);
@@ -535,7 +620,7 @@ function room_update_question(PDO $pdo, array $body): void
     if ($seq === null || $seq !== $room['q_seq'] || !$room['q_open']) {
         conflict('That question is closed.');
     }
-    $question = room_question($body['question'] ?? null, now_ms(), $room['names']);
+    $question = room_question($body['question'] ?? null, now_ms());
     $update = $pdo->prepare(
         'UPDATE game_rooms SET question = ?, version = LAST_INSERT_ID(version + 1), seen_at = NOW()
           WHERE id = ? AND host_session = ? AND q_seq = ? AND q_open = 1'
@@ -586,7 +671,18 @@ function room_answers(PDO $pdo): void
             'ms' => $seq === $room['q_seq'] ? max(0, (int) $row['received_ms'] - $room['q_opened_ms']) : null,
         ];
     }
-    json_response(['seq' => $seq, 'open' => $seq === $room['q_seq'] && $room['q_open'], 'answers' => $answers]);
+    $helpers = [];
+    if ($room['helpers']) { // US-66: the tags of the Answers panel, in the same reply
+        foreach (helper_rows($pdo, $room['id'], $seq) as $row) {
+            $helpers[] = ['contestant' => $row['contestant'], 'kind' => $row['kind'], 'target' => $row['target']];
+        }
+    }
+    json_response([
+        'seq' => $seq,
+        'open' => $seq === $room['q_seq'] && $room['q_open'],
+        'answers' => $answers,
+        'helpers' => $helpers,
+    ]);
 }
 
 /** A phone's answer: once per contestant per question, only while that question is open. */
@@ -608,13 +704,18 @@ function room_answer(PDO $pdo, array $body): void
         bad_request('seq must be the question number');
     }
     $text = answer_text($body['text'] ?? null);
-    // Atomic: the row goes in only while this seq is the open question, so a close always wins.
+    $now = now_ms();
+    refuse_if_frozen($pdo, $room['id'], $seq, (int) $you, $now);
+    // Atomic: the row goes in only while this seq is the open question and no Freeze (US-66) holds this
+    // contestant, so a close or a Freeze always wins.
     $insert = $pdo->prepare(
-        'INSERT INTO room_answers (room_id, seq, contestant, text, received_ms)
-         SELECT id, ?, ?, ?, ? FROM game_rooms WHERE id = ? AND q_seq = ? AND q_open = 1'
+        "INSERT INTO room_answers (room_id, seq, contestant, text, received_ms)
+         SELECT id, ?, ?, ?, ? FROM game_rooms WHERE id = ? AND q_seq = ? AND q_open = 1
+            AND NOT EXISTS (SELECT 1 FROM room_helpers
+                             WHERE room_id = ? AND kind = 'freeze' AND seq = ? AND target = ? AND until_ms > ?)"
     );
     try {
-        $insert->execute([$seq, (int) $you, $text, now_ms(), $room['id'], $seq]);
+        $insert->execute([$seq, (int) $you, $text, $now, $room['id'], $seq, $room['id'], $seq, (int) $you, $now]);
     } catch (PDOException $e) {
         if (is_duplicate_key($e)) {
             json_response(['error' => 'You already sent an answer to this question.', 'reason' => 'duplicate'], 409);
@@ -622,6 +723,7 @@ function room_answer(PDO $pdo, array $body): void
         throw $e;
     }
     if ($insert->rowCount() === 0) {
+        refuse_if_frozen($pdo, $room['id'], $seq, (int) $you, $now); // a Freeze that came in meanwhile
         json_response(['error' => 'Too late: the question is closed.', 'reason' => 'late'], 409);
     }
     json_response(['seq' => $seq, 'text' => $text], 201);
@@ -675,17 +777,9 @@ function encode_question(array $question): string
  * The question as the phones may see it, rebuilt from known fields only: never the answer and never the
  * picture's path. $now stamps the countdown (the phones count down from it with their clock offset).
  */
-function room_question($input, int $now, int $names): array
+function room_question($input, int $now): array
 {
     $q = state_object($input, 'question');
-    $by = $q['by'] ?? null;
-    if ($by !== null && (!is_int($by) || $by < 0 || $by >= $names)) {
-        bad_request('question.by must be a contestant index or null');
-    }
-    $byHelper = $q['byHelper'] ?? null;
-    if ($by !== null && $byHelper !== 'choices') {
-        bad_request('question.byHelper must be choices');
-    }
     $mix = state_bool($q['mix'] ?? false, 'question.mix');
     // US-65: the Golden Goal question has no points (each contestant plays for their bet) but its round
     $goal = state_bool($q['goal'] ?? false, 'question.goal');
@@ -699,18 +793,6 @@ function room_question($input, int $now, int $names): array
     $points = $q['points'] ?? null;
     if ($goal ? $points !== null : (!is_int($points) || $points < 1 || $points > ROOM_SCORE_MAX)) {
         bad_request($goal ? 'question.points must be null on the Golden Goal question' : 'question.points must be positive');
-    }
-    $choices = null;
-    if (($q['choices'] ?? null) !== null) {
-        $list = state_list($q['choices'], 'question.choices', 3, 3);
-        $choices = [];
-        foreach ($list as $i => $c) {
-            $c = state_object($c, "question.choices[$i]");
-            $choices[] = [
-                'text' => question_text($c['text'] ?? null, "question.choices[$i].text", ROOM_CHOICE_MAX, false),
-                'textAr' => question_text($c['textAr'] ?? null, "question.choices[$i].textAr", ROOM_CHOICE_MAX, true),
-            ];
-        }
     }
     $timer = state_object($q['timer'] ?? null, 'question.timer');
     $total = $timer['totalMs'] ?? null;
@@ -731,9 +813,6 @@ function room_question($input, int $now, int $names): array
         'text' => question_text($q['text'] ?? null, 'question.text', ROOM_TEXT_MAX, false),
         'textAr' => question_text($q['textAr'] ?? null, 'question.textAr', ROOM_TEXT_MAX, true),
         'hasImage' => state_bool($q['hasImage'] ?? false, 'question.hasImage'),
-        'choices' => $choices,
-        'by' => $by,
-        'byHelper' => $by === null ? null : $byHelper,
         'timer' => [
             'totalMs' => $total,
             'remainingMs' => $left,
@@ -835,6 +914,7 @@ function room_start_bets(PDO $pdo, array $body): void
         json_response(['error' => 'This game is open in another tab.', 'other_tab' => true], 409);
     }
     $seq = stored_version($pdo);
+    bind_doubles($pdo, $room['id'], 0); // US-66: Golden Goal has started, an armed ×2 is spent
     json_response(['seq' => $seq, 'version' => current_version($pdo, $room['id'])]);
 }
 
@@ -959,6 +1039,286 @@ function room_bet(PDO $pdo, array $body): void
         json_response(['error' => 'Too late: the bets are closed.', 'reason' => 'closed'], 409);
     }
     json_response(['seq' => $seq, 'amount' => $amount], 201);
+}
+
+// ---------------------------------------------------------------------------
+// Phone helpers: ❄ Freeze, 💡 Hint, ×2 Double down (US-66, D-81)
+// ---------------------------------------------------------------------------
+
+/** The helper uses of a room, all of them ($seq null) or those of one question: [{ contestant, kind, seq, target, until_ms }]. */
+function helper_rows(PDO $pdo, int $roomId, ?int $seq): array
+{
+    $sql = 'SELECT contestant, kind, seq, target, until_ms FROM room_helpers WHERE room_id = ?';
+    $params = [$roomId];
+    if ($seq !== null) {
+        $sql .= ' AND seq = ?';
+        $params[] = $seq;
+    }
+    $stmt = $pdo->prepare($sql . ' ORDER BY used_ms, contestant');
+    $stmt->execute($params);
+    $rows = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $rows[] = [
+            'contestant' => (int) $row['contestant'],
+            'kind' => $row['kind'],
+            'seq' => $row['seq'] === null ? null : (int) $row['seq'],
+            'target' => $row['target'] === null ? null : (int) $row['target'],
+            'until_ms' => $row['until_ms'] === null ? null : (int) $row['until_ms'],
+        ];
+    }
+    return $rows;
+}
+
+/** 409 frozen (with the ms left) while a Freeze on this contestant runs on question $seq and it is still open. */
+function refuse_if_frozen(PDO $pdo, int $roomId, int $seq, int $contestant, int $now): void
+{
+    // A Freeze ends with its question: on a closed one the answer is simply late.
+    $stmt = $pdo->prepare(
+        "SELECT MAX(h.until_ms) FROM room_helpers h
+           JOIN game_rooms g ON g.id = h.room_id AND g.q_seq = h.seq AND g.q_open = 1
+          WHERE h.room_id = ? AND h.kind = 'freeze' AND h.seq = ? AND h.target = ? AND h.until_ms > ?"
+    );
+    $stmt->execute([$roomId, $seq, $contestant, $now]);
+    $until = $stmt->fetchColumn();
+    if ($until !== null && $until !== false) {
+        json_response([
+            'error' => 'You are frozen: you can send your answer when the freeze ends.',
+            'reason' => 'frozen',
+            'remaining_ms' => (int) $until - $now,
+        ], 409);
+    }
+}
+
+/** [contestant index => true] for the contestants who answered question $seq. */
+function answered_indexes(PDO $pdo, int $roomId, int $seq): array
+{
+    $stmt = $pdo->prepare('SELECT contestant FROM room_answers WHERE room_id = ? AND seq = ?');
+    $stmt->execute([$roomId, $seq]);
+    $sent = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $index) {
+        $sent[(int) $index] = true;
+    }
+    return $sent;
+}
+
+/**
+ * Why $target cannot be frozen by $you on question $seq ('' when they can): themselves, not in the room,
+ * has sent, already frozen on this question, or immune with ×2 on it.
+ */
+function freeze_block(int $you, int $target, int $seq, array $room, array $joined, array $sent, array $rows): string
+{
+    if ($target === $you) {
+        return 'self';
+    }
+    if ($target < 0 || $target >= $room['names'] || !isset($joined[$target])) {
+        return 'not_in_room';
+    }
+    if (isset($sent[$target])) {
+        return 'target_sent';
+    }
+    foreach ($rows as $row) {
+        if ($row['seq'] === $seq && $row['kind'] === 'freeze' && $row['target'] === $target) {
+            return 'already_frozen';
+        }
+        if ($row['seq'] === $seq && $row['kind'] === 'double' && $row['contestant'] === $target) {
+            return 'immune';
+        }
+    }
+    return '';
+}
+
+/**
+ * This contestant's helpers for their phone (null when the room has none): which are left, the ×2
+ * (armed, or on the open question), a Freeze on them, their 💡 pattern on this question and whom they can freeze.
+ */
+function room_helper_view(PDO $pdo, array $room, int $you, ?array $question, int $now): ?array
+{
+    if (!$room['helpers']) {
+        return null;
+    }
+    $rows = helper_rows($pdo, $room['id'], null);
+    $seq = $room['q_seq'];
+    $open = $question !== null && $room['q_open'] && empty($question['goal']);
+    $view = ['left' => ['freeze' => true, 'hint' => true, 'double' => true], 'double' => null, 'frozen' => null, 'hint' => null, 'targets' => []];
+    foreach ($rows as $row) {
+        if ($row['contestant'] === $you) {
+            $view['left'][$row['kind']] = false;
+            if ($row['kind'] === 'double' && $row['seq'] === null) {
+                $view['double'] = 'armed';
+            } elseif ($row['kind'] === 'double' && $open && $row['seq'] === $seq) {
+                $view['double'] = 'on';
+            } elseif ($row['kind'] === 'hint' && $open && $row['seq'] === $seq) {
+                $view['hint'] = stored_hint($pdo, $room['id']);
+            }
+        }
+        if ($open && $row['kind'] === 'freeze' && $row['target'] === $you && $row['seq'] === $seq && $row['until_ms'] > $now) {
+            $view['frozen'] = ['by' => $row['contestant'], 'untilMs' => $row['until_ms']];
+        }
+    }
+    if ($open && $view['left']['freeze']) {
+        $joined = joined_indexes($pdo, $room['id']);
+        $sent = answered_indexes($pdo, $room['id'], $seq);
+        for ($i = 0; $i < $room['names']; $i++) {
+            if (freeze_block($you, $i, $seq, $room, $joined, $sent, $rows) === '') {
+                $view['targets'][] = $i;
+            }
+        }
+    }
+    return $view;
+}
+
+/** The open question's hint patterns { en, ar } (either may be null), or null. */
+function stored_hint(PDO $pdo, int $roomId): ?array
+{
+    $stmt = $pdo->prepare('SELECT q_hint FROM game_rooms WHERE id = ?');
+    $stmt->execute([$roomId]);
+    $hint = json_decode((string) $stmt->fetchColumn(), true);
+    return is_array($hint) ? ['en' => $hint['en'] ?? null, 'ar' => $hint['ar'] ?? null] : null;
+}
+
+/** The contestant index of the phone with this device token: 401 without one, 403 when it is not joined. */
+function require_player(PDO $pdo, array $room, $token): int
+{
+    if (!is_token($token)) {
+        json_response(['error' => 'Pick your name first.'], 401);
+    }
+    $stmt = $pdo->prepare('SELECT contestant FROM room_players WHERE room_id = ? AND device_hash = ?');
+    $stmt->execute([$room['id'], token_hash($token)]);
+    $you = $stmt->fetchColumn();
+    if ($you === false) {
+        json_response(['error' => 'This phone is no longer joined to the game. Pick your name again.'], 403);
+    }
+    return (int) $you;
+}
+
+/** The messages of the helper refusals (the phone shows its own text for each reason). */
+const HELPER_REFUSALS = [
+    'off' => 'Helpers are turned off in this game.',
+    'used' => 'You have already used this helper in this game.',
+    'goal' => 'No helpers in Golden Goal.',
+    'closed' => 'There is no open question.',
+    'open' => 'Arm ×2 while no question is open.',
+    'sent' => 'You have already sent your answer.',
+    'nohint' => 'This question has no hint.',
+    'self' => 'You cannot freeze yourself.',
+    'not_in_room' => 'That player has not joined the game.',
+    'target_sent' => 'That player has already sent an answer.',
+    'already_frozen' => 'That player is already frozen on this question.',
+    'immune' => 'That player has ×2 on this question and cannot be frozen.',
+];
+
+/**
+ * A phone uses a helper (US-66). Every rule is checked here, with the room row locked, so helpers, answers
+ * and open_question are taken one at a time. Freeze and Hint: on the open question, before this contestant
+ * sent. ×2: armed while no question is open; it applies to the next question the host opens.
+ */
+function room_helper(PDO $pdo, array $body): void
+{
+    $room = find_room($pdo, require_room_code($body['code'] ?? null));
+    $you = require_player($pdo, $room, $body['device_token'] ?? null);
+    $kind = $body['kind'] ?? null;
+    if (!is_string($kind) || !in_array($kind, ROOM_HELPER_KINDS, true)) {
+        bad_request('kind must be one of: ' . implode(', ', ROOM_HELPER_KINDS));
+    }
+    $seq = null;
+    $target = null;
+    if ($kind !== 'double') {
+        $seq = $body['seq'] ?? null;
+        if (!is_int($seq) || $seq < 1) {
+            bad_request('seq must be the question number');
+        }
+    }
+    if ($kind === 'freeze') {
+        $target = $body['target'] ?? null;
+        if (!is_int($target)) {
+            bad_request('target must be a contestant index');
+        }
+    }
+    $refuse = function (string $reason) use ($pdo): void {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        json_response(['error' => HELPER_REFUSALS[$reason], 'reason' => $reason], 409);
+    };
+    if (!$room['helpers']) {
+        $refuse('off');
+    }
+    $now = now_ms();
+    $untilMs = null;
+    $pdo->beginTransaction();
+    try {
+        $lock = $pdo->prepare('SELECT q_seq, q_open, question, state, b_seq FROM game_rooms WHERE id = ? FOR UPDATE');
+        $lock->execute([$room['id']]);
+        $live = $lock->fetch();
+        if (!$live) {
+            $pdo->rollBack();
+            not_found('This game has ended or the code is wrong.');
+        }
+        $qSeq = (int) $live['q_seq'];
+        $qOpen = (int) $live['q_open'] === 1;
+        $question = json_decode((string) $live['question'], true);
+        $state = json_decode((string) $live['state'], true);
+        $rows = helper_rows($pdo, $room['id'], null);
+        foreach ($rows as $row) {
+            if ($row['contestant'] === $you && $row['kind'] === $kind) {
+                $refuse('used');
+            }
+        }
+        if ($kind === 'double') {
+            if ($qOpen) {
+                $refuse('open');
+            }
+            // Golden Goal (offer, bets, question) or the results: nothing left for a ×2
+            if ((int) $live['b_seq'] > 0 || !is_array($state) || ($state['goal'] ?? null) !== null ||
+                !in_array($state['screen'] ?? '', ['board', 'question'], true)) {
+                $refuse('goal');
+            }
+        } else {
+            if ($seq !== $qSeq || !$qOpen || !is_array($question)) {
+                $refuse('closed');
+            }
+            if (!empty($question['goal'])) {
+                $refuse('goal');
+            }
+            $sent = answered_indexes($pdo, $room['id'], $seq);
+            if (isset($sent[$you])) {
+                $refuse('sent');
+            }
+            if ($kind === 'hint' && stored_hint($pdo, $room['id']) === null) {
+                $refuse('nohint');
+            }
+            if ($kind === 'freeze') {
+                $reason = freeze_block($you, $target, $seq, $room, joined_indexes($pdo, $room['id']), $sent, $rows);
+                if ($reason !== '') {
+                    $refuse($reason);
+                }
+                $untilMs = $now + freeze_seconds($question) * 1000;
+            }
+        }
+        $pdo->prepare('INSERT INTO room_helpers (room_id, contestant, kind, seq, target, until_ms, used_ms) VALUES (?, ?, ?, ?, ?, ?, ?)')
+            ->execute([$room['id'], $you, $kind, $seq, $target, $untilMs, $now]);
+        bump_version($pdo, $room['id']); // the phones (the target's too) see it on their next poll
+        $pdo->commit();
+    } catch (PDOException $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        if (is_duplicate_key($e)) {
+            $refuse('used');
+        }
+        throw $e;
+    }
+    json_response(['kind' => $kind, 'seq' => $seq, 'target' => $target, 'until_ms' => $untilMs, 'now' => $now], 201);
+}
+
+/** A Freeze lasts a quarter of the question's timer, rounded (30 s -> 8 s, 20 s -> 5 s); 10 s without a timer. */
+function freeze_seconds(array $question): int
+{
+    $total = $question['timer']['totalMs'] ?? null;
+    if (!is_int($total) || $total < 1000) {
+        return ROOM_FREEZE_NO_TIMER_S;
+    }
+    return max(1, (int) round($total / 4000));
 }
 
 /** New Game: the host closes the room (with its players, answers and bets); its phones then show "This game has ended." */

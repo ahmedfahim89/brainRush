@@ -7,6 +7,7 @@
   --cell-grey-ink: #c3c7d4; /* ds-allow-hardcode */
   --cell-top: #1f2a6b; /* ds-allow-hardcode: .board-cell gradient */
   --cell-bottom: #161f57; /* ds-allow-hardcode */
+  --ice: #8fd3ff; /* ds-allow-hardcode: the Freeze banner (US-66), --bg text on it is 11:1 */
 }
 
 .join-header { padding: 0.6rem 1rem; }
@@ -127,13 +128,6 @@
 .jq-picture { margin: 0 0 0.4rem; }
 .jq-text { margin: 0 0 0.5rem; font-size: 1.25rem; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
 .jq-lang { margin: 0 0 0.6rem; }
-.jq-choices { display: grid; gap: 0.4rem; margin: 0 0 0.6rem; padding: 0; list-style: none; }
-.jq-choices[hidden] { display: none; }
-.jq-choice { display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.5rem 0.7rem; color: var(--text); font-size: 1rem; text-align: start; background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; }
-.jq-choice:disabled { cursor: not-allowed; opacity: 0.6; }
-.jq-choice.is-picked { border-color: var(--gold); }
-.jq-choice-letter { flex: none; color: var(--gold); font-weight: 800; }
-.jq-choice-text { min-width: 0; overflow-wrap: anywhere; }
 .jq-timer { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.6rem; margin: 0 0 0.7rem; }
 .jq-timer-value { min-width: 2.5ch; color: var(--gold); font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .jq-timer-value.is-low { color: var(--danger); }
@@ -178,6 +172,44 @@
 .jover-name { flex: 1 1 auto; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
 .jover-score { flex: none; font-size: 1.15rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 #join-again { margin-top: 0.4rem; }
+
+/* ---------- Phone helpers (US-66, D-81) ---------- */
+.jh-box[hidden], .jh-row[hidden], .jh-chip[hidden], .jh-picker[hidden], .jh-hint[hidden], .jh-frozen[hidden], .jh-on[hidden], .jb-score-helpers[hidden] { display: none; }
+.jh-box { margin: 0 0 0.8rem; }
+.jh-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 0 0 0.6rem; }
+.jh-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 2.5rem;
+  padding: 0.3rem 0.8rem;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 700;
+  background: var(--panel-2);
+  border: 1px solid var(--gold-dark);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.jh-chip:disabled { cursor: not-allowed; opacity: 0.45; }
+.jh-chip.is-used .jh-icon { text-decoration: line-through; }
+.jh-icon { font-weight: 800; line-height: 1; }
+.jh-on { padding: 0.1rem 0.5rem; color: var(--bg); font-size: 0.85rem; font-weight: 800; background: var(--gold); border-radius: var(--radius); }
+.jh-picker { margin: 0 0 0.6rem; padding: 0.6rem; background: var(--panel-2); border: 1px solid var(--gold-dark); border-radius: var(--radius); }
+.jh-picker-title { margin: 0 0 0.4rem; font-weight: 700; }
+.jh-targets { display: grid; gap: 0.35rem; margin: 0 0 0.5rem; padding: 0; list-style: none; }
+.jh-target { display: flex; align-items: center; gap: 0.5rem; width: 100%; min-height: 2.5rem; padding: 0.35rem 0.7rem; color: var(--text); font-size: 1rem; font-weight: 700; text-align: start; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; }
+.jh-target-dot { flex: none; width: 0.9rem; height: 0.9rem; border-radius: 50%; }
+.jh-target-name { min-width: 0; overflow-wrap: anywhere; }
+#jh-msg, #jh-board-msg, #jh-armed { margin: 0 0 0.6rem; overflow-wrap: anywhere; }
+.jh-hint { margin: 0 0 0.6rem; font-weight: 700; overflow-wrap: anywhere; }
+.jh-pattern { color: var(--gold); font-size: 1.3rem; font-weight: 800; letter-spacing: 0.08em; white-space: pre-wrap; }
+.jh-word { display: inline-block; max-width: 100%; } /* a word stays on one line unless it is wider than the line */
+.jh-frozen { margin: 0 0 0.6rem; padding: 0.45rem 0.7rem; color: var(--bg); font-weight: 800; background: var(--ice); border-radius: var(--radius); overflow-wrap: anywhere; }
+.jb-score-helpers { display: flex; flex: 1 0 100%; gap: 0.25rem; font-size: 0.75rem; font-weight: 800; }
+.jb-score-helper { padding: 0.05rem 0.35rem; background: rgba(255, 255, 255, 0.35); border-radius: 999px; } /* ds-allow-hardcode: as .score-helper on the host */
+.jb-score-helper.is-used { opacity: 0.35; text-decoration: line-through; }
+.jb-score-helper.is-armed { color: var(--bg); background: var(--gold); }
 
 .join-scores-title { margin: 1.1rem 0 0.4rem; color: var(--gold); }
 .join-scores { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 0.4rem; margin: 0; padding: 0; list-style: none; }

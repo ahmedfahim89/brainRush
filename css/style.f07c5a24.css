@@ -13,6 +13,7 @@
   --danger-bg: rgba(255, 107, 107, 0.12);
   --success: #4cd18a;
   --success-bg: rgba(76, 209, 138, 0.12);
+  --blue: #2563eb;      /* Hide Answer button: white text 5.2:1 */
   --heart-on: #ff4d5e;  /* a second chance held: 5.1:1 on --panel, 4.4:1 on the Christmas panel */
   --heart-off: #6c7599; /* not earned yet or used: 3.7:1 on --panel, 3.2:1 on the Christmas panel */
   --radius: 8px;
@@ -951,6 +952,9 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 .score-helper { padding: 0.12rem 0.4rem; background: rgba(255, 255, 255, 0.3); border-radius: 999px; }
 .score-helpers[hidden], .srow-helpers[hidden] { display: none; }
 .score-helper.is-used { opacity: 0.35; text-decoration: line-through; }
+.score-helper.is-armed { color: var(--bg); background: var(--gold); } /* US-66: a x2 armed for the next question */
+.srow-x2 { flex: none; padding: 0 0.35rem; color: var(--bg); font-size: 0.8rem; font-weight: 800; background: var(--gold); border-radius: var(--radius); } /* US-66 */
+.srow-x2[hidden] { display: none; }
 
 /* Question screen (US-11..US-14): question left, scoring right; stacks on narrow screens */
 .question { max-width: 90rem; margin: 0 auto; }
@@ -1173,6 +1177,8 @@ body[data-screen="board"] #screen-board > * { width: 100%; }
 .answer-text:focus { outline: none; }
 #answer-value { white-space: pre-wrap; }
 .answer-text[hidden] { display: none; }
+.btn-hide-answer { margin-top: 0.5rem; background: var(--blue); color: #fff; border-color: var(--blue); font-weight: 600; }
+.btn-hide-answer[hidden] { display: none; }
 .answer-label { display: block; color: var(--muted); font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
 
 .scoring h3 { color: var(--gold); margin-bottom: 0.2rem; }
@@ -2150,11 +2156,16 @@ html[dir="rtl"] .bracket-name { text-align: right; }
 /* game.js (fitAnswersList) caps the height to the room left above Back to Board (D-30); the gutter keeps
    the scrollbar off the times (owner CR 1) */
 .answers-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.15rem; margin: 0; padding: 0; overflow-y: auto; scrollbar-gutter: stable; list-style: none; }
-.answer-row { display: grid; grid-template-columns: minmax(0, 10rem) minmax(0, 1fr) max-content; align-items: baseline; gap: 0.6rem; min-width: 0; padding-inline-end: 0.3rem; }
+.answer-row { display: grid; grid-template-columns: minmax(0, 10rem) minmax(0, 1fr) max-content max-content; align-items: baseline; gap: 0.6rem; min-width: 0; padding-inline-end: 0.3rem; }
 .answer-name { justify-self: start; max-width: 100%; overflow: hidden; padding: 0.05rem 0.45rem; font-size: 0.85rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; border-radius: var(--radius); }
 .answer-said { min-width: 0; overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; } /* full text in the tooltip */
 .answer-time { white-space: nowrap; color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
 .answers-hint { margin: 0; }
+/* US-66: the phone helper tags of a row (froze X, frozen by X, hint, x2); a row with tags but no answer yet */
+.answer-tags { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.25rem; }
+.answer-tag { padding: 0 0.35rem; color: var(--gold); font-size: 0.78rem; font-weight: 700; white-space: nowrap; border: 1px solid var(--gold-dark); border-radius: 999px; }
+.answer-row.is-pending .answer-said { color: var(--muted); font-weight: 400; font-style: italic; }
+.room-player-x2 { flex: none; padding: 0 0.4rem; color: var(--bg); font-size: 0.8rem; font-weight: 800; background: var(--gold); border-radius: var(--radius); }
 .answers-hint[hidden] { display: none; }
 @media (max-width: 480px) {
   .room-qr { width: 9rem; height: 9rem; }
